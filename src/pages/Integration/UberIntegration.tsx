@@ -325,7 +325,6 @@ const UberIntegration: React.FC = () => {
           </div>
         ),
         okText: '关闭',
-        width: 900
       })
     } catch (error: any) {
       console.error('❌ 诊断失败:', error)

@@ -1,0 +1,18 @@
+@import "tailwindcss" layer(booking);
+
+/*
+ * Booking public page styles — scoped under .booking-page
+ * to prevent Tailwind resets from interfering with Ant Design globals.
+ */
+
+@layer booking {
+  .booking-page {
+    --booking-primary: #18181b;
+    --booking-muted: #f4f4f5;
+    --booking-muted-foreground: #71717a;
+    --booking-border: #e4e4e7;
+    --booking-background: #ffffff;
+    --booking-foreground: #09090b;
+    --booking-card: #ffffff;
+  }
+}

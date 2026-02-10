@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 // https://vitejs.dev/config/
 export default defineConfig(function (_a) {
     var mode = _a.mode;
@@ -14,7 +15,7 @@ export default defineConfig(function (_a) {
         VITE_MAPBOX_TOKEN: env.VITE_MAPBOX_TOKEN ? '(exists)' : '(missing)'
     });
     return {
-        plugins: [react()],
+        plugins: [react(), tailwindcss()],
         server: {
             port: 5173,
             open: true,
@@ -103,6 +104,13 @@ export default defineConfig(function (_a) {
                     target: 'http://localhost:3003',
                     changeOrigin: true,
                     secure: false,
+                    ws: true
+                },
+                // Booking Service 代理
+                '/api/booking-service': {
+                    target: 'https://tymoe.com',
+                    changeOrigin: true,
+                    secure: true,
                     ws: true
                 }
             }

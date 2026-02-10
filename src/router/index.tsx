@@ -26,6 +26,11 @@ import { UberIntegration } from '@/pages/Integration'
 import TaxManagement from '@/pages/TaxManagement'
 import UberOrders from '@/pages/UberOrders'
 import PaymentSettings from '@/pages/PaymentSettings'
+import BookingDashboard from '@/pages/BookingManagement/Dashboard'
+import BookingList from '@/pages/BookingManagement/Bookings'
+import BookingResources from '@/pages/BookingManagement/Resources'
+import BookingSettings from '@/pages/BookingManagement/Settings'
+import PublicBookingPage from '@/pages/PublicBooking'
 
 // 辅助函数：为路由元素包装 ErrorBoundary
 const withErrorBoundary = (element: ReactElement): ReactElement => (
@@ -240,7 +245,56 @@ const routes: RouteObject[] = [
         ),
         errorElement: <ErrorPage />
       },
+      {
+        path: 'booking',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <BookingDashboard />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'booking/bookings',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <BookingList />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'booking/resources',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <BookingResources />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'booking/settings',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <BookingSettings />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
     ]
+  },
+  {
+    path: '/public-booking/:orgId',
+    element: <PublicBookingPage />,
+    errorElement: <ErrorPage />
   },
   {
     path: '/login',

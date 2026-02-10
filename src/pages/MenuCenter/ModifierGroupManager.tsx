@@ -833,7 +833,6 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = () => {
                         <InputNumber
                           value={editPrice}
                           placeholder="请输入元为单位的价格"
-                          precision={2}
                           onChange={(newPrice) => setEditingValues(prev => ({ ...prev, [editKey]: newPrice || 0 }))}
                           onBlur={async () => {
                             // 失焦时保存

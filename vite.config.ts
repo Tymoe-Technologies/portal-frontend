@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -16,10 +17,10 @@ export default defineConfig(({ mode }) => {
   })
 
   return {
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
-    open: true,
+    open: false,
     host: true, // 允许外部访问
     allowedHosts: [
       'localhost',
@@ -48,16 +49,16 @@ export default defineConfig(({ mode }) => {
       },
       // Auth Service 代理 - 处理所有认证相关请求
       '/api/auth-service': {
-        target: 'https://tymoe.com',
+        target: 'http://localhost:8090',
         changeOrigin: true,
-        secure: true,
+        secure: false,
         ws: true,
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {
             console.log('🔄 Auth API Request:', req.method, req.url);
             // 修改 Origin 头部以通过 CORS 检查
-            proxyReq.setHeader('origin', 'https://tymoe.com');
-            proxyReq.setHeader('referer', 'https://tymoe.com/');
+            proxyReq.setHeader('origin', 'http://localhost:8090');
+            proxyReq.setHeader('referer', 'http://localhost:8090/');
 
             // 对于注册和登录请求，强制移除 Cookie 头部
             if (req.url?.includes('/identity/register') || req.url?.includes('/identity/login')) {
@@ -76,9 +77,9 @@ export default defineConfig(({ mode }) => {
       },
       // OAuth代理
       '/oauth': {
-        target: 'https://tymoe.com',
+        target: 'http://localhost:8090',
         changeOrigin: true,
-        secure: true,
+        secure: false,
         ws: true,
         configure: (proxy, options) => {
           proxy.on('error', (err, req, res) => {
@@ -86,11 +87,11 @@ export default defineConfig(({ mode }) => {
           });
           proxy.on('proxyReq', (proxyReq, req, res) => {
             console.log('🔄 Sending OAuth Request to Target:', req.method, req.url);
-            console.log('🎯 Target URL:', `https://tymoe.com${req.url}`);
+            console.log('🎯 Target URL:', `http://localhost:8090${req.url}`);
 
             // 修改 Origin 头部以通过 CORS 检查
-            proxyReq.setHeader('origin', 'https://tymoe.com');
-            proxyReq.setHeader('referer', 'https://tymoe.com/');
+            proxyReq.setHeader('origin', 'http://localhost:8090');
+            proxyReq.setHeader('referer', 'http://localhost:8090/');
 
             console.log('📋 OAuth Request Headers:', proxyReq.getHeaders());
           });
@@ -105,6 +106,13 @@ export default defineConfig(({ mode }) => {
       // Finance Service 代理 - 支付相关API
       '/api/finance': {
         target: 'http://localhost:3003',
+        changeOrigin: true,
+        secure: false,
+        ws: true
+      },
+      // Booking Service 代理
+      '/api/booking-service': {
+        target: 'http://localhost:8082',
         changeOrigin: true,
         secure: false,
         ws: true

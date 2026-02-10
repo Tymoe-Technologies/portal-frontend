@@ -1,7 +1,7 @@
 import React from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, theme, Select, Space, Dropdown, Avatar, Typography } from 'antd'
-import { DashboardOutlined, AppstoreOutlined, UserOutlined, LogoutOutlined, SettingOutlined, ShopOutlined, TeamOutlined, MobileOutlined, PrinterOutlined, StarOutlined, ShoppingCartOutlined, DollarOutlined, CreditCardOutlined } from '@ant-design/icons'
+import { DashboardOutlined, AppstoreOutlined, UserOutlined, LogoutOutlined, SettingOutlined, ShopOutlined, TeamOutlined, MobileOutlined, PrinterOutlined, StarOutlined, ShoppingCartOutlined, DollarOutlined, CreditCardOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '../auth/AuthProvider'
 import uberLogo from '../../uber_eats_logo.svg'
@@ -38,8 +38,10 @@ const BaseLayout: React.FC = () => {
       '/uber-orders': '/uber-orders',
       // 支付相关页面
       '/payment-settings': '/payment-settings',
-      // 其他功能可在此添加
-      // '/feature-module/sub-page': '/feature-module'
+      // 预约管理子页面 — map to exact child key for sub-menu highlighting
+      '/booking/bookings': '/booking/bookings',
+      '/booking/resources': '/booking/resources',
+      '/booking/settings': '/booking/settings',
     }
 
     // 如果当前路径在映射中，返回父路由key
@@ -134,6 +136,7 @@ const BaseLayout: React.FC = () => {
           theme="light"
           mode="inline"
           selectedKeys={selectedKeys}
+          defaultOpenKeys={pathname.startsWith('/booking') ? ['/booking'] : []}
           items={[
             {
               key: '/dashboard',
@@ -188,6 +191,33 @@ const BaseLayout: React.FC = () => {
               icon: <CreditCardOutlined />,
               label: <Link to="/payment-settings">支付方式设置</Link>,
               onClick: () => navigate('/payment-settings')
+            },
+            {
+              key: '/booking',
+              icon: <CalendarOutlined />,
+              label: t('nav.booking'),
+              children: [
+                {
+                  key: '/booking',
+                  label: <Link to="/booking">{t('pages.booking.dashboard.title')}</Link>,
+                  onClick: () => navigate('/booking'),
+                },
+                {
+                  key: '/booking/bookings',
+                  label: <Link to="/booking/bookings">{t('pages.booking.bookings.title')}</Link>,
+                  onClick: () => navigate('/booking/bookings'),
+                },
+                {
+                  key: '/booking/resources',
+                  label: <Link to="/booking/resources">{t('pages.booking.resources.title')}</Link>,
+                  onClick: () => navigate('/booking/resources'),
+                },
+                {
+                  key: '/booking/settings',
+                  label: <Link to="/booking/settings">{t('pages.booking.settings.title')}</Link>,
+                  onClick: () => navigate('/booking/settings'),
+                },
+              ],
             },
             {
               key: '/features',

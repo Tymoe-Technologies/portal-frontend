@@ -47,18 +47,15 @@ export default defineConfig(({ mode }) => {
           });
         }
       },
-      // Auth Service 代理 - 处理所有认证相关请求
+      // Auth Service 代理 - 直连（auth-service 自身处理鉴权）
       '/api/auth-service': {
-        target: 'http://localhost:8090',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
         ws: true,
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {
             console.log('🔄 Auth API Request:', req.method, req.url);
-            // 修改 Origin 头部以通过 CORS 检查
-            proxyReq.setHeader('origin', 'http://localhost:8090');
-            proxyReq.setHeader('referer', 'http://localhost:8090/');
 
             // 对于注册和登录请求，强制移除 Cookie 头部
             if (req.url?.includes('/identity/register') || req.url?.includes('/identity/login')) {
@@ -75,9 +72,9 @@ export default defineConfig(({ mode }) => {
           });
         }
       },
-      // OAuth代理
+      // OAuth代理 - 直连
       '/oauth': {
-        target: 'http://localhost:8090',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
         ws: true,
@@ -87,13 +84,6 @@ export default defineConfig(({ mode }) => {
           });
           proxy.on('proxyReq', (proxyReq, req, res) => {
             console.log('🔄 Sending OAuth Request to Target:', req.method, req.url);
-            console.log('🎯 Target URL:', `http://localhost:8090${req.url}`);
-
-            // 修改 Origin 头部以通过 CORS 检查
-            proxyReq.setHeader('origin', 'http://localhost:8090');
-            proxyReq.setHeader('referer', 'http://localhost:8090/');
-
-            console.log('📋 OAuth Request Headers:', proxyReq.getHeaders());
           });
           proxy.on('proxyRes', (proxyRes, req, res) => {
             console.log('✅ Received OAuth Response:', proxyRes.statusCode, req.url);
@@ -110,9 +100,9 @@ export default defineConfig(({ mode }) => {
         secure: false,
         ws: true
       },
-      // Booking Service 代理
+      // Booking Service 代理 - 通过 Traefik 网关
       '/api/booking-service': {
-        target: 'http://localhost:8082',
+        target: 'http://localhost:9080',
         changeOrigin: true,
         secure: false,
         ws: true

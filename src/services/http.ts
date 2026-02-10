@@ -51,7 +51,8 @@ class HttpService {
               config.url.includes('/api/order') ||
               config.url.includes('/api/finance') ||
               config.url.includes('/menu-center') ||
-              config.url.includes('/api/booking-service')
+              config.url.includes('/api/booking-service') ||
+              config.url.includes('/api/subscription-service')
             )
 
             // 排除不需要组织上下文的请求（认证、注册等）
@@ -70,8 +71,8 @@ class HttpService {
               if (config.url?.includes('/api/finance')) {
                 config.headers['x-tenant-id'] = organizationId
               }
-              // Booking Service 使用 X-Org-Id
-              if (config.url?.includes('/api/booking-service')) {
+              // Booking Service 和 Subscription Service 使用 X-Org-Id
+              if (config.url?.includes('/api/booking-service') || config.url?.includes('/api/subscription-service')) {
                 config.headers['X-Org-Id'] = organizationId
               }
             }

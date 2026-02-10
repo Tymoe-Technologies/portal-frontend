@@ -1,7 +1,7 @@
 import React from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, theme, Select, Space, Dropdown, Avatar, Typography } from 'antd'
-import { DashboardOutlined, AppstoreOutlined, UserOutlined, LogoutOutlined, SettingOutlined, ShopOutlined, TeamOutlined, MobileOutlined, PrinterOutlined, StarOutlined, ShoppingCartOutlined, DollarOutlined, CreditCardOutlined, CalendarOutlined } from '@ant-design/icons'
+import { DashboardOutlined, AppstoreOutlined, UserOutlined, LogoutOutlined, SettingOutlined, ShopOutlined, TeamOutlined, MobileOutlined, PrinterOutlined, StarOutlined, ShoppingCartOutlined, DollarOutlined, CreditCardOutlined, CalendarOutlined, WalletOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '../auth/AuthProvider'
 import uberLogo from '../../uber_eats_logo.svg'
@@ -218,6 +218,12 @@ const BaseLayout: React.FC = () => {
                   onClick: () => navigate('/booking/settings'),
                 },
               ],
+            },
+            {
+              key: '/subscription',
+              icon: <WalletOutlined />,
+              label: <Link to="/subscription">{t('nav.subscription')}</Link>,
+              onClick: () => navigate('/subscription')
             },
             {
               key: '/features',

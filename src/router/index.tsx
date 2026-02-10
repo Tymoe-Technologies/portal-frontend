@@ -31,6 +31,7 @@ import BookingList from '@/pages/BookingManagement/Bookings'
 import BookingResources from '@/pages/BookingManagement/Resources'
 import BookingSettings from '@/pages/BookingManagement/Settings'
 import PublicBookingPage from '@/pages/PublicBooking'
+import SubscriptionManagement from '@/pages/SubscriptionManagement'
 
 // 辅助函数：为路由元素包装 ErrorBoundary
 const withErrorBoundary = (element: ReactElement): ReactElement => (
@@ -284,6 +285,17 @@ const routes: RouteObject[] = [
           <RequireAuth>
             <RequireOrganization>
               <BookingSettings />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'subscription',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <SubscriptionManagement />
             </RequireOrganization>
           </RequireAuth>
         ),

@@ -106,6 +106,13 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
         ws: true
+      },
+      // Subscription Service 代理 - 通过 Traefik 网关
+      '/api/subscription-service': {
+        target: 'http://localhost:9080',
+        changeOrigin: true,
+        secure: false,
+        ws: true
       }
     }
   },

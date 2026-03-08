@@ -57,15 +57,31 @@ export default function SubscriptionManagement() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const status = params.get('status')
-    if (status === 'success') {
-      message.success(t('pages.subscription.paymentSuccess'))
-    } else if (status === 'canceled') {
-      message.warning(t('pages.subscription.paymentCanceled'))
-    }
     if (status) {
       window.history.replaceState({}, '', window.location.pathname)
     }
-  }, [t])
+    if (status === 'success') {
+      message.success(t('pages.subscription.paymentSuccess'))
+      // 轮询等待 webhook 处理完成后订阅状态更新，最多重试 6 次（约 12 秒）
+      let attempts = 0
+      const poll = setInterval(async () => {
+        attempts++
+        try {
+          const query = await subscriptionApi.getSubscriptionQuery(orgId)
+          // 状态变为活跃时停止轮询并更新页面
+          if (query.subscription.status === 'active' || query.subscription.status === 'trialing') {
+            clearInterval(poll)
+            setQueryResult(query)
+          }
+        } catch {
+          // 轮询失败静默处理，不影响页面
+        }
+        if (attempts >= 6) clearInterval(poll)
+      }, 2000)
+    } else if (status === 'canceled') {
+      message.warning(t('pages.subscription.paymentCanceled'))
+    }
+  }, [t, orgId])
 
   useEffect(() => {
     loadData()

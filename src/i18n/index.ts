@@ -3,8 +3,9 @@ import { initReactI18next } from 'react-i18next'
 import en from './locales/en'
 import zhCN from './locales/zh-CN'
 import zhTW from './locales/zh-TW'
+import fr from './locales/fr'
 
-const resources = { en, 'zh-CN': zhCN, 'zh-TW': zhTW }
+const resources = { en, 'zh-CN': zhCN, 'zh-TW': zhTW, fr }
 const STORAGE_KEY = 'app.lng'
 const fallbackLng = 'en'
 

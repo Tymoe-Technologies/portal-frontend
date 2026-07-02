@@ -22,22 +22,48 @@ const en = {
       no: 'No',
       total: 'Total',
       items: 'items',
-      refresh: 'Refresh'
+      refresh: 'Refresh',
+      copied: 'Copied',
+      copy: 'Copy',
+      show: 'Show',
+      hide: 'Hide',
+      on: 'On',
+      off: 'Off',
+      invalidEmail: 'Please enter a valid email',
     },
     nav: {
-    dashboard: 'Dashboard',
-    menuCenter: 'Menu Center',
-    organizations: 'Organizations',
-    accounts: 'Accounts',
-    devices: 'Devices',
-    receiptTemplate: 'Receipt Templates',
-    features: 'Features',
-    recipeGuide: 'Recipe Guide',
-    orderConfig: 'Order Configuration',
-    paymentSettings: 'Payment Settings',
-    booking: 'Booking',
-    subscription: 'Subscription',
-  },
+      dashboard: 'Dashboard',
+      features: 'Features',
+      recipeGuide: 'Recipe Guide',
+      // Group labels
+      groupMenu: 'Products',
+      groupOrder: 'Orders & Delivery',
+      groupStore: 'Store Operations',
+      groupOrg: 'Organization & People',
+      groupSystem: 'System',
+      // Menu Management
+      menuCenter: 'Item',
+      multiMenu: 'Menu',
+      taxManagement: 'Tax',
+      // Orders & Delivery
+      orderConfig: 'Order Configuration',
+      onlineOrderConfig: 'Online Order Config',
+directDelivery: 'Direct Delivery',
+      uberIntegration: 'Uber Integration',
+      // Store Operations
+      paymentSettings: 'Payment Settings',
+      giftCardSettings: 'Gift Cards',
+      printSettings: 'Print Settings',
+      booking: 'Booking',
+      // Organization & People
+      organizations: 'Organizations',
+      accounts: 'Accounts',
+      devices: 'Devices',
+      memberManagement: 'Member Management',
+      // System
+      subscription: 'Subscription',
+      receiptTemplate: 'Receipt Templates',
+    },
     organization: {
       title: 'Organization Management',
       create: 'Create Organization',
@@ -124,8 +150,8 @@ const en = {
       deleteWarning: 'This action cannot be undone',
       
       // Address confirmation
-      addressSelected: 'Selected address: {address}',
-      coordinates: 'Coordinates: {lat}, {lon}'
+      addressSelected: 'Selected address: {{address}}',
+      coordinates: 'Coordinates: {{lat}}, {{lon}}'
     },
     auth: {
       login: {
@@ -214,8 +240,8 @@ const en = {
         recipeGuideDesc: 'Generate standardized recipe guide codes that can be printed on product labels to streamline staff workflows, effectively reduce training costs, and consistently enhance product quality'
       },
       menuCenter: {
-        title: 'Menu Center',
-        desc: 'Manage menu items, attributes, modifiers and combos',
+        title: 'Item Center',
+        desc: 'Manage items, attributes, modifiers and combos',
         loadingCategories: 'Loading categories...',
         loadingItems: 'Loading items...',
         loadingAttributes: 'Loading attributes...',
@@ -359,7 +385,7 @@ const en = {
         createAttributeOptionSuccess: 'Attribute option created successfully',
         updateAttributeOptionFailed: 'Failed to update attribute option',
         createAttributeOptionFailed: 'Failed to create attribute option',
-        loginRequired: 'Please login to use menu center features',
+        loginRequired: 'Please login to use item center features',
         // Attribute Type Management
         attributeTypeManagement: 'Attribute Management',
         createAttributeType: 'Create Attribute',
@@ -455,13 +481,19 @@ const en = {
         discount: 'Discount',
         finalPrice: 'Final Price',
         // Tab labels
-        menuManagement: 'Menu Management',
-        itemList: 'Menu Items',
+        menuManagement: 'Item Management',
+        itemList: 'Item List',
         attributeManagement: 'Attribute Management',
         comboManagement: 'Combo Management',
         // Pagination
         total: 'Total',
         items: 'items'
+      },
+      multiMenu: {
+        title: 'Menu',
+        subtitle: 'Configure multiple menus for your store. Each menu activates by time schedule, and multiple menus can be active simultaneously.',
+        hintEmpty: 'No menus configured. POS and online ordering will display items directly based on the Item Center settings.',
+        hintActive: '{{count}} menu(s) configured. When menus exist, the ordering interface shows menus matching the current time; falls back to all items if no schedule matches.',
       },
       profile: {
         title: 'Profile',
@@ -492,36 +524,52 @@ const en = {
         create: 'Create Account',
         edit: 'Edit Account',
         delete: 'Delete Account',
-        search: 'Search employee number or username...',
+        search: 'Search name, staff code or username...',
         refresh: 'Refresh',
-        
+
         // Table columns
-        username: 'Username',
+        name: 'Name',
+        username: 'Login Name',
         accountType: 'Account Type',
         productType: 'Product Type',
-        employeeNumber: 'Employee Number',
+        accountCode: 'Account Code',
+        email: 'Email',
+        phone: 'Phone',
         pinCode: 'PIN Code',
         status: 'Status',
         lastLoginAt: 'Last Login',
         createdAt: 'Created At',
         actions: 'Actions',
         orgName: 'Organization',
-        
+
         // Account types
         typeOwner: 'Owner',
         typeManager: 'Manager',
         typeStaff: 'Staff',
-        
+
         // Product types
-        productBeauty: 'Beauty',
-        productFb: 'F&B',
-        
+        product_beauty_salon: 'Beauty Salon',
+        product_hair_salon: 'Hair Salon',
+        product_spa: 'Spa',
+        product_restaurant: 'Restaurant',
+        product_fast_food: 'Fast Food',
+        product_cafe: 'Cafe',
+        product_beverage: 'Beverage',
+        product_home_studio: 'Home Studio',
+        product_fitness: 'Fitness',
+        product_yoga_studio: 'Yoga Studio',
+        product_retail: 'Retail',
+        product_chinese_restaurant: 'Chinese Restaurant',
+        product_clinic: 'Clinic',
+        product_liquor_store: 'Liquor Store',
+        product_other: 'Other',
+
         // Status
         statusActive: 'Active',
         statusSuspended: 'Suspended',
         statusDeleted: 'Deleted',
         statusAll: 'All',
-        
+
         // Form
         selectOrg: 'Select Organization',
         selectOrgPlaceholder: 'Please select organization',
@@ -529,45 +577,37 @@ const en = {
         selectAccountType: 'Account Type',
         selectAccountTypePlaceholder: 'Please select account type',
         accountTypeRequired: 'Please select account type',
-        selectProductType: 'Product Type',
-        selectProductTypePlaceholder: 'Please select product type',
-        productTypeRequired: 'Please select product type',
-        usernamePlaceholder: 'Enter username (4-50 characters)',
-        usernameRequired: 'Please enter username',
-        usernameLength: 'Username must be 4-50 characters',
-        usernameNoAt: 'Username cannot contain @ symbol',
-        passwordPlaceholder: 'Enter password (at least 8 characters)',
-        passwordRequired: 'Please enter password',
-        passwordMinLength: 'Password must be at least 8 characters',
-        passwordPattern: 'Password must contain uppercase, lowercase letters and numbers',
-        employeeNumberPlaceholder: 'Enter employee number',
-        employeeNumberRequired: 'Please enter employee number',
-        pinCodePlaceholder: 'Enter 4-digit PIN code',
-        pinCodeRequired: 'Please enter PIN code',
-        pinCodeLength: 'PIN code must be 4 digits',
-        pinCodePattern: 'PIN code can only contain numbers',
-        
-        // Tooltips
-        usernameTooltip: 'Required for OWNER/MANAGER, globally unique, 4-50 characters, cannot contain @ symbol',
-        passwordTooltip: 'Required for OWNER/MANAGER, at least 8 characters, must contain uppercase, lowercase letters and numbers',
-        employeeNumberTooltip: 'Employee number, unique within organization',
-        pinCodeTooltip: '4-digit number, unique within organization, will not be displayed after creation',
-        pinCodeWarning: 'Please save the PIN code, it will not be displayed again after creation',
-        
+        namePlaceholder: 'Enter full name',
+        nameRequired: 'Please enter name',
+        usernamePlaceholder: 'Enter login name (4-50 characters, no @)',
+        usernameRequired: 'Please enter login name',
+        usernameLength: 'Login name must be 4-50 characters',
+        usernameNoAt: 'Login name cannot contain @ symbol',
+        password: 'Password',
+        passwordAutoTooltip: 'Password is auto-generated. Please copy and save it before closing.',
+        passwordWarning: 'Please save this password, it will not be shown again after creation',
+        emailPlaceholder: 'Enter email address',
+        emailRequired: 'Owner/Manager must provide an email. Credentials will be sent there.',
+        emailInvalid: 'Please enter a valid email address',
+        emailTooltipRequired: 'Required. Login name, password and PIN will be sent to this email.',
+        emailTooltip: 'Optional. PIN code will be sent to this email.',
+        phonePlaceholder: 'Enter phone number (optional)',
+
         // Permission descriptions
         permissionTitle: 'Permission Rules',
         permissionUser: 'User: Main/Branch stores can create MANAGER/STAFF, Franchise stores can only create OWNER (limited to 1)',
         permissionOwner: 'OWNER: Can only create MANAGER and STAFF',
         permissionManager: 'MANAGER: Can only create STAFF',
         permissionStaff: 'STAFF: No permissions',
-        
+
         // Buttons
         cancel: 'Cancel',
         save: 'Save',
         confirm: 'Confirm',
-        
+
         // Messages
         createSuccess: 'Account created successfully',
+        createSuccessWithEmail: 'Account created. Credentials sent to {{email}}.',
         updateSuccess: 'Account updated successfully',
         deleteSuccess: 'Account deleted successfully',
         loadSuccess: 'Loaded {{count}} accounts',
@@ -575,30 +615,30 @@ const en = {
         updateFailed: 'Failed to update account',
         deleteFailed: 'Failed to delete account',
         loadFailed: 'Failed to load accounts',
-        
+
         // Delete confirmation
         deleteConfirm: 'Are you sure you want to delete this account?',
         deleteWarning: 'This action cannot be undone',
         deleteCascadeWarning: 'Deleting OWNER will cascade delete all MANAGER and STAFF in this organization',
         deletedCount: 'Deleted {{count}} accounts',
-        
+
         // Empty state
         emptyTitle: 'No Accounts',
-        emptyDescription: 'No accounts have been created for this organization yet. Please create an account first.',
+        emptyDescription: 'No accounts have been created for this organization yet.',
         emptyButton: 'Create First Account',
-        
+
         // No results state
         noResultsTitle: 'No Accounts Found',
         noResultsDescription: 'No accounts match your current filter criteria. Try adjusting your filters.',
         clearFilters: 'Clear Filters',
-        
+
         // Error messages
         cannotCreateOwner: 'Main and Branch stores cannot create OWNER accounts',
         canOnlyCreateOwner: 'Franchise stores can only create OWNER accounts',
         canOnlyCreateStaff: 'MANAGER can only create STAFF accounts',
         ownerAlreadyExists: 'This franchise organization already has an OWNER account',
-        employeeNumberExists: 'This employee number already exists',
-        usernameExists: 'This username is already taken',
+        accountCodeExists: 'This account code already exists',
+        usernameExists: 'This login name is already taken',
         pinCodeExists: 'This PIN code is already taken',
         cannotDeleteSelf: 'You cannot delete your own account',
         insufficientPermissions: 'Insufficient permissions'
@@ -629,6 +669,7 @@ const en = {
         typePos: 'POS',
         typeKiosk: 'KIOSK',
         typeTablet: 'TABLET',
+        typeDisplay: 'Display',
         statusPending: 'Pending',
         statusActive: 'Active',
         statusDeleted: 'Deleted',
@@ -651,7 +692,7 @@ const en = {
         currentActivationCodeRequired: 'Please enter current activation code',
         newDeviceName: 'New Device Name',
         newDeviceNamePlaceholder: 'Enter new device name (optional)',
-        deviceTypeTooltip: 'POS: Point of Sale | KIOSK: Self-Service | TABLET: Mobile Device',
+        deviceTypeTooltip: 'POS: Point of Sale | KIOSK: Self-Service | TABLET: Mobile Device | DISPLAY: Queue Display',
         activationCodeTooltip: '9-character uppercase alphanumeric, auto-generated',
         deviceIdTooltip: '9-character lowercase alphanumeric, auto-generated',
         activationWarning: 'Please save both Device ID and Activation Code. Both are required for activation.',
@@ -881,6 +922,7 @@ const en = {
         
         // Tabs
         recipeManagement: 'Recipe Management',
+        modifierPrintCodeManagement: 'Custom Option Print Codes',
         stepTypeManagement: 'Step Types',
         
         // Usage Guide
@@ -1144,15 +1186,15 @@ const en = {
       },
       orderConfig: {
         title: 'Order Configuration',
-        description: 'Configure order channels and settings for your organization',
+        description: 'Configure sales channels and settings for your organization',
 
         // Channel management module
-        channelManagementTitle: 'Channel Management',
-        channelManagementDesc: 'Manage order channels for your organization, supporting both system preset and custom channels',
+        channelManagementTitle: 'Sales Channel Management',
+        channelManagementDesc: 'Manage sales channels for your organization, supporting both system preset and custom channels',
 
-        createSource: 'Create Order Channel',
-        editSource: 'Edit Order Channel',
-        deleteConfirm: 'Are you sure you want to delete this order channel?',
+        createSource: 'Create Sales Channel',
+        editSource: 'Edit Sales Channel',
+        deleteConfirm: 'Are you sure you want to delete this sales channel?',
         deleteWarning: 'This action cannot be undone',
 
         // Table columns
@@ -1184,13 +1226,13 @@ const en = {
         selectOrgRequired: 'Please select an organization first',
 
         // Messages
-        createSuccess: 'Order channel created successfully',
-        updateSuccess: 'Order channel updated successfully',
-        deleteSuccess: 'Order channel deleted successfully',
-        createFailed: 'Failed to create order channel',
-        updateFailed: 'Failed to update order channel',
-        deleteFailed: 'Failed to delete order channel',
-        loadFailed: 'Failed to load order channels',
+        createSuccess: 'Sales Channel created successfully',
+        updateSuccess: 'Sales Channel updated successfully',
+        deleteSuccess: 'Sales Channel deleted successfully',
+        createFailed: 'Failed to create sales channel',
+        updateFailed: 'Failed to update sales channel',
+        deleteFailed: 'Failed to delete sales channel',
+        loadFailed: 'Failed to load sales channels',
 
         // Actions
         edit: 'Edit',
@@ -1201,7 +1243,7 @@ const en = {
         managePricing: 'Manage Pricing',
 
         // Empty state
-        empty: 'No order channels yet',
+        empty: 'No sales channels yet',
 
         // System preset tag
         systemPreset: 'System Preset',
@@ -1213,13 +1255,13 @@ const en = {
 
         // Pricing management module
         pricingManagementTitle: 'Pricing Management',
-        pricingManagementDesc: 'Set differentiated pricing for different order channels',
+        pricingManagementDesc: 'Set differentiated pricing for different sales channels',
         pricingManagement: 'Channel Pricing Management',
-        selectChannel: 'Select Order Channel',
-        selectChannelPlaceholder: 'Please select an order channel',
-        selectChannelFirst: 'Please select an order channel first',
+        selectChannel: 'Select Sales Channel',
+        selectChannelPlaceholder: 'Please select an sales channel',
+        selectChannelFirst: 'Please select an sales channel first',
         selectedChannel: 'Current Selected Channel',
-        loadChannelsFailed: 'Failed to load order channels',
+        loadChannelsFailed: 'Failed to load sales channels',
         loadPricesFailed: 'Failed to load pricing configuration',
 
         // Pricing item management
@@ -1604,8 +1646,109 @@ const en = {
         editMenu: 'Edit Menu',
         editMenuInfo: 'Edit Menu Information',
         newMenu: 'New Menu'
-      }
-    }
+      },
+    },
+    giftCard: {
+      title: 'Gift Cards',
+      subtitle: 'Allow customers to purchase and redeem gift cards',
+      mainStoreOnly: 'Main Store Only',
+      mainStoreOnlyDesc: 'Gift card settings can only be managed by the main store account.',
+      loadError: 'Failed to load gift card config',
+      saveError: 'Failed to save gift card config',
+      enabled: 'Gift cards enabled',
+      disabled: 'Gift cards disabled',
+      denominations: 'Preset Denominations',
+      denominationsHint: 'Customers can select from these amounts when purchasing a gift card. Leave empty to allow custom amounts.',
+      denominationsSaved: 'Denominations saved',
+      noDenominations: 'No preset denominations. Customers can enter any amount.',
+      suggestedDenominations: 'Quick add:',
+      customDenomination: 'Custom amount',
+      addDenomination: 'Add',
+      cardImage: 'Card Design',
+      cardImageHint: 'This image appears in gift card emails and on the member portal.',
+      uploadImage: 'Upload Image',
+      uploadComingSoon: 'Image upload coming soon',
+      issue: 'Issue',
+      issueNew: 'Issue Gift Card',
+      issueHint: 'Manually issue a gift card and record the card number and PIN for the customer.',
+      issueSuccess: 'Gift Card Issued',
+      issueError: 'Failed to issue gift card',
+      pinWarning: 'Save the PIN now — it will not be shown again after you close this panel.',
+      pinOnceHint: 'The PIN is only shown once after issuance. Keep it safe.',
+      cardNumber: 'Card Number',
+      balance: 'Balance',
+      initialBalance: 'Initial Balance',
+      balanceRequired: 'Please enter an initial balance',
+      selectBalance: 'Select a denomination',
+      customAmount: 'Custom amount...',
+      recipientEmail: 'Recipient Email (optional)',
+      note: 'Internal Note (optional)',
+      notePlaceholder: 'e.g. Issued for loyalty reward',
+      imageUploaded: 'Card image updated',
+      imageDeleted: 'Card image removed',
+    },
+    onlineOrder: {
+      title: 'Online Order Settings',
+      mainStoreHint: 'The main store can configure the full online ordering experience',
+      badges: { main: 'Main Store', branch: 'Branch', franchise: 'Franchise' },
+      stripeWarning: {
+        title: 'Payment account not configured',
+        descBranch: 'This branch has not linked the main store\'s payment account. Online ordering cannot be enabled. Please go to Payment Settings to complete the setup.',
+        descMain: 'Stripe Connect setup is incomplete. Online ordering cannot be enabled until you complete the Stripe onboarding in Payment Settings.',
+        action: 'Go to settings',
+      },
+      urlLabel: 'Online order URL',
+      basic: {
+        title: 'General',
+        enableLabel: 'Enable online ordering',
+        enabledHint: 'Customers can place orders through the online store',
+        disabledHint: 'Online ordering is currently disabled',
+        subdomainLabel: 'Subdomain',
+        subdomainInherited: 'Subdomain (inherited from main store)',
+        subdomainHint: 'The subdomain used to access your online store — globally unique',
+        subdomainPlaceholder: 'mcdonald',
+        subdomainNoParent: 'Main store has not set a subdomain',
+      },
+      orderType: {
+        title: 'Order types',
+        allowPickup: 'Allow pickup',
+        scheduleTitle: 'Scheduled pickup settings',
+        allowSchedule: 'Allow customers to schedule a pickup time',
+        leadMinutes: 'Minimum lead time',
+        leadMinutesHint: 'How far in advance customers must place pickup orders',
+        slotInterval: 'Time slot interval',
+        advanceDays: 'Advance booking days',
+        advanceDaysHint: '0 = today only, 1 = today + tomorrow',
+        allowDelivery: 'Allow delivery',
+        deliveryConfig: 'Delivery settings',
+        deliveryIncomplete: 'Delivery setup is incomplete. Please finish configuring before enabling delivery.',
+        minutes: 'min',
+        days: 'days',
+        min15: '15 minutes',
+        min30: '30 minutes',
+        min60: '60 minutes',
+      },
+      hours: {
+        title: 'Business hours',
+        migratedTitle: 'Business hours have moved to Organization Settings',
+        migratedDesc: 'Go to Organization Settings to configure your store hours. Online ordering will automatically use those hours.',
+        goSetup: 'Go to settings',
+      },
+      save: 'Save settings',
+      loadError: 'Failed to load settings. Please try again.',
+      selectOrgError: 'Please select an organization first',
+      saveSuccess: 'Settings updated',
+      createSuccess: 'Settings saved',
+      saveFailed: 'Failed to save',
+      subdomainTaken: 'This subdomain is already taken by another store',
+      subdomainInvalid: 'Invalid subdomain format',
+      subdomainSaved: 'Subdomain saved',
+      subdomainSaveFailed: 'Failed to save subdomain',
+      parentNotEnabled: 'The main store has not enabled online ordering',
+      stripeBlockBranch: 'This branch has not linked a payment account. Go to Payment Settings and click "Link main store account".',
+      stripeBlockMain: 'Stripe Connect setup is incomplete. Go to Payment Settings to finish the Stripe onboarding.',
+    },
+
   }
 }
 

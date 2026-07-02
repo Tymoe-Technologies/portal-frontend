@@ -17,20 +17,47 @@ const zhTW = {
       loading: '加載中...',
       noData: '暫無數據',
       yes: '是',
-      no: '否'
+      no: '否',
+      copy: '複製',
+      copied: '已複製',
+      show: '顯示',
+      hide: '隱藏',
+      on: '開',
+      off: '關',
+      invalidEmail: '請輸入有效的電郵地址',
     },
     nav: {
       dashboard: '儀表板',
-      menuCenter: '選單中心',
+      features: '特色功能',
+      recipeGuide: '製作指引',
+      // 分組標籤
+      groupMenu: '商品管理',
+      groupOrder: '訂單與配送',
+      groupStore: '店鋪運營',
+      groupOrg: '組織與人員',
+      groupSystem: '系統',
+      // 選單管理
+      menuCenter: '商品',
+      multiMenu: '菜單',
+      taxManagement: '稅務',
+      // 訂單與配送
+      orderConfig: '訂單配置',
+      onlineOrderConfig: '線上點餐配置',
+directDelivery: '自配送',
+      uberIntegration: 'Uber 集成',
+      // 店鋪運營
+      paymentSettings: '支付設置',
+      giftCardSettings: '禮品卡',
+      printSettings: '打印設置',
+      booking: '預約管理',
+      // 組織與人員
       organizations: '組織管理',
       accounts: '賬號管理',
       devices: '設備管理',
-      receiptTemplate: '小票模板',
-      features: '特色功能',
-      recipeGuide: '製作指引',
-      orderConfig: '訂單配置',
-      booking: '預約管理',
+      memberManagement: '會員管理',
+      // 系統
       subscription: '訂閱管理',
+      receiptTemplate: '小票模板',
     },
     organization: {
       title: '組織管理',
@@ -118,8 +145,8 @@ const zhTW = {
       deleteWarning: '此操作不可恢復',
       
       // 地址確認
-      addressSelected: '已選擇地址: {address}',
-      coordinates: '坐標: {lat}, {lon}'
+      addressSelected: '已選擇地址: {{address}}',
+      coordinates: '坐標: {{lat}}, {{lon}}'
     },
     auth: {
       login: {
@@ -208,13 +235,13 @@ const zhTW = {
         recipeGuideDesc: '為組織生成標準化產品製作指引碼,可打印在產品標籤上,規範員工操作流程,有效降低培訓成本,持續提升產品品質'
       },
       menuCenter: {
-        title: '菜單中心',
-        desc: '統一管理菜品、屬性、加料與套餐',
+        title: '商品中心',
+        desc: '統一管理商品、屬性、加料與套餐',
         loadingCategories: '加載分類中...',
         loadingItems: '加載商品中...',
         loadingAttributes: '加載屬性中...',
         categoriesTitle: '分類',
-        itemsTitle: '菜品列表',
+        itemsTitle: '商品列表',
         categoryName: '分類名稱',
         addCategory: '建立分類',
         createCategory: '創建分類',
@@ -238,7 +265,7 @@ const zhTW = {
         // 商品管理
         createItem: '創建商品',
         editItem: '編輯商品',
-        itemName: '菜品名稱',
+        itemName: '商品名稱',
         itemNameLabel: '商品名稱',
         itemNamePlaceholder: '請輸入商品名稱',
         itemNameRequired: '請輸入商品名稱',
@@ -258,8 +285,8 @@ const zhTW = {
         basicInfo: '基本信息',
         itemBasicInfo: '商品基本信息',
         price: '價格',
-        addItem: '建立菜品',
-        emptyItems: '當前分類下暫無菜品',
+        addItem: '建立商品',
+        emptyItems: '當前分類下暫無商品',
         // 屬性配置
         attributeConfig: '屬性配置',
         itemAttributeConfig: '商品屬性配置',
@@ -392,7 +419,7 @@ const zhTW = {
         inactive: '停用',
         enabled: '已啟用',
         disabled: '已停用',
-        // 菜品詳情
+        // 商品詳情
         salePrice: '售價',
         deleteModifierConfirm: '確定要刪除這個加料嗎？',
         name: '名稱',
@@ -425,7 +452,7 @@ const zhTW = {
         createAttributeOptionSuccess: '屬性選項創建成功',
         updateAttributeOptionFailed: '更新屬性選項失敗',
         createAttributeOptionFailed: '創建屬性選項失敗',
-        loginRequired: '請先登入以使用菜單中心功能',
+        loginRequired: '請先登入以使用商品中心功能',
         // 套餐管理相關
         combosInCategory: '該分類下的套餐',
         comboTag: '套餐',
@@ -447,13 +474,19 @@ const zhTW = {
         discount: '折扣',
         finalPrice: '最終售價',
         // Tab標籤
-        menuManagement: '菜單管理',
-        itemList: '菜品列表',
+        menuManagement: '商品管理',
+        itemList: '商品列表',
         attributeManagement: '屬性管理',
         comboManagement: '套餐管理',
         // 分頁
         total: '共',
         items: '條'
+      },
+      multiMenu: {
+        title: '菜單',
+        subtitle: '為門店配置多套菜單，按時間段自動切換，多個菜單可同時激活。',
+        hintEmpty: '目前未配置菜單，POS 和線上點餐將依商品中心的設定直接展示。',
+        hintActive: '已配置 {{count}} 套菜單。有菜單時，點餐端優先展示當前時段激活的菜單；無匹配時段時退回展示全部商品。',
       },
       profile: {
         title: '個人資料',
@@ -483,36 +516,52 @@ const zhTW = {
         create: '創建賬號',
         edit: '編輯賬號',
         delete: '刪除賬號',
-        search: '搜索員工號或用戶名...',
+        search: '搜尋姓名、工號或登入名...',
         refresh: '刷新',
-        
+
         // 表格列
-        username: '用戶名',
+        name: '姓名',
+        username: '登入名',
         accountType: '賬號類型',
         productType: '產品類型',
-        employeeNumber: '員工號',
+        accountCode: '帳號編碼',
+        email: '電子郵件',
+        phone: '手機號碼',
         pinCode: 'PIN碼',
         status: '狀態',
         lastLoginAt: '最後登入',
         createdAt: '創建時間',
         actions: '操作',
         orgName: '所屬組織',
-        
+
         // 賬號類型
         typeOwner: '加盟商',
         typeManager: '經理',
         typeStaff: '員工',
-        
+
         // 產品類型
-        productBeauty: '美業',
-        productFb: '餐飲',
-        
+        product_beauty_salon: '美容院',
+        product_hair_salon: '髮廊',
+        product_spa: 'SPA',
+        product_restaurant: '餐廳',
+        product_fast_food: '快餐',
+        product_cafe: '咖啡廳',
+        product_beverage: '飲品店',
+        product_home_studio: '家庭工作室',
+        product_fitness: '健身房',
+        product_yoga_studio: '瑜伽館',
+        product_retail: '零售',
+        product_chinese_restaurant: '中餐廳',
+        product_clinic: '診所',
+        product_liquor_store: '酒類專賣',
+        product_other: '其他',
+
         // 狀態
         statusActive: '活躍',
         statusSuspended: '停用',
         statusDeleted: '已刪除',
         statusAll: '全部',
-        
+
         // 表單
         selectOrg: '選擇組織',
         selectOrgPlaceholder: '請選擇組織',
@@ -520,45 +569,37 @@ const zhTW = {
         selectAccountType: '賬號類型',
         selectAccountTypePlaceholder: '請選擇賬號類型',
         accountTypeRequired: '請選擇賬號類型',
-        selectProductType: '產品類型',
-        selectProductTypePlaceholder: '請選擇產品類型',
-        productTypeRequired: '請選擇產品類型',
-        usernamePlaceholder: '請輸入用戶名（4-50字符）',
-        usernameRequired: '請輸入用戶名',
-        usernameLength: '用戶名長度為4-50字符',
-        usernameNoAt: '用戶名不能包含@符號',
-        passwordPlaceholder: '請輸入密碼（至少8位）',
-        passwordRequired: '請輸入密碼',
-        passwordMinLength: '密碼至少8位',
-        passwordPattern: '密碼必須包含大小寫字母和數字',
-        employeeNumberPlaceholder: '請輸入員工號',
-        employeeNumberRequired: '請輸入員工號',
-        pinCodePlaceholder: '請輸入4位PIN碼',
-        pinCodeRequired: '請輸入PIN碼',
-        pinCodeLength: 'PIN碼必須為4位數字',
-        pinCodePattern: 'PIN碼只能包含數字',
-        
-        // 提示信息
-        usernameTooltip: 'OWNER/MANAGER必填，全局唯一，4-50字符，不能包含@符號',
-        passwordTooltip: 'OWNER/MANAGER必填，至少8位，包含大小寫字母和數字',
-        employeeNumberTooltip: '員工號，組織內唯一',
-        pinCodeTooltip: '4位數字，組織內唯一，創建後不再顯示',
-        pinCodeWarning: '請保存PIN碼，創建後將不再顯示',
-        
+        namePlaceholder: '請輸入姓名',
+        nameRequired: '請輸入姓名',
+        usernamePlaceholder: '請輸入登入名（4-50字符，不含@）',
+        usernameRequired: '請輸入登入名',
+        usernameLength: '登入名長度為4-50字符',
+        usernameNoAt: '登入名不能包含@符號',
+        password: '登入密碼',
+        passwordAutoTooltip: '密碼已自動生成，請在關閉前複製保存',
+        passwordWarning: '請保存密碼，創建後將不再顯示',
+        emailPlaceholder: '請輸入電子郵件',
+        emailRequired: '加盟商/經理必須填寫電子郵件，憑證將發送至此',
+        emailInvalid: '請輸入有效的電子郵件地址',
+        emailTooltipRequired: '必填，登入名、密碼及PIN碼將發送至此電子郵件',
+        emailTooltip: '選填，PIN碼將發送至此電子郵件',
+        phonePlaceholder: '請輸入手機號碼（選填）',
+
         // 權限說明
         permissionTitle: '權限說明',
-        permissionUser: 'User: 主店/分店可創建MANAGER/STAFF，加盟店只能創建OWNER（限1個）',
-        permissionOwner: 'OWNER: 只能創建MANAGER和STAFF',
-        permissionManager: 'MANAGER: 只能創建STAFF',
-        permissionStaff: 'STAFF: 無權限',
-        
+        permissionUser: 'User: 主店/分店可創建經理/員工，加盟店只能創建加盟商（限1個）',
+        permissionOwner: '加盟商: 只能創建經理和員工',
+        permissionManager: '經理: 只能創建員工',
+        permissionStaff: '員工: 無權限',
+
         // 按鈕
         cancel: '取消',
         save: '保存',
         confirm: '確定',
-        
+
         // 消息
         createSuccess: '賬號創建成功',
+        createSuccessWithEmail: '賬號創建成功，憑證已發送至 {{email}}',
         updateSuccess: '賬號更新成功',
         deleteSuccess: '賬號刪除成功',
         loadSuccess: '加載了 {{count}} 個賬號',
@@ -566,30 +607,30 @@ const zhTW = {
         updateFailed: '更新賬號失敗',
         deleteFailed: '刪除賬號失敗',
         loadFailed: '加載賬號列表失敗',
-        
+
         // 刪除確認
         deleteConfirm: '確定要刪除這個賬號嗎？',
         deleteWarning: '此操作不可恢復',
-        deleteCascadeWarning: '刪除OWNER將級聯刪除該組織所有MANAGER和STAFF',
+        deleteCascadeWarning: '刪除加盟商將級聯刪除該組織所有經理和員工',
         deletedCount: '已刪除 {{count}} 個賬號',
-        
+
         // 空狀態
         emptyTitle: '暫無賬號',
-        emptyDescription: '該組織下還沒有創建任何賬號，請先創建一個賬號。',
+        emptyDescription: '該組織下還沒有創建任何賬號。',
         emptyButton: '創建第一個賬號',
-        
+
         // 篩選後空狀態
         noResultsTitle: '未找到符合條件的賬號',
         noResultsDescription: '當前篩選條件下沒有找到任何賬號，請嘗試調整篩選條件。',
         clearFilters: '清除篩選條件',
-        
+
         // 錯誤信息
-        cannotCreateOwner: '主店和分店不能創建OWNER賬號',
-        canOnlyCreateOwner: '加盟店只能創建OWNER賬號',
-        canOnlyCreateStaff: 'MANAGER只能創建STAFF賬號',
-        ownerAlreadyExists: '該加盟店已有OWNER賬號',
-        employeeNumberExists: '該員工號已存在',
-        usernameExists: '該用戶名已被使用',
+        cannotCreateOwner: '主店和分店不能創建加盟商賬號',
+        canOnlyCreateOwner: '加盟店只能創建加盟商賬號',
+        canOnlyCreateStaff: '經理只能創建員工賬號',
+        ownerAlreadyExists: '該加盟店已有加盟商賬號',
+        accountCodeExists: '該帳號編碼已存在',
+        usernameExists: '該登入名已被使用',
         pinCodeExists: '該PIN碼已被使用',
         cannotDeleteSelf: '不能刪除自己的賬號',
         insufficientPermissions: '權限不足'
@@ -620,6 +661,7 @@ const zhTW = {
         typePos: 'POS',
         typeKiosk: 'KIOSK',
         typeTablet: 'TABLET',
+        typeDisplay: '叫號屏',
         statusPending: '待激活',
         statusActive: '已激活',
         statusDeleted: '已刪除',
@@ -642,7 +684,7 @@ const zhTW = {
         currentActivationCodeRequired: '請輸入當前激活碼',
         newDeviceName: '新設備名稱',
         newDeviceNamePlaceholder: '請輸入新設備名稱（可選）',
-        deviceTypeTooltip: 'POS: 銷售終端 | KIOSK: 自助終端 | TABLET: 平板設備',
+        deviceTypeTooltip: 'POS: 銷售終端 | KIOSK: 自助終端 | TABLET: 平板設備 | DISPLAY: 叫號屏',
         activationCodeTooltip: '9位大寫字母數字組合，系統自動生成',
         deviceIdTooltip: '9位小寫字母數字組合，系統自動生成',
         activationWarning: '請保存設備ID和激活碼，激活時需要同時輸入',
@@ -869,10 +911,11 @@ const zhTW = {
       },
       recipeGuide: {
         title: '製作指引管理',
-        description: '管理菜品的配方、步驟和屬性變體',
+        description: '管理商品的配方、步驟和屬性變體',
         
         // 標籤頁
         recipeManagement: '配方管理',
+        modifierPrintCodeManagement: '自定義選項列印代碼',
         stepTypeManagement: '步驟類型',
         
         // 配方列表
@@ -1123,20 +1166,20 @@ const zhTW = {
       },
       orderConfig: {
         title: '訂單配置',
-        description: '為您的組織配置訂單渠道和相關設置',
+        description: '為您的組織配置銷售渠道和相關設置',
 
-        // 訂單渠道管理模塊
-        channelManagementTitle: '渠道管理',
-        channelManagementDesc: '為您的組織管理訂單渠道，支持系統預設渠道和自定義渠道',
+        // 銷售渠道管理模塊
+        channelManagementTitle: '銷售渠道管理',
+        channelManagementDesc: '為您的組織管理銷售渠道，支持系統預設渠道和自定義渠道',
 
-        createSource: '創建訂單渠道',
-        editSource: '編輯訂單渠道',
-        deleteConfirm: '確定要刪除這個訂單渠道嗎？',
+        createSource: '創建銷售渠道',
+        editSource: '編輯銷售渠道',
+        deleteConfirm: '確定要刪除這個銷售渠道嗎？',
         deleteWarning: '此操作不可恢復',
 
         // 表格列
-        sourceType: '渠道類型',
-        sourceName: '渠道名稱',
+        sourceType: '銷售渠道類型',
+        sourceName: '銷售渠道名稱',
         descriptionColumn: '描述',
         displayOrder: '顯示順序',
         status: '狀態',
@@ -1148,28 +1191,28 @@ const zhTW = {
         inactive: '停用',
 
         // 表單標籤
-        selectSourceType: '選擇渠道類型',
-        sourceNamePlaceholder: '請輸入渠道名稱',
+        selectSourceType: '選擇銷售渠道類型',
+        sourceNamePlaceholder: '請輸入銷售渠道名稱',
         descriptionLabel: '描述',
         descriptionPlaceholder: '請輸入描述（可選）',
         displayOrderPlaceholder: '請輸入顯示順序',
 
         // 驗證
-        sourceTypeRequired: '請選擇渠道類型',
-        sourceNameRequired: '請輸入渠道名稱',
-        sourceNameMinLength: '渠道名稱至少需要2個字符',
-        sourceNameMaxLength: '渠道名稱不能超過100個字符',
+        sourceTypeRequired: '請選擇銷售渠道類型',
+        sourceNameRequired: '請輸入銷售渠道名稱',
+        sourceNameMinLength: '銷售渠道名稱至少需要2個字符',
+        sourceNameMaxLength: '銷售渠道名稱不能超過100個字符',
         displayOrderRequired: '請輸入顯示順序',
         selectOrgRequired: '請先選擇一個組織',
 
         // 消息
-        createSuccess: '訂單渠道創建成功',
-        updateSuccess: '訂單渠道更新成功',
-        deleteSuccess: '訂單渠道刪除成功',
-        createFailed: '創建訂單渠道失敗',
-        updateFailed: '更新訂單渠道失敗',
-        deleteFailed: '刪除訂單渠道失敗',
-        loadFailed: '加載訂單渠道列表失敗',
+        createSuccess: '銷售渠道創建成功',
+        updateSuccess: '銷售渠道更新成功',
+        deleteSuccess: '銷售渠道刪除成功',
+        createFailed: '創建銷售渠道失敗',
+        updateFailed: '更新銷售渠道失敗',
+        deleteFailed: '刪除銷售渠道失敗',
+        loadFailed: '加載銷售渠道列表失敗',
 
         // 操作
         edit: '編輯',
@@ -1180,32 +1223,32 @@ const zhTW = {
         managePricing: '管理定價',
 
         // 空狀態
-        empty: '暫無訂單渠道',
+        empty: '暫無銷售渠道',
 
         // 系統預設標籤
         systemPreset: '系統預設',
 
         // 搜索和分頁
-        search: '按渠道類型或名稱搜索...',
+        search: '按銷售渠道類型或名稱搜索...',
         total: '共',
         items: '條',
 
         // 渠道定價管理模塊
         pricingManagementTitle: '定價管理',
-        pricingManagementDesc: '為不同的訂單渠道設置差異化的商品定價',
+        pricingManagementDesc: '為不同的銷售渠道設置差異化的商品定價',
         pricingManagement: '渠道定價管理',
-        selectChannel: '選擇訂單渠道',
-        selectChannelPlaceholder: '請選擇訂單渠道',
-        selectChannelFirst: '請先選擇一個訂單渠道',
+        selectChannel: '選擇銷售渠道',
+        selectChannelPlaceholder: '請選擇銷售渠道',
+        selectChannelFirst: '請先選擇一個銷售渠道',
         selectedChannel: '當前選中渠道',
-        loadChannelsFailed: '加載訂單渠道列表失敗',
+        loadChannelsFailed: '加載銷售渠道列表失敗',
         loadPricesFailed: '加載價格配置失敗',
 
         // 定價項管理
         itemId: '項目ID',
-        itemIdPlaceholder: '請輸入菜品/加料/套餐的ID',
+        itemIdPlaceholder: '請輸入商品/加料/套餐的ID',
         itemType: '項目類型',
-        item: '菜品',
+        item: '商品',
         addon: '加料',
         combo: '套餐',
         addons: '加料',
@@ -1568,8 +1611,108 @@ const zhTW = {
         editMenu: '編輯菜單',
         editMenuInfo: '編輯菜單信息',
         newMenu: '新建菜單'
-      }
-    }
+      },
+    },
+    giftCard: {
+      title: '禮品卡',
+      subtitle: '為您的顧客提供禮品卡功能',
+      mainStoreOnly: '僅主店可使用禮品卡功能',
+      mainStoreOnlyDesc: '禮品卡配置和發行功能僅限主店賬號訪問。',
+      loadError: '加載禮品卡配置失敗',
+      saveError: '保存配置失敗',
+      enabled: '禮品卡功能已開啟',
+      disabled: '禮品卡功能已關閉',
+      denominations: '預設面額',
+      denominationsHint: '配置預設面額，顧客結賬時可快速選擇。面額單位為分。',
+      denominationsSaved: '面額已保存',
+      noDenominations: '暫未配置預設面額',
+      suggestedDenominations: '快速添加',
+      customDenomination: '自定義金額',
+      addDenomination: '添加',
+      cardImage: '卡片圖片',
+      cardImageHint: '上傳禮品卡圖片，將在線上商城和購買頁面展示。',
+      uploadImage: '上傳圖片',
+      uploadComingSoon: '圖片上傳功能即將上線',
+      issue: '發行禮品卡',
+      issueNew: '發行新卡',
+      issueHint: '手動發行禮品卡，可用於線下銷售或贈送。',
+      issueSuccess: '禮品卡發行成功',
+      issueError: '發行禮品卡失敗',
+      pinWarning: '請立即記錄以下信息，PIN 碼僅顯示一次，關閉後無法再次查看！',
+      pinOnceHint: 'PIN 碼僅在發行時顯示一次，請務必安全保存。',
+      cardNumber: '卡號',
+      balance: '餘額',
+      initialBalance: '初始金額',
+      balanceRequired: '請輸入初始金額',
+      selectBalance: '選擇面額',
+      customAmount: '自定義金額',
+      recipientEmail: '收件人電郵（可選）',
+      note: '備注（可選）',
+      notePlaceholder: '用途說明，如：生日禮物',
+      imageUploaded: '卡片圖片已更新',
+      imageDeleted: '卡片圖片已刪除',
+    },
+    onlineOrder: {
+      title: '線上點餐設定',
+      mainStoreHint: '主店可設定完整的線上點餐功能',
+      badges: { main: '主店', branch: '分店', franchise: '加盟店' },
+      stripeWarning: {
+        title: '未完成收款帳戶設定',
+        descBranch: '本店尚未綁定主店收款帳戶，無法開啟線上點餐。請前往「支付方式」頁完成綁定。',
+        descMain: '本店尚未完成 Stripe 收款帳戶設定，無法開啟線上點餐。請前往「支付方式」完成設定。',
+        action: '去設定',
+      },
+      urlLabel: '線上點餐網址',
+      basic: {
+        title: '基本設定',
+        enableLabel: '啟用線上點餐',
+        enabledHint: '顧客可透過線上頁面下單',
+        disabledHint: '目前已關閉線上點餐',
+        subdomainLabel: '子網域',
+        subdomainInherited: '子網域（繼承自主店）',
+        subdomainHint: '存取線上點餐的子網域，全域唯一',
+        subdomainPlaceholder: 'mcdonald',
+        subdomainNoParent: '主店未設定子網域',
+      },
+      orderType: {
+        title: '訂單類型',
+        allowPickup: '允許自取',
+        scheduleTitle: '預約自取設定',
+        allowSchedule: '允許顧客預約取餐時間',
+        leadMinutes: '最短提前量',
+        leadMinutesHint: '顧客最少需提前多少分鐘預約',
+        slotInterval: '時間槽間隔',
+        advanceDays: '可預約天數',
+        advanceDaysHint: '0 = 僅今天，1 = 今天+明天',
+        allowDelivery: '允許外送',
+        deliveryConfig: '自配送設定',
+        deliveryIncomplete: '自配送尚未設定完成，啟用外送前請先完成設定',
+        minutes: '分鐘',
+        days: '天',
+        min15: '15 分鐘',
+        min30: '30 分鐘',
+        min60: '60 分鐘',
+      },
+      hours: {
+        title: '營業時間',
+        migratedTitle: '營業時間已移轉至「組織管理」',
+        migratedDesc: '請前往「組織管理」頁面設定門市營業時間，線上點餐將自動套用門市的營業時間設定。',
+        goSetup: '前往設定',
+      },
+      save: '儲存設定',
+      loadError: '載入設定失敗，請稍後再試',
+      selectOrgError: '請先選擇組織',
+      saveSuccess: '設定更新成功',
+      createSuccess: '設定建立成功',
+      saveFailed: '儲存失敗',
+      subdomainTaken: '該子網域已被其他商家使用',
+      subdomainInvalid: '子網域格式不正確',
+      subdomainSaved: '子網域已儲存',
+      subdomainSaveFailed: '儲存子網域失敗',
+      parentNotEnabled: '主店未啟用線上點餐，無法啟用子店',
+      stripeBlockBranch: '本店未綁定收款帳戶，無法開啟線上點餐。請前往「支付方式」頁點擊「綁定主店收款帳戶」',
+      stripeBlockMain: '本店未完成 Stripe 收款帳戶設定，無法開啟線上點餐。請前往「支付方式」頁完成 Stripe Connect 設定',
+    },
   }
 }
 

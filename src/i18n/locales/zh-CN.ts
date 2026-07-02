@@ -22,20 +22,47 @@ const zhCN = {
       no: '否',
       total: '共',
       items: '条',
-      refresh: '刷新'
+      refresh: '刷新',
+      copy: '复制',
+      copied: '已复制',
+      show: '显示',
+      hide: '隐藏',
+      on: '开',
+      off: '关',
+      invalidEmail: '请输入有效的邮箱地址',
     },
     nav: {
       dashboard: '仪表盘',
-      menuCenter: '菜单中心',
+      features: '特色功能',
+      recipeGuide: '制作指引',
+      // 分组标签
+      groupMenu: '商品管理',
+      groupOrder: '订单与配送',
+      groupStore: '店铺运营',
+      groupOrg: '组织与人员',
+      groupSystem: '系统',
+      // 菜单管理
+      menuCenter: '商品',
+      multiMenu: '菜单',
+      taxManagement: '税务',
+      // 订单与配送
+      orderConfig: '订单配置',
+      onlineOrderConfig: '在线点单配置',
+directDelivery: '自配送',
+      uberIntegration: 'Uber 集成',
+      // 店铺运营
+      paymentSettings: '支付设置',
+      giftCardSettings: '礼品卡',
+      printSettings: '打印设置',
+      booking: '预约管理',
+      // 组织与人员
       organizations: '组织管理',
       accounts: '账号管理',
       devices: '设备管理',
-      receiptTemplate: '小票模板',
-      features: '特色功能',
-      recipeGuide: '制作指引',
-      orderConfig: '订单配置',
-      booking: '预约管理',
+      memberManagement: '会员管理',
+      // 系统
       subscription: '订阅管理',
+      receiptTemplate: '小票模板',
     },
     organization: {
       title: '组织管理',
@@ -123,8 +150,8 @@ const zhCN = {
       deleteWarning: '此操作不可恢复',
       
       // 地址确认
-      addressSelected: '已选择地址: {address}',
-      coordinates: '坐标: {lat}, {lon}'
+      addressSelected: '已选择地址: {{address}}',
+      coordinates: '坐标: {{lat}}, {{lon}}'
     },
     auth: {
       login: {
@@ -213,13 +240,13 @@ const zhCN = {
         recipeGuideDesc: '为组织生成标准化产品制作指引码,可打印在产品标签上,规范员工操作流程,有效降低培训成本,持续提升产品品质'
       },
       menuCenter: {
-        title: '菜单中心',
-        desc: '统一管理菜品、属性、加料与套餐',
+        title: '商品中心',
+        desc: '统一管理商品、属性、加料与套餐',
         loadingCategories: '加载分类中...',
         loadingItems: '加载商品中...',
         loadingAttributes: '加载属性中...',
         categoriesTitle: '分类',
-        itemsTitle: '菜品列表',
+        itemsTitle: '商品列表',
         categoryName: '分类名称',
         addCategory: '创建分类',
         emptyCategories: '暂无分类',
@@ -227,10 +254,10 @@ const zhCN = {
         createFirstCategoryCTA: '创建第一个分类',
         selectCategoryPlaceholder: '请先选择一个分类',
         currentCategory: '当前分类：{{name}}',
-        itemName: '菜品名称',
+        itemName: '商品名称',
         price: '价格',
-        addItem: '创建菜品',
-        emptyItems: '当前分类下暂无菜品',
+        addItem: '创建商品',
+        emptyItems: '当前分类下暂无商品',
         // 通用操作
         refresh: '刷新',
         edit: '编辑',
@@ -261,24 +288,24 @@ const zhCN = {
         deleteCategoryContent: '将删除分类"{{name}}"',
         deleteCategorySuccess: '分类删除成功',
         deleteCategoryFailed: '删除分类失败',
-        // 菜品管理
-        editItem: '编辑菜品',
-        createItem: '创建菜品',
-        createFirstItem: '创建第一个菜品',
-        itemBasicInfo: '菜品基本信息',
-        itemNameLabel: '菜品名称',
-        itemNamePlaceholder: '请输入菜品名称',
-        itemNameRequired: '请输入菜品名称',
+        // 商品管理
+        editItem: '编辑商品',
+        createItem: '创建商品',
+        createFirstItem: '创建第一个商品',
+        itemBasicInfo: '商品基本信息',
+        itemNameLabel: '商品名称',
+        itemNamePlaceholder: '请输入商品名称',
+        itemNameRequired: '请输入商品名称',
         itemNameMaxLength: '商品名称不能超过255个字符',
         itemNameNoWhitespace: '商品名称不能只包含空格',
-        itemCategory: '菜品分类',
+        itemCategory: '商品分类',
         selectCategory: '选择分类',
-        selectCategoryRequired: '请选择菜品分类',
+        selectCategoryRequired: '请选择商品分类',
         basePrice: '售价',
-        basePriceRequired: '请输入菜品售价',
+        basePriceRequired: '请输入商品售价',
         validNumber: '请输入有效的数字',
         salePrice: '售价',
-        salePriceRequired: '请输入菜品售价',
+        salePriceRequired: '请输入商品售价',
         cost: '成本',
         costCannotBeNegative: '成本不能为负数',
         status: '状态',
@@ -287,7 +314,7 @@ const zhCN = {
         basicInfo: '基本信息',
         description: '描述',
         activeStatus: '激活状态',
-        deleteItemConfirm: '确定删除这个菜品吗？',
+        deleteItemConfirm: '确定删除这个商品吗？',
         // 属性配置
         attributeConfig: '属性配置',
         itemAttributeConfig: '商品属性配置',
@@ -449,7 +476,7 @@ const zhCN = {
         createAttributeOptionSuccess: '属性选项创建成功',
         updateAttributeOptionFailed: '更新属性选项失败',
         createAttributeOptionFailed: '创建属性选项失败',
-        loginRequired: '请先登录以使用菜单中心功能',
+        loginRequired: '请先登录以使用商品中心功能',
         // 套餐管理
         comboManagement: '套餐管理',
         comboList: '套餐列表',
@@ -483,12 +510,18 @@ const zhCN = {
         unknown: '未知',
         none: '无',
         // Tab标签
-        menuManagement: '菜单管理',
-        itemList: '菜品列表',
+        menuManagement: '商品管理',
+        itemList: '商品列表',
         customFields: '自定义字段',
         // 分页
         total: '共',
         items: '条'
+      },
+      multiMenu: {
+        title: '菜单',
+        subtitle: '为门店配置多套菜单，按时间段自动切换，多个菜单可同时激活。',
+        hintEmpty: '当前未配置菜单，POS 和在线点单将按商品中心的配置直接展示。',
+        hintActive: '已配置 {{count}} 套菜单。有菜单时，点单端优先展示当前时段激活的菜单；无匹配时段时退回展示全部商品。',
       },
       profile: {
         title: '个人资料',
@@ -519,36 +552,52 @@ const zhCN = {
         create: '创建账号',
         edit: '编辑账号',
         delete: '删除账号',
-        search: '搜索员工号或用户名...',
+        search: '搜索姓名、工号或登录名...',
         refresh: '刷新',
-        
+
         // 表格列
-        username: '用户名',
+        name: '姓名',
+        username: '登录名',
         accountType: '账号类型',
         productType: '产品类型',
-        employeeNumber: '员工号',
+        accountCode: '账号编码',
+        email: '邮箱',
+        phone: '手机号',
         pinCode: 'PIN码',
         status: '状态',
         lastLoginAt: '最后登录',
         createdAt: '创建时间',
         actions: '操作',
         orgName: '所属组织',
-        
+
         // 账号类型
         typeOwner: '加盟商',
         typeManager: '经理',
         typeStaff: '员工',
-        
+
         // 产品类型
-        productBeauty: '美业',
-        productFb: '餐饮',
-        
+        product_beauty_salon: '美容院',
+        product_hair_salon: '发廊',
+        product_spa: 'SPA',
+        product_restaurant: '餐厅',
+        product_fast_food: '快餐',
+        product_cafe: '咖啡厅',
+        product_beverage: '饮品店',
+        product_home_studio: '家庭工作室',
+        product_fitness: '健身房',
+        product_yoga_studio: '瑜伽馆',
+        product_retail: '零售',
+        product_chinese_restaurant: '中餐厅',
+        product_clinic: '诊所',
+        product_liquor_store: '酒类专卖',
+        product_other: '其他',
+
         // 状态
         statusActive: '活跃',
         statusSuspended: '停用',
         statusDeleted: '已删除',
         statusAll: '全部',
-        
+
         // 表单
         selectOrg: '选择组织',
         selectOrgPlaceholder: '请选择组织',
@@ -556,45 +605,37 @@ const zhCN = {
         selectAccountType: '账号类型',
         selectAccountTypePlaceholder: '请选择账号类型',
         accountTypeRequired: '请选择账号类型',
-        selectProductType: '产品类型',
-        selectProductTypePlaceholder: '请选择产品类型',
-        productTypeRequired: '请选择产品类型',
-        usernamePlaceholder: '请输入用户名（4-50字符）',
-        usernameRequired: '请输入用户名',
-        usernameLength: '用户名长度为4-50字符',
-        usernameNoAt: '用户名不能包含@符号',
-        passwordPlaceholder: '请输入密码（至少8位）',
-        passwordRequired: '请输入密码',
-        passwordMinLength: '密码至少8位',
-        passwordPattern: '密码必须包含大小写字母和数字',
-        employeeNumberPlaceholder: '请输入员工号',
-        employeeNumberRequired: '请输入员工号',
-        pinCodePlaceholder: '请输入4位PIN码',
-        pinCodeRequired: '请输入PIN码',
-        pinCodeLength: 'PIN码必须为4位数字',
-        pinCodePattern: 'PIN码只能包含数字',
-        
-        // 提示信息
-        usernameTooltip: 'OWNER/MANAGER必填，全局唯一，4-50字符，不能包含@符号',
-        passwordTooltip: 'OWNER/MANAGER必填，至少8位，包含大小写字母和数字',
-        employeeNumberTooltip: '员工号，组织内唯一',
-        pinCodeTooltip: '4位数字，组织内唯一，创建后不再显示',
-        pinCodeWarning: '请保存PIN码，创建后将不再显示',
-        
+        namePlaceholder: '请输入姓名',
+        nameRequired: '请输入姓名',
+        usernamePlaceholder: '请输入登录名（4-50字符，不含@）',
+        usernameRequired: '请输入登录名',
+        usernameLength: '登录名长度为4-50字符',
+        usernameNoAt: '登录名不能包含@符号',
+        password: '登录密码',
+        passwordAutoTooltip: '密码已自动生成，请在关闭前复制保存',
+        passwordWarning: '请保存密码，创建后将不再显示',
+        emailPlaceholder: '请输入邮箱',
+        emailRequired: '加盟商/经理必须填写邮箱，凭证将发送至此',
+        emailInvalid: '请输入有效的邮箱地址',
+        emailTooltipRequired: '必填，账号凭证（登录名、密码、PIN码）将发送至此邮箱',
+        emailTooltip: '选填，PIN码将发送至此邮箱',
+        phonePlaceholder: '请输入手机号（选填）',
+
         // 权限说明
         permissionTitle: '权限说明',
-        permissionUser: 'User: 主店/分店可创建MANAGER/STAFF，加盟店只能创建OWNER（限1个）',
-        permissionOwner: 'OWNER: 只能创建MANAGER和STAFF',
-        permissionManager: 'MANAGER: 只能创建STAFF',
-        permissionStaff: 'STAFF: 无权限',
-        
+        permissionUser: 'User: 主店/分店可创建经理/员工，加盟店只能创建加盟商（限1个）',
+        permissionOwner: '加盟商: 只能创建经理和员工',
+        permissionManager: '经理: 只能创建员工',
+        permissionStaff: '员工: 无权限',
+
         // 按钮
         cancel: '取消',
         save: '保存',
         confirm: '确定',
-        
+
         // 消息
         createSuccess: '账号创建成功',
+        createSuccessWithEmail: '账号创建成功，凭证已发送至 {{email}}',
         updateSuccess: '账号更新成功',
         deleteSuccess: '账号删除成功',
         loadSuccess: '加载了 {{count}} 个账号',
@@ -602,30 +643,30 @@ const zhCN = {
         updateFailed: '更新账号失败',
         deleteFailed: '删除账号失败',
         loadFailed: '加载账号列表失败',
-        
+
         // 删除确认
         deleteConfirm: '确定要删除这个账号吗？',
         deleteWarning: '此操作不可恢复',
-        deleteCascadeWarning: '删除OWNER将级联删除该组织所有MANAGER和STAFF',
+        deleteCascadeWarning: '删除加盟商将级联删除该组织所有经理和员工',
         deletedCount: '已删除 {{count}} 个账号',
-        
+
         // 空状态
         emptyTitle: '暂无账号',
-        emptyDescription: '该组织下还没有创建任何账号，请先创建一个账号。',
+        emptyDescription: '该组织下还没有创建任何账号。',
         emptyButton: '创建第一个账号',
-        
+
         // 筛选后空状态
         noResultsTitle: '未找到符合条件的账号',
         noResultsDescription: '当前筛选条件下没有找到任何账号，请尝试调整筛选条件。',
         clearFilters: '清除筛选条件',
-        
+
         // 错误信息
-        cannotCreateOwner: '主店和分店不能创建OWNER账号',
-        canOnlyCreateOwner: '加盟店只能创建OWNER账号',
-        canOnlyCreateStaff: 'MANAGER只能创建STAFF账号',
-        ownerAlreadyExists: '该加盟店已有OWNER账号',
-        employeeNumberExists: '该员工号已存在',
-        usernameExists: '该用户名已被使用',
+        cannotCreateOwner: '主店和分店不能创建加盟商账号',
+        canOnlyCreateOwner: '加盟店只能创建加盟商账号',
+        canOnlyCreateStaff: '经理只能创建员工账号',
+        ownerAlreadyExists: '该加盟店已有加盟商账号',
+        accountCodeExists: '该账号编码已存在',
+        usernameExists: '该登录名已被使用',
         pinCodeExists: '该PIN码已被使用',
         cannotDeleteSelf: '不能删除自己的账号',
         insufficientPermissions: '权限不足'
@@ -820,6 +861,7 @@ const zhCN = {
         typePos: 'POS',
         typeKiosk: 'KIOSK',
         typeTablet: 'TABLET',
+        typeDisplay: '叫号屏',
         
         // 状态
         statusPending: '待激活',
@@ -848,7 +890,7 @@ const zhCN = {
         newDeviceNamePlaceholder: '请输入新设备名称（可选）',
         
         // 提示信息
-        deviceTypeTooltip: 'POS: 销售终端 | KIOSK: 自助终端 | TABLET: 平板设备',
+        deviceTypeTooltip: 'POS: 销售终端 | KIOSK: 自助终端 | TABLET: 平板设备 | DISPLAY: 叫号屏',
         activationCodeTooltip: '9位大写字母数字组合，系统自动生成',
         deviceIdTooltip: '9位小写字母数字组合，系统自动生成',
         activationWarning: '请保存设备ID和激活码，激活时需要同时输入',
@@ -927,10 +969,11 @@ const zhCN = {
       },
       recipeGuide: {
         title: '制作指引管理',
-        description: '管理菜品的配方、步骤和属性变体',
+        description: '管理商品的配方、步骤和属性变体',
         
         // 标签页
         recipeManagement: '配方管理',
+        modifierPrintCodeManagement: '自定义选项打印代码',
         stepTypeManagement: '步骤类型',
         
         // 使用指南
@@ -1200,20 +1243,20 @@ const zhCN = {
       },
       orderConfig: {
         title: '订单配置',
-        description: '为您的组织配置订单渠道和相关设置',
+        description: '为您的组织配置销售渠道和相关设置',
 
-        // 订单渠道管理模块
-        channelManagementTitle: '渠道管理',
-        channelManagementDesc: '为您的组织管理订单渠道，支持系统预设渠道和自定义渠道',
+        // 销售渠道管理模块
+        channelManagementTitle: '销售渠道管理',
+        channelManagementDesc: '为您的组织管理销售渠道，支持系统预设渠道和自定义渠道',
 
-        createSource: '创建订单渠道',
-        editSource: '编辑订单渠道',
-        deleteConfirm: '确定要删除这个订单渠道吗？',
+        createSource: '创建销售渠道',
+        editSource: '编辑销售渠道',
+        deleteConfirm: '确定要删除这个销售渠道吗？',
         deleteWarning: '此操作不可恢复',
 
         // 表格列
-        sourceType: '渠道类型',
-        sourceName: '渠道名称',
+        sourceType: '销售渠道类型',
+        sourceName: '销售渠道名称',
         descriptionColumn: '描述',
         displayOrder: '显示顺序',
         status: '状态',
@@ -1225,28 +1268,28 @@ const zhCN = {
         inactive: '停用',
 
         // 表单标签
-        selectSourceType: '选择渠道类型',
-        sourceNamePlaceholder: '请输入渠道名称',
+        selectSourceType: '选择销售渠道类型',
+        sourceNamePlaceholder: '请输入销售渠道名称',
         descriptionLabel: '描述',
         descriptionPlaceholder: '请输入描述（可选）',
         displayOrderPlaceholder: '请输入显示顺序',
 
         // 验证
-        sourceTypeRequired: '请选择渠道类型',
-        sourceNameRequired: '请输入渠道名称',
-        sourceNameMinLength: '渠道名称至少需要2个字符',
-        sourceNameMaxLength: '渠道名称不能超过100个字符',
+        sourceTypeRequired: '请选择销售渠道类型',
+        sourceNameRequired: '请输入销售渠道名称',
+        sourceNameMinLength: '销售渠道名称至少需要2个字符',
+        sourceNameMaxLength: '销售渠道名称不能超过100个字符',
         displayOrderRequired: '请输入显示顺序',
         selectOrgRequired: '请先选择一个组织',
 
         // 消息
-        createSuccess: '订单渠道创建成功',
-        updateSuccess: '订单渠道更新成功',
-        deleteSuccess: '订单渠道删除成功',
-        createFailed: '创建订单渠道失败',
-        updateFailed: '更新订单渠道失败',
-        deleteFailed: '删除订单渠道失败',
-        loadFailed: '加载订单渠道列表失败',
+        createSuccess: '销售渠道创建成功',
+        updateSuccess: '销售渠道更新成功',
+        deleteSuccess: '销售渠道删除成功',
+        createFailed: '创建销售渠道失败',
+        updateFailed: '更新销售渠道失败',
+        deleteFailed: '删除销售渠道失败',
+        loadFailed: '加载销售渠道列表失败',
 
         // 操作
         edit: '编辑',
@@ -1257,32 +1300,32 @@ const zhCN = {
         managePricing: '管理定价',
 
         // 空状态
-        empty: '暂无订单渠道',
+        empty: '暂无销售渠道',
 
         // 系统预设标签
         systemPreset: '系统预设',
 
         // 搜索和分页
-        search: '按渠道类型或名称搜索...',
+        search: '按销售渠道类型或名称搜索...',
         total: '共',
         items: '条',
 
-        // 渠道定价管理模块
+        // 销售渠道定价管理模块
         pricingManagementTitle: '定价管理',
-        pricingManagementDesc: '为不同的订单渠道设置差异化的商品定价',
-        pricingManagement: '渠道定价管理',
-        selectChannel: '选择订单渠道',
-        selectChannelPlaceholder: '请选择订单渠道',
-        selectChannelFirst: '请先选择一个订单渠道',
+        pricingManagementDesc: '为不同的销售渠道设置差异化的商品定价',
+        pricingManagement: '销售渠道定价管理',
+        selectChannel: '选择销售渠道',
+        selectChannelPlaceholder: '请选择销售渠道',
+        selectChannelFirst: '请先选择一个销售渠道',
         selectedChannel: '当前选中渠道',
-        loadChannelsFailed: '加载订单渠道列表失败',
+        loadChannelsFailed: '加载销售渠道列表失败',
         loadPricesFailed: '加载价格配置失败',
 
         // 定价项管理
         itemId: '项目ID',
-        itemIdPlaceholder: '请输入菜品/加料/套餐的ID',
+        itemIdPlaceholder: '请输入商品/加料/套餐的ID',
         itemType: '项目类型',
-        item: '菜品',
+        item: '商品',
         addon: '加料',
         combo: '套餐',
         addons: '加料',
@@ -1354,8 +1397,8 @@ const zhCN = {
         hideCustomOptions: '收起自定义选项',
         noCustomOptions: '该商品没有关联的自定义选项',
         noCustomOptionsData: '该商品的自定义选项暂无定价数据',
-        noModifiersConfigured: '该商品尚未配置修饰符',
-        pleaseConfigureModifiersFirst: '请先在商品管理中为该商品配置修饰符组和选项',
+        noModifiersConfigured: '该商品尚未配置自定义选项',
+        pleaseConfigureModifiersFirst: '请先在商品管理中为该商品配置自定义选项组和选项',
         notSet: '未设置',
         customOptionPricingTip: '自定义选项价格支持三层优先级：渠道价 > 商品级价 > 默认价',
         loadCustomOptionPricesFailed: '加载自定义选项价格失败',
@@ -1634,7 +1677,7 @@ const zhCN = {
         categoryManagement: '分类管理',
         categoryManagementTip: '分类会按照此处的顺序在 Uber 上展示。若要隐藏商品，请在所有分类中移除。若未配置分类，菜单不会在 Uber 上显示。',
         itemConfig: '商品配置',
-        modifierConfig: '修饰符配置',
+        modifierConfig: '自定义选项配置',
         noCategoriesAdded: '该菜单还没有添加任何分类。请从下方选择分类添加。',
         categoriesOfMenu: '菜单的分类',
         itemsConfigured: '已配置 {{count}} 个商品',
@@ -1659,8 +1702,109 @@ const zhCN = {
         editMenu: '编辑菜单',
         editMenuInfo: '编辑菜单信息',
         newMenu: '新建菜单'
-      }
-    }
+      },
+    },
+    giftCard: {
+      title: '礼品卡',
+      subtitle: '为您的顾客提供礼品卡功能',
+      mainStoreOnly: '仅主店可使用礼品卡功能',
+      mainStoreOnlyDesc: '礼品卡配置和发行功能仅限主店账号访问。',
+      loadError: '加载礼品卡配置失败',
+      saveError: '保存配置失败',
+      enabled: '礼品卡功能已开启',
+      disabled: '礼品卡功能已关闭',
+      denominations: '预设面额',
+      denominationsHint: '配置预设面额，顾客结账时可快速选择。面额单位为分。',
+      denominationsSaved: '面额已保存',
+      noDenominations: '暂未配置预设面额',
+      suggestedDenominations: '快速添加',
+      customDenomination: '自定义金额',
+      addDenomination: '添加',
+      cardImage: '卡片图片',
+      cardImageHint: '上传礼品卡图片，将在线上商城和购买页面展示。',
+      uploadImage: '上传图片',
+      uploadComingSoon: '图片上传功能即将上线',
+      issue: '发行礼品卡',
+      issueNew: '发行新卡',
+      issueHint: '手动发行礼品卡，可用于线下销售或赠送。',
+      issueSuccess: '礼品卡发行成功',
+      issueError: '发行礼品卡失败',
+      pinWarning: '请立即记录以下信息，PIN 码仅显示一次，关闭后无法再次查看！',
+      pinOnceHint: 'PIN 码仅在发行时显示一次，请务必安全保存。',
+      cardNumber: '卡号',
+      balance: '余额',
+      initialBalance: '初始金额',
+      balanceRequired: '请输入初始金额',
+      selectBalance: '选择面额',
+      customAmount: '自定义金额',
+      recipientEmail: '收件人邮箱（可选）',
+      note: '备注（可选）',
+      notePlaceholder: '用途说明，如：生日礼物',
+      imageUploaded: '卡片图片已更新',
+      imageDeleted: '卡片图片已删除',
+    },
+    onlineOrder: {
+      title: '在线点单配置',
+      mainStoreHint: '主店可以配置完整的在线点单功能',
+      badges: { main: '主店', branch: '分店', franchise: '加盟店' },
+      stripeWarning: {
+        title: '未完成收款账户配置',
+        descBranch: '本店尚未绑定主店收款账户，无法开启在线点单。请前往「支付方式」页完成绑定。',
+        descMain: '本店尚未完成 Stripe 收款账户设置，无法开启在线点单。请前往「支付方式」完成设置。',
+        action: '去设置',
+      },
+      urlLabel: '在线点单地址',
+      basic: {
+        title: '基础配置',
+        enableLabel: '启用在线点单',
+        enabledHint: '顾客可通过在线页面下单',
+        disabledHint: '当前已关闭在线点单',
+        subdomainLabel: '子域名',
+        subdomainInherited: '子域名（继承自主店）',
+        subdomainHint: '访问在线点单的子域名，全局唯一',
+        subdomainPlaceholder: 'mcdonald',
+        subdomainNoParent: '主店未设置子域名',
+      },
+      orderType: {
+        title: '订单类型',
+        allowPickup: '允许自取',
+        scheduleTitle: '预约自取设置',
+        allowSchedule: '允许顾客预约取餐时间',
+        leadMinutes: '最短提前量',
+        leadMinutesHint: '顾客最少需提前多少分钟预约',
+        slotInterval: '时间槽间隔',
+        advanceDays: '可预约天数',
+        advanceDaysHint: '0 = 仅今天，1 = 今天+明天',
+        allowDelivery: '允许配送',
+        deliveryConfig: '自配送配置',
+        deliveryIncomplete: '自配送尚未配置完成，开启配送前请先完成配置',
+        minutes: '分钟',
+        days: '天',
+        min15: '15 分钟',
+        min30: '30 分钟',
+        min60: '60 分钟',
+      },
+      hours: {
+        title: '营业时间',
+        migratedTitle: '营业时间已迁移到「组织管理」',
+        migratedDesc: '请前往「组织管理」页面设置门店营业时间，在线点单将自动使用门店的营业时间配置。',
+        goSetup: '前往设置',
+      },
+      save: '保存配置',
+      loadError: '加载配置失败，请稍后重试',
+      selectOrgError: '请先选择组织',
+      saveSuccess: '配置更新成功',
+      createSuccess: '配置创建成功',
+      saveFailed: '保存失败',
+      subdomainTaken: '该子域名已被其他商家使用',
+      subdomainInvalid: '子域名格式不正确',
+      subdomainSaved: '子域名已保存',
+      subdomainSaveFailed: '保存子域名失败',
+      parentNotEnabled: '主店未启用在线点单，无法启用子店',
+      stripeBlockBranch: '本店未绑定收款账户，无法开启在线点单。请前往「支付方式」页点击「绑定主店收款账户」',
+      stripeBlockMain: '本店未完成 Stripe 收款账户设置，无法开启在线点单。请前往「支付方式」页完成 Stripe Connect 设置',
+    },
+
   }
 }
 

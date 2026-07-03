@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { Table, Button, Space, message, Tag, Popconfirm, Empty } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getStepTypes, deleteStepType } from '@/services/recipe'
 import type { StepType } from '@/services/recipe'
-import type { ColumnsType } from 'antd/es/table'
 import StepTypeFormModalEnhanced from './StepTypeFormModalEnhanced'
+import { Table, type Column, Btn, EmptyState, ConfirmDialog, toast } from '@/components/ui-kit'
 
 const StepTypeManagement: React.FC = () => {
   const { t } = useTranslation()
@@ -13,6 +12,7 @@ const StepTypeManagement: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingStepType, setEditingStepType] = useState<StepType | undefined>()
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     loadStepTypes()
@@ -24,19 +24,21 @@ const StepTypeManagement: React.FC = () => {
       const data = await getStepTypes()
       setStepTypes(data)
     } catch (error: any) {
-      message.error(error.message || t('pages.recipeGuide.loadFailed'))
+      toast.error(error.message || t('pages.recipeGuide.loadFailed'))
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!deleteId) return
     try {
-      await deleteStepType(id)
-      message.success(t('pages.recipeGuide.deleteSuccess'))
+      await deleteStepType(deleteId)
+      toast.success(t('pages.recipeGuide.deleteSuccess'))
+      setDeleteId(null)
       loadStepTypes()
     } catch (error: any) {
-      message.error(error.message || t('pages.recipeGuide.deleteFailed'))
+      toast.error(error.message || t('pages.recipeGuide.deleteFailed'))
     }
   }
 
@@ -50,165 +52,52 @@ const StepTypeManagement: React.FC = () => {
     setModalVisible(true)
   }
 
-  const handleModalClose = () => {
-    setModalVisible(false)
-    setEditingStepType(undefined)
-  }
-
-  const handleModalSuccess = () => {
-    loadStepTypes()
-  }
-
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      ingredient: 'blue',
-      equipment: 'green',
-      manual: 'orange',
-      timing: 'purple'
-    }
-    return colors[category] || 'default'
-  }
-
-  const columns: ColumnsType<StepType> = [
+  const columns: Column<StepType>[] = [
+    { key: 'code', title: t('pages.recipeGuide.stepTypeCode'), width: 150, render: (r) => r.code },
+    { key: 'name', title: t('pages.recipeGuide.stepTypeName'), render: (r) => r.name },
     {
-      title: t('pages.recipeGuide.stepTypeCode'),
-      dataIndex: 'code',
-      key: 'code',
-      width: 150
+      key: 'actions', title: t('pages.recipeGuide.actions'), width: 150,
+      render: (r) => (
+        <div className="flex items-center gap-1">
+          <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEdit(r)}>{t('pages.recipeGuide.edit')}</Btn>
+          <Btn variant="link" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setDeleteId(r.id)}>{t('pages.recipeGuide.delete')}</Btn>
+        </div>
+      ),
     },
-    {
-      title: t('pages.recipeGuide.stepTypeName'),
-      dataIndex: 'name',
-      key: 'name',
-      width: 200
-    },
-    {
-      title: t('pages.recipeGuide.category'),
-      dataIndex: 'category',
-      key: 'category',
-      width: 120,
-      render: (category: string) => (
-        <Tag color={getCategoryColor(category)}>
-          {t(`pages.recipeGuide.category${category.charAt(0).toUpperCase() + category.slice(1)}`)}
-        </Tag>
-      )
-    },
-    {
-      title: t('pages.recipeGuide.symbol'),
-      dataIndex: 'symbol',
-      key: 'symbol',
-      width: 100
-    },
-    {
-      title: t('pages.recipeGuide.color'),
-      dataIndex: 'color',
-      key: 'color',
-      width: 120,
-      render: (color: string) =>
-        color ? (
-          <Space>
-            <div
-              style={{
-                width: 20,
-                height: 20,
-                backgroundColor: color,
-                border: '1px solid #d9d9d9',
-                borderRadius: 4
-              }}
-            />
-            <span>{color}</span>
-          </Space>
-        ) : null
-    },
-    {
-      title: t('pages.recipeGuide.isSystem'),
-      dataIndex: 'isSystem',
-      key: 'isSystem',
-      width: 100,
-      render: (isSystem: boolean) =>
-        isSystem ? <Tag color="default">{t('pages.recipeGuide.isSystem')}</Tag> : null
-    },
-    {
-      title: t('pages.recipeGuide.actions'),
-      key: 'actions',
-      width: 150,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            {t('pages.recipeGuide.edit')}
-          </Button>
-          <Popconfirm
-            title={t('pages.recipeGuide.deleteStepTypeConfirm')}
-            description={t('pages.recipeGuide.deleteWarning')}
-            onConfirm={() => handleDelete(record.id)}
-            okText={t('pages.recipeGuide.confirm')}
-            cancelText={t('pages.recipeGuide.cancel')}
-          >
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-            >
-              {t('pages.recipeGuide.delete')}
-            </Button>
-          </Popconfirm>
-        </Space>
-      )
-    }
   ]
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleCreate}
-        >
-          {t('pages.recipeGuide.createStepType')}
-        </Button>
+      <div className="mb-4">
+        <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreate}>{t('pages.recipeGuide.createStepType')}</Btn>
       </div>
 
       <StepTypeFormModalEnhanced
         visible={modalVisible}
         stepType={editingStepType}
         existingStepTypes={stepTypes}
-        onClose={handleModalClose}
-        onSuccess={handleModalSuccess}
+        onClose={() => { setModalVisible(false); setEditingStepType(undefined) }}
+        onSuccess={loadStepTypes}
       />
 
-      <Table
-        columns={columns}
-        dataSource={stepTypes}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          showSizeChanger: true,
-          showTotal: (total) => `${t('pages.menuCenter.total')} ${total} ${t('pages.menuCenter.items')}`
-        }}
-        locale={{
-          emptyText: (
-            <Empty
-              description={t('pages.recipeGuide.noStepTypes')}
-              style={{ padding: '40px 0' }}
-            >
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleCreate}
-              >
-                {t('pages.recipeGuide.createFirstStepType')}
-              </Button>
-            </Empty>
-          )
-        }}
+      {!loading && stepTypes.length === 0 ? (
+        <EmptyState
+          title={t('pages.recipeGuide.noStepTypes')}
+          action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreate}>{t('pages.recipeGuide.createFirstStepType')}</Btn>}
+        />
+      ) : (
+        <Table columns={columns} data={stepTypes} rowKey={(r) => r.id} loading={loading} />
+      )}
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title={t('pages.recipeGuide.deleteStepTypeConfirm')}
+        description={t('pages.recipeGuide.deleteWarning')}
+        danger
+        confirmText={t('pages.recipeGuide.confirm')}
+        cancelText={t('pages.recipeGuide.cancel')}
+        onConfirm={handleDelete}
       />
     </div>
   )

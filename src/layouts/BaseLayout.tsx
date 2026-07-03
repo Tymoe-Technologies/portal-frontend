@@ -67,7 +67,7 @@ function HeaderSelect({ value, options, onChange, placeholder, ariaLabel, classN
         className={clsx(
           'group inline-flex min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700',
           'hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 data-[state=open]:border-indigo-400',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 data-[state=open]:border-slate-400',
           '[&>span:first-child]:truncate',
           className,
         )}
@@ -90,12 +90,12 @@ function HeaderSelect({ value, options, onChange, placeholder, ariaLabel, classN
                 value={opt.value}
                 className={clsx(
                   'relative flex items-center rounded-lg pl-8 pr-3 py-2 text-sm text-slate-700 select-none cursor-pointer outline-none',
-                  'data-[highlighted]:bg-indigo-50 data-[highlighted]:text-indigo-700',
-                  'data-[state=checked]:font-medium data-[state=checked]:text-indigo-700',
+                  'data-[highlighted]:bg-slate-100 data-[highlighted]:text-slate-900',
+                  'data-[state=checked]:font-medium data-[state=checked]:text-slate-900',
                 )}
               >
                 <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                  <Check className="w-4 h-4 text-indigo-600" />
+                  <Check className="w-4 h-4 text-slate-900" />
                 </Select.ItemIndicator>
                 <Select.ItemText>{opt.label}</Select.ItemText>
               </Select.Item>
@@ -116,21 +116,21 @@ function NavLeaf({ item, active, collapsed }: { item: NavItem; active: boolean; 
         to={item.to!}
         className={clsx(
           'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium transition-all duration-150',
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500',
+          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900',
           active
-            ? 'bg-indigo-50 text-indigo-700'
-            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+            ? 'bg-slate-100 text-slate-900'
+            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
           collapsed && 'justify-center px-2',
         )}
       >
         {/* 活跃指示条 */}
         {active && !collapsed && (
-          <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-indigo-600" />
+          <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-slate-900" />
         )}
         <span
           className={clsx(
             'shrink-0 w-[18px] h-[18px] transition-colors',
-            active ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600',
+            active ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600',
           )}
         >
           {item.icon}
@@ -173,7 +173,7 @@ function NavGroup({ item, activeKey, collapsed, defaultOpen }: {
       <Collapsible.Trigger className="group w-full flex items-center justify-between rounded-md px-3 py-1.5 cursor-pointer select-none hover:bg-slate-50 transition-colors">
         <span className={clsx(
           'text-xs font-semibold uppercase tracking-wider transition-colors',
-          hasActiveChild ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600',
+          hasActiveChild ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600',
         )}>
           {item.label}
         </span>
@@ -359,7 +359,7 @@ const BaseLayout: React.FC = () => {
             'flex items-center h-16 shrink-0 border-b border-slate-100',
             collapsed ? 'justify-center px-2' : 'px-4 gap-3'
           )}>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white font-bold text-base shadow-sm shadow-indigo-500/30">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 text-white font-bold text-base shadow-sm shadow-slate-900/20">
               T
             </div>
             {!collapsed && (
@@ -387,7 +387,7 @@ const BaseLayout: React.FC = () => {
               )
             })}
 
-            {/* 特色功能 — 保留渐变特效 */}
+            {/* 特色功能 — 琥珀金高亮（非紫、实心可读） */}
             <div className="mt-4 pt-3 border-t border-slate-100">
               <NavTooltip label={t('nav.features')} collapsed={collapsed}>
                 <Link
@@ -396,22 +396,13 @@ const BaseLayout: React.FC = () => {
                     'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-semibold transition-all duration-150',
                     'ring-1 ring-inset',
                     activeKey === '/features'
-                      ? 'bg-gradient-to-r from-pink-50 to-fuchsia-50 ring-pink-200'
-                      : 'ring-transparent hover:bg-pink-50/60',
+                      ? 'bg-amber-50 ring-amber-200 text-amber-700'
+                      : 'ring-transparent text-amber-600 hover:bg-amber-50/60',
                     collapsed && 'justify-center px-2',
                   )}
                 >
-                  <Sparkles className="w-4 h-4 shrink-0 text-pink-500 transition-transform group-hover:scale-110" />
-                  {!collapsed && (
-                    <span style={{
-                      background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                    }}>
-                      {t('nav.features')}
-                    </span>
-                  )}
+                  <Sparkles className="w-4 h-4 shrink-0 text-amber-500 transition-transform group-hover:scale-110" />
+                  {!collapsed && <span className="truncate">{t('nav.features')}</span>}
                 </Link>
               </NavTooltip>
             </div>
@@ -423,7 +414,7 @@ const BaseLayout: React.FC = () => {
               <button
                 onClick={() => setCollapsed(v => !v)}
                 className={clsx(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer text-sm font-medium',
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer text-sm font-medium',
                   collapsed && 'justify-center',
                 )}
               >
@@ -529,7 +520,7 @@ const BaseLayout: React.FC = () => {
             <AlertDialog.Trigger asChild>
               <button
                 title="清除测试数据"
-                className="fixed bottom-8 right-8 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white shadow-lg hover:bg-red-600 transition-colors cursor-pointer"
+                className="fixed bottom-8 right-8 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white! shadow-lg hover:bg-red-600 transition-colors cursor-pointer"
               >
                 <Trash2 className="w-5 h-5" />
               </button>
@@ -551,7 +542,7 @@ const BaseLayout: React.FC = () => {
                     <button
                       onClick={handleClearTestData}
                       disabled={clearingData}
-                      className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 cursor-pointer"
+                      className="px-4 py-2 text-sm font-medium text-white! bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 cursor-pointer"
                     >
                       {clearingData ? '清除中...' : '确认删除'}
                     </button>

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import * as RadixSwitch from '@radix-ui/react-switch'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '../../auth/AuthProvider'
@@ -14,205 +13,14 @@ import {
 import { updateOrganization } from '../../services/auth'
 import { getStoreStripeAccountPublic } from '../../services/payment-provider'
 import directService from '../../services/directService'
-import clsx from 'clsx'
 import {
-  Save,
-  RotateCcw,
-  ExternalLink,
-  AlertTriangle,
-  Info,
-  Crown,
-  Store,
-  GitBranch,
-  Car,
-  CheckCircle2,
-  Loader2,
+  Save, RotateCcw, ExternalLink, Crown, Store, GitBranch, Car,
 } from 'lucide-react'
-
-// ─── 通用基础组件 ──────────────────────────────────────────────────────────────
-
-function Badge({ children, variant = 'default', icon }: {
-  children: React.ReactNode
-  variant?: 'default' | 'gold' | 'blue' | 'green'
-  icon?: React.ReactNode
-}) {
-  return (
-    <span className={clsx(
-      'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ring-1',
-      variant === 'gold'  && 'bg-amber-50 text-amber-700 ring-amber-200',
-      variant === 'blue'  && 'bg-blue-50 text-blue-700 ring-blue-200',
-      variant === 'green' && 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-      variant === 'default' && 'bg-slate-100 text-slate-600 ring-slate-200',
-    )}>
-      {icon}{children}
-    </span>
-  )
-}
-
-function Btn({
-  children, variant = 'primary', size = 'md', loading = false,
-  disabled = false, onClick, type = 'button', icon,
-}: {
-  children?: React.ReactNode
-  variant?: 'primary' | 'secondary' | 'ghost' | 'link'
-  size?: 'sm' | 'md'
-  loading?: boolean
-  disabled?: boolean
-  onClick?: () => void
-  type?: 'button' | 'submit'
-  icon?: React.ReactNode
-}) {
-  return (
-    <button
-      type={type}
-      disabled={disabled || loading}
-      onClick={onClick}
-      className={clsx(
-        'inline-flex items-center gap-1.5 font-medium rounded-lg transition-all duration-150 cursor-pointer',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
-        'focus-visible:outline-2 focus-visible:outline-offset-2',
-        variant === 'primary'   && 'bg-slate-900 text-white hover:bg-slate-800 px-3.5 py-2 text-sm focus-visible:outline-slate-900',
-        variant === 'secondary' && 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 px-3.5 py-2 text-sm focus-visible:outline-slate-400',
-        variant === 'ghost'     && 'text-slate-600 hover:bg-slate-100 px-3 py-1.5 text-sm focus-visible:outline-slate-400',
-        variant === 'link'      && 'text-slate-600 hover:text-slate-900 underline-offset-4 hover:underline text-sm',
-        size === 'sm' && 'text-xs px-2.5 py-1.5',
-      )}
-    >
-      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : icon}
-      {children}
-    </button>
-  )
-}
-
-function Switch({ checked, onCheckedChange, disabled }: {
-  checked: boolean
-  onCheckedChange: (v: boolean) => void
-  disabled?: boolean
-}) {
-  return (
-    <RadixSwitch.Root
-      checked={checked}
-      onCheckedChange={onCheckedChange}
-      disabled={disabled}
-      className={clsx(
-        'relative w-10 h-5 rounded-full transition-colors duration-200 cursor-pointer',
-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900',
-        checked ? 'bg-slate-900' : 'bg-slate-200',
-        disabled && 'opacity-50 cursor-not-allowed',
-      )}
-    >
-      <RadixSwitch.Thumb className="block w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
-    </RadixSwitch.Root>
-  )
-}
-
-function AlertBox({ type = 'info', title, description, action }: {
-  type?: 'info' | 'warning' | 'success'
-  title: string
-  description?: React.ReactNode
-  action?: React.ReactNode
-}) {
-  const styles = {
-    info:    { wrap: 'bg-blue-50 border-blue-200',   icon: <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />,         text: 'text-blue-800',  sub: 'text-blue-600' },
-    warning: { wrap: 'bg-amber-50 border-amber-200', icon: <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />, text: 'text-amber-800', sub: 'text-amber-700' },
-    success: { wrap: 'bg-emerald-50 border-emerald-200', icon: <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />, text: 'text-emerald-800', sub: 'text-emerald-700' },
-  }[type]
-
-  return (
-    <div className={clsx('flex items-start gap-3 rounded-xl border px-4 py-3', styles.wrap)}>
-      {styles.icon}
-      <div className="flex-1 min-w-0">
-        <p className={clsx('text-sm font-medium', styles.text)}>{title}</p>
-        {description && <p className={clsx('text-sm mt-0.5', styles.sub)}>{description}</p>}
-      </div>
-      {action && <div className="shrink-0">{action}</div>}
-    </div>
-  )
-}
-
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-200">
-      <div className="px-5 py-3 border-b border-slate-100">
-        <p className="text-sm font-semibold text-slate-900">{title}</p>
-      </div>
-      <div className="px-5 py-4">{children}</div>
-    </div>
-  )
-}
-
-function FormRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-3 border-b border-slate-100 last:border-0">
-      <div>
-        <p className="text-sm font-medium text-slate-700">{label}</p>
-        {hint && <p className="text-xs text-slate-400 mt-0.5">{hint}</p>}
-      </div>
-      <div className="shrink-0">{children}</div>
-    </div>
-  )
-}
-
-function TextInput({ value, onChange, placeholder, disabled, pattern }: {
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  disabled?: boolean
-  pattern?: string
-}) {
-  return (
-    <input
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      disabled={disabled}
-      pattern={pattern}
-      className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 w-full
-        disabled:bg-slate-50 disabled:text-slate-400
-        focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
-    />
-  )
-}
-
-function NumberInput({ value, onChange, min, max, suffix }: {
-  value: number
-  onChange: (v: number) => void
-  min?: number
-  max?: number
-  suffix?: string
-}) {
-  return (
-    <div className="flex items-center gap-1">
-      <input
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        onChange={e => onChange(Number(e.target.value))}
-        className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 w-20
-          focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
-      />
-      {suffix && <span className="text-xs text-slate-400">{suffix}</span>}
-    </div>
-  )
-}
-
-function SelectInput({ value, onChange, options }: {
-  value: string | number
-  onChange: (v: any) => void
-  options: { label: string; value: string | number }[]
-}) {
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(Number(e.target.value) || e.target.value)}
-      className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 cursor-pointer
-        focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
-    >
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  )
-}
+// 统一使用共享设计组件（单一来源），不再内联
+import {
+  Badge, Btn, Switch, AlertBox, SectionCard, FormRow,
+  TextInput, NumberInput, SelectInput, Spinner,
+} from '../../components/ui-kit'
 
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 
@@ -391,9 +199,7 @@ const OnlineOrderConfigPage: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-          </div>
+          <Spinner />
         ) : (
           <div className="space-y-4">
 

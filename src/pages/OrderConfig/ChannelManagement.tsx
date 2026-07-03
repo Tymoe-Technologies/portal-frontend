@@ -1,482 +1,802 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Button,
-  Card,
-  Table,
-  Space,
-  Typography,
-  Tag,
-  Modal,
-  Form,
-  Input,
-  Select,
-  message,
-  Tooltip,
-  Empty,
-  Popconfirm,
-  Divider,
-  InputNumber,
-  Switch,
-  Tabs,
-  Alert
-} from 'antd'
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  SearchOutlined,
-  ReloadOutlined,
-  ShoppingCartOutlined,
-  InfoCircleOutlined,
-  DollarOutlined
-} from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
 import { useNavigate } from 'react-router-dom'
+import {
+  Plus, Pencil, Trash2, Search, RotateCcw, ShoppingCart,
+  DollarSign, Store, Car, Lock, Percent, Users,
+} from 'lucide-react'
 import { useAuthContext } from '../../auth/AuthProvider'
 import {
-  getOrderSources,
-  createOrderSource,
-  updateOrderSource,
-  deleteOrderSource,
-  type OrderSource,
-  type OrderSourceType,
-  type CreateOrderSourceRequest,
-  type UpdateOrderSourceRequest
+  getSalesChannels,
+  createSalesChannel,
+  updateSalesChannel,
+  deleteSalesChannel,
+  getChannelMembers,
+  addChannelMember,
+  updateChannelMember,
+  removeChannelMember,
+  type SalesChannel,
+  type ChannelMember,
+  type CheckoutMode,
+  type ChannelAccessMode,
+  type BillingCycle,
+  type DiscountType,
+  type CreateSalesChannelRequest,
+  type UpdateSalesChannelRequest,
 } from '../../services/order-config'
+import {
+  PageHeader, SectionCard, Table, Badge, Btn, Switch, TextInput, Textarea,
+  NumberInput, SelectInput, Field, AlertBox, Modal, ConfirmDialog, EmptyState,
+  Spinner, type Column,
+} from '../../components/ui-kit'
 
-const { Title, Text, Paragraph } = Typography
-const { Option } = Select
+// 外卖平台销售渠道的 sourceType 集合
+const DELIVERY_PLATFORM_TYPES = new Set([
+  'UBER_EATS', 'DOORDASH', 'SKIP_THE_DISHES', 'GRUBHUB', 'RITUAL', 'FANTUAN', 'OTHER_PLATFORM',
+])
 
-interface OrderSourceFormData {
-  sourceName: string
-  description?: string
-  isActive: boolean
-  displayOrder: number
+const PLATFORM_LABELS: Record<string, string> = {
+  UBER_EATS: 'Uber Eats',
+  DOORDASH: 'DoorDash',
+  SKIP_THE_DISHES: 'Skip The Dishes',
+  GRUBHUB: 'Grubhub',
+  RITUAL: 'Ritual',
+  FANTUAN: '饭团',
+  OTHER_PLATFORM: '其他平台',
 }
 
-// 系统预设的订单渠道（不可编辑删除）
-const SYSTEM_SOURCE_TYPES = ['POS', 'ONLINE', 'DELIVERY', 'SELF_SERVICE']
+const PLATFORM_LOGOS: Record<string, string> = {
+  UBER_EATS: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Uber_Eats_2020_logo.svg/320px-Uber_Eats_2020_logo.svg.png',
+  DOORDASH: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/DoorDash_Logo.svg/320px-DoorDash_Logo.svg.png',
+  SKIP_THE_DISHES: 'https://upload.wikimedia.org/wikipedia/en/thumb/3/35/SkipTheDishes_logo.svg/320px-SkipTheDishes_logo.svg.png',
+  GRUBHUB: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Grubhub_logo_2016.svg/320px-Grubhub_logo_2016.svg.png',
+  RITUAL: 'https://images.ctfassets.net/hkpf2qd2vxgx/4rT0QqZLCMNVIi9cEgomLn/5e1bc16e6c4c9e3d8b4c9d4a2e8e8e8e/ritual-logo.png',
+  FANTUAN: 'https://play-lh.googleusercontent.com/W2DaOQRfj6x1QOJ-sGbh2g3XvXJk0nRNNKOEeNzYvXJK1tKI1IYFrABq9ZHPpuEb_g=w240-h480-rw',
+  OTHER_PLATFORM: '',
+}
 
-// 自定义订单渠道类型（用户可创建）
-const CUSTOM_SOURCE_TYPE = 'CUSTOM'
+const PLATFORM_COLORS: Record<string, string> = {
+  UBER_EATS: '#06C167',
+  DOORDASH: '#FF3008',
+  SKIP_THE_DISHES: '#FF6900',
+  GRUBHUB: '#F63440',
+  RITUAL: '#FF5A5F',
+  FANTUAN: '#E8312A',
+  OTHER_PLATFORM: '#64748b',
+}
+
+const BILLING_CYCLE_LABELS: Record<string, string> = {
+  WEEKLY: '每周', BIWEEKLY: '每两周', MONTHLY: '每月',
+}
+
+// 平台 Logo：有 URL 显示图片，失败或无 URL 显示品牌色缩写块
+const PlatformLogo: React.FC<{ platform: string; size?: number }> = ({ platform, size = 40 }) => {
+  const [imgError, setImgError] = useState(false)
+  const logoUrl = PLATFORM_LOGOS[platform]
+  const color = PLATFORM_COLORS[platform] ?? '#64748b'
+  const label = PLATFORM_LABELS[platform] ?? platform
+
+  if (logoUrl && !imgError) {
+    return (
+      <img
+        src={logoUrl}
+        alt={label}
+        style={{ width: size * 2, height: size, objectFit: 'contain' }}
+        onError={() => setImgError(true)}
+      />
+    )
+  }
+  return (
+    <div
+      className="flex items-center justify-center rounded-md text-white font-bold"
+      style={{ width: size * 2, height: size, background: color, fontSize: size * 0.36 }}
+    >
+      {label.slice(0, 2).toUpperCase()}
+    </div>
+  )
+}
+
+interface ChannelFormData {
+  channelName: string
+  description: string
+  isActive: boolean
+  displayOrder: number
+  accessMode: ChannelAccessMode
+  checkoutMode: CheckoutMode
+  billingCycle?: BillingCycle
+  cycleLimit?: number
+  discountEnabled: boolean
+  discountType: DiscountType
+  discountValue?: number
+}
+
+const emptyChannelForm = (order: number): ChannelFormData => ({
+  channelName: '',
+  description: '',
+  isActive: true,
+  displayOrder: order,
+  accessMode: 'PUBLIC',
+  checkoutMode: 'NORMAL',
+  billingCycle: undefined,
+  cycleLimit: undefined,
+  discountEnabled: false,
+  discountType: 'PERCENTAGE',
+  discountValue: undefined,
+})
 
 const ChannelManagement: React.FC = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
-
-  // 翻译键前缀
   const tk = (key: string) => t(`pages.orderConfig.${key}`)
   const { isAuthenticated } = useAuthContext()
-  const [form] = Form.useForm<OrderSourceFormData>()
-  const [selectedOrgId, setSelectedOrgId] = useState<string>(
-    localStorage.getItem('organization_id') || ''
+
+  const [loading, setLoading] = useState(false)
+  const [allSources, setAllSources] = useState<SalesChannel[]>([])
+  const [searchText, setSearchText] = useState('')
+  const [flash, setFlash] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const notify = (type: 'success' | 'error', msg: string) => {
+    setFlash({ type, msg }); setTimeout(() => setFlash(null), type === 'success' ? 3000 : 5000)
+  }
+
+  // 自定义渠道弹窗
+  const [modalVisible, setModalVisible] = useState(false)
+  const [editingSource, setEditingSource] = useState<SalesChannel | null>(null)
+  const [channelForm, setChannelForm] = useState<ChannelFormData>(emptyChannelForm(1))
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const setField = <K extends keyof ChannelFormData>(k: K, v: ChannelFormData[K]) =>
+    setChannelForm(prev => ({ ...prev, [k]: v }))
+  const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<SalesChannel | null>(null)
+
+  // 外卖平台配置弹窗
+  const [deliveryModalVisible, setDeliveryModalVisible] = useState(false)
+  const [editingDelivery, setEditingDelivery] = useState<SalesChannel | null>(null)
+  const [deliveryActive, setDeliveryActive] = useState(false)
+  const [deliveryCommission, setDeliveryCommission] = useState<number | undefined>(undefined)
+
+  // 成员管理弹窗
+  const [memberModalChannel, setMemberModalChannel] = useState<SalesChannel | null>(null)
+  const [members, setMembers] = useState<ChannelMember[]>([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [memberPhone, setMemberPhone] = useState('')
+  const [memberName, setMemberName] = useState('')
+  const [memberNote, setMemberNote] = useState('')
+  const [addingMember, setAddingMember] = useState(false)
+  const [removeMemberTarget, setRemoveMemberTarget] = useState<ChannelMember | null>(null)
+
+  // 分组数据
+  const customChannels = allSources.filter(s => !DELIVERY_PLATFORM_TYPES.has(s.sourceType))
+  const deliveryChannels = allSources.filter(s => DELIVERY_PLATFORM_TYPES.has(s.sourceType))
+  const filteredCustom = customChannels.filter(
+    s =>
+      s.sourceName.toLowerCase().includes(searchText.toLowerCase()) ||
+      s.sourceType.toLowerCase().includes(searchText.toLowerCase())
   )
 
-  // 状态管理
-  const [loading, setLoading] = useState(false)
-  const [orderSources, setOrderSources] = useState<OrderSource[]>([])
-  const [filteredSources, setFilteredSources] = useState<OrderSource[]>([])
-  const [searchText, setSearchText] = useState('')
-  const [isModalVisible, setIsModalVisible] = useState(false)
-  const [editingSource, setEditingSource] = useState<OrderSource | null>(null)
-
-  // 加载订单渠道列表
-  const loadOrderSources = async () => {
-    if (!isAuthenticated) {
-      return
-    }
-
+  const loadSources = async () => {
+    if (!isAuthenticated) return
     setLoading(true)
     try {
-      const sources = await getOrderSources()
-      // 确保sources是数组
-      const sourceArray = Array.isArray(sources) ? sources : []
-      setOrderSources(sourceArray)
-      setFilteredSources(sourceArray)
-    } catch (error) {
-      console.error('Error loading order channels:', error)
-      message.error(tk('loadFailed'))
-      // 错误时设置为空数组
-      setOrderSources([])
-      setFilteredSources([])
+      const sources = await getSalesChannels()
+      setAllSources(Array.isArray(sources) ? sources : [])
+    } catch {
+      notify('error', tk('loadFailed'))
+      setAllSources([])
     } finally {
       setLoading(false)
     }
   }
 
-  // 监听 localStorage 中的组织选择变化
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'organization_id') {
-        const newOrgId = e.newValue || ''
-        setSelectedOrgId(newOrgId)
-      }
+  useEffect(() => { loadSources() }, [isAuthenticated])
+
+  // ── 成员管理 ────────────────────────────────────────────────
+
+  const openMemberModal = async (channel: SalesChannel) => {
+    setMemberModalChannel(channel)
+    setMemberPhone(''); setMemberName(''); setMemberNote('')
+    setMembersLoading(true)
+    try {
+      setMembers(await getChannelMembers(channel.id))
+    } catch {
+      notify('error', '加载成员失败')
+    } finally {
+      setMembersLoading(false)
     }
+  }
 
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
-  }, [])
+  const handleAddMember = async () => {
+    if (!memberModalChannel) return
+    if (!memberPhone.trim()) { notify('error', '请输入手机号'); return }
+    setAddingMember(true)
+    try {
+      await addChannelMember(memberModalChannel.id, { phone: memberPhone.trim(), name: memberName || undefined, note: memberNote || undefined } as any)
+      notify('success', '成员已添加')
+      setMemberPhone(''); setMemberName(''); setMemberNote('')
+      setMembers(await getChannelMembers(memberModalChannel.id))
+    } catch (e: any) {
+      notify('error', '添加失败：' + (e?.message || '请重试'))
+    } finally {
+      setAddingMember(false)
+    }
+  }
 
-  // 初始化加载
-  useEffect(() => {
-    loadOrderSources()
-  }, [isAuthenticated])
+  const handleRemoveMember = async (member: ChannelMember) => {
+    if (!memberModalChannel) return
+    try {
+      await removeChannelMember(memberModalChannel.id, member.id)
+      setMembers(prev => prev.filter(m => m.id !== member.id))
+    } catch {
+      notify('error', '删除失败')
+    } finally {
+      setRemoveMemberTarget(null)
+    }
+  }
 
-  // 搜索过滤
-  useEffect(() => {
-    const filtered = orderSources.filter(
-      source =>
-        source.sourceName.toLowerCase().includes(searchText.toLowerCase()) ||
-        source.sourceType.toLowerCase().includes(searchText.toLowerCase())
-    )
-    setFilteredSources(filtered)
-  }, [searchText, orderSources])
+  const handleToggleMember = async (member: ChannelMember, isActive: boolean) => {
+    if (!memberModalChannel) return
+    try {
+      const updated = await updateChannelMember(memberModalChannel.id, member.id, { isActive })
+      setMembers(prev => prev.map(m => m.id === updated.id ? updated : m))
+    } catch {
+      notify('error', '更新失败')
+    }
+  }
 
-  // 打开创建/编辑模态框
-  const openModal = (source?: OrderSource) => {
+  // ── 自定义渠道弹窗 ─────────────────────────────────────────
+
+  const openModal = (source?: SalesChannel) => {
+    setErrors({})
     if (source) {
       setEditingSource(source)
-      form.setFieldsValue({
-        sourceName: source.sourceName,
-        description: source.description,
+      const mode = source.checkoutMode ?? 'NORMAL'
+      const discount = source.checkoutRules?.orderDiscount
+      setChannelForm({
+        channelName: source.sourceName,
+        description: source.description ?? '',
         isActive: source.isActive,
-        displayOrder: source.displayOrder
+        displayOrder: source.displayOrder,
+        accessMode: source.accessMode ?? 'PUBLIC',
+        checkoutMode: mode,
+        billingCycle: source.creditConfig?.billingCycle,
+        cycleLimit: source.creditConfig?.cycleLimit ? source.creditConfig.cycleLimit / 100 : undefined,
+        discountEnabled: discount?.enabled ?? false,
+        discountType: discount?.type ?? 'PERCENTAGE',
+        discountValue: discount?.value,
       })
     } else {
       setEditingSource(null)
-      form.resetFields()
-      form.setFieldsValue({
-        isActive: true,
-        displayOrder: orderSources.length + 1
-      })
+      setChannelForm(emptyChannelForm(customChannels.length + 1))
     }
-    setIsModalVisible(true)
+    setModalVisible(true)
   }
 
-  // 关闭模态框
   const closeModal = () => {
-    setIsModalVisible(false)
+    setModalVisible(false)
     setEditingSource(null)
-    form.resetFields()
+    setErrors({})
   }
 
-  // 处理保存
-  const handleSave = async (values: OrderSourceFormData) => {
+  const validateChannel = (): boolean => {
+    const e: Record<string, string> = {}
+    const name = channelForm.channelName.trim()
+    if (!name) e.channelName = tk('sourceNameRequired')
+    else if (name.length < 2) e.channelName = tk('sourceNameMinLength')
+    else if (name.length > 100) e.channelName = tk('sourceNameMaxLength')
+    if (!channelForm.displayOrder) e.displayOrder = '必填'
+    if (channelForm.checkoutMode === 'CREDIT_ACCOUNT') {
+      if (!channelForm.billingCycle) e.billingCycle = '请选择结账周期'
+      if (channelForm.cycleLimit == null) e.cycleLimit = '请输入周期限额'
+    }
+    if (channelForm.discountEnabled && channelForm.discountValue == null) {
+      e.discountValue = '请输入折扣值'
+    }
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const handleSave = async () => {
+    if (!validateChannel()) return
+    setSaving(true)
     try {
-      setLoading(true)
+      const v = channelForm
+      const creditConfig =
+        v.checkoutMode === 'CREDIT_ACCOUNT' && v.billingCycle
+          ? { billingCycle: v.billingCycle, cycleLimit: Math.round((v.cycleLimit ?? 0) * 100) }
+          : undefined
+
+      const checkoutRules =
+        v.discountEnabled
+          ? { orderDiscount: { enabled: true, type: v.discountType, value: v.discountValue ?? 0 } }
+          : { orderDiscount: { enabled: false, type: 'PERCENTAGE' as DiscountType, value: 0 } }
 
       if (editingSource) {
-        // 更新
-        const request: UpdateOrderSourceRequest = {
-          channelName: values.sourceName,
-          description: values.description,
-          isActive: values.isActive,
-          displayOrder: values.displayOrder
+        const req: UpdateSalesChannelRequest = {
+          channelName: v.channelName,
+          description: v.description,
+          isActive: v.isActive,
+          displayOrder: v.displayOrder,
+          accessMode: v.accessMode,
+          checkoutMode: v.checkoutMode,
+          creditConfig: creditConfig ?? null,
+          checkoutRules,
         }
-        await updateOrderSource(editingSource.id, request)
-        message.success(tk('updateSuccess'))
+        await updateSalesChannel(editingSource.id, req)
+        notify('success', tk('updateSuccess'))
       } else {
-        // 创建 - 自动设置渠道类型为自定义
-        const request: any = {
-          channelType: CUSTOM_SOURCE_TYPE,
-          channelName: values.sourceName,
-          description: values.description,
-          isActive: values.isActive,
-          displayOrder: values.displayOrder
+        const req: CreateSalesChannelRequest = {
+          channelType: 'CUSTOM',
+          channelName: v.channelName,
+          description: v.description,
+          isActive: v.isActive,
+          displayOrder: v.displayOrder,
+          accessMode: v.accessMode,
+          checkoutMode: v.checkoutMode,
+          creditConfig,
+          checkoutRules,
         }
-        await createOrderSource(request)
-        message.success(tk('createSuccess'))
+        await createSalesChannel(req)
+        notify('success', tk('createSuccess'))
       }
-
       closeModal()
-      await loadOrderSources()
-    } catch (error) {
-      console.error('Error saving order channel:', error)
-      message.error(editingSource ? tk('updateFailed') : tk('createFailed'))
+      await loadSources()
+    } catch {
+      notify('error', editingSource ? tk('updateFailed') : tk('createFailed'))
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  // 处理删除
-  const handleDelete = async (source: OrderSource) => {
+  const handleDelete = async (source: SalesChannel) => {
+    setSaving(true)
     try {
-      setLoading(true)
-      await deleteOrderSource(source.id)
-      message.success(tk('deleteSuccess'))
-      await loadOrderSources()
-    } catch (error) {
-      console.error('Error deleting order channel:', error)
-      message.error(tk('deleteFailed'))
+      await deleteSalesChannel(source.id)
+      notify('success', tk('deleteSuccess'))
+      await loadSources()
+    } catch {
+      notify('error', tk('deleteFailed'))
     } finally {
-      setLoading(false)
+      setSaving(false)
+      setDeleteTarget(null)
     }
   }
 
-  // 表格列定义
-  const columns: ColumnsType<OrderSource> = [
-    {
-      title: tk('sourceType'),
-      dataIndex: 'sourceType',
-      key: 'sourceType',
-      width: 120,
-      render: (text: OrderSourceType) => (
-        <Tag color="blue">{text}</Tag>
-      )
-    },
-    {
-      title: tk('sourceName'),
-      dataIndex: 'sourceName',
-      key: 'sourceName',
-      width: 200,
-      render: (text: string) => <Text strong>{text}</Text>
-    },
-    {
-      title: tk('descriptionColumn'),
-      dataIndex: 'description',
-      key: 'description',
-      width: 250,
-      render: (text: string) => text || '-'
-    },
-    {
-      title: tk('displayOrder'),
-      dataIndex: 'displayOrder',
-      key: 'displayOrder',
-      width: 100,
-      render: (text: number) => <Text>{text}</Text>
-    },
-    {
-      title: tk('status'),
-      dataIndex: 'isActive',
-      key: 'isActive',
-      width: 100,
-      render: (isActive: boolean) => (
-        <Tag color={isActive ? 'green' : 'red'}>
-          {isActive ? tk('active') : tk('inactive')}
-        </Tag>
-      )
-    },
-    {
-      title: tk('createdAt'),
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (text: string) => text ? new Date(text).toLocaleString() : '-'
-    },
-    {
-      title: tk('actions'),
-      key: 'actions',
-      fixed: 'right',
-      width: 200,
-      render: (_, record) => {
-        const isSystem = SYSTEM_SOURCE_TYPES.includes(record.sourceType)
+  // ── 外卖平台配置弹窗 ───────────────────────────────────────
 
-        return (
-          <Space size="small">
-            {/* 管理定价按钮 - 所有渠道都可用 */}
-            <Tooltip title={tk('managePricing')}>
-              <Button
-                type="link"
-                icon={<DollarOutlined />}
-                onClick={() => navigate(`/order-config/pricing?source=${record.sourceType}`)}
-              >
-                {tk('managePricing')}
-              </Button>
-            </Tooltip>
+  const openDeliveryModal = (source: SalesChannel) => {
+    setEditingDelivery(source)
+    setDeliveryActive(source.isActive)
+    setDeliveryCommission(source.commissionRate ? parseFloat(source.commissionRate) * 100 : undefined)
+    setDeliveryModalVisible(true)
+  }
 
-            {/* 系统预设渠道只显示标签 */}
-            {isSystem ? (
-              <Tag color="blue">{tk('systemPreset')}</Tag>
-            ) : (
-              <>
-                <Divider type="vertical" />
-                <Tooltip title={tk('edit')}>
-                  <Button
-                    type="text"
-                    icon={<EditOutlined />}
-                    onClick={() => openModal(record)}
-                  />
-                </Tooltip>
-                <Popconfirm
-                  title={tk('deleteConfirm')}
-                  description={tk('deleteWarning')}
-                  onConfirm={() => handleDelete(record)}
-                  okText={tk('confirm')}
-                  cancelText={tk('cancel')}
-                >
-                  <Tooltip title={tk('delete')}>
-                    <Button type="text" danger icon={<DeleteOutlined />} />
-                  </Tooltip>
-                </Popconfirm>
-              </>
-            )}
-          </Space>
-        )
+  const handleDeliverySave = async () => {
+    if (!editingDelivery) return
+    setSaving(true)
+    try {
+      const req: UpdateSalesChannelRequest = {
+        isActive: deliveryActive,
+        commissionRate: deliveryCommission != null ? deliveryCommission / 100 : null,
       }
+      await updateSalesChannel(editingDelivery.id, req)
+      notify('success', tk('updateSuccess'))
+      setDeliveryModalVisible(false)
+      await loadSources()
+    } catch {
+      notify('error', tk('updateFailed'))
+    } finally {
+      setSaving(false)
     }
+  }
+
+  // ── 自定义渠道表格列 ─────────────────────────────────────────
+
+  const customColumns: Column<SalesChannel>[] = [
+    {
+      key: 'sourceName',
+      title: tk('sourceName'),
+      render: r => (
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-slate-800">{r.sourceName}</span>
+          {r.isSystemChannel && <Badge variant="blue">{tk('systemPreset')}</Badge>}
+        </div>
+      ),
+    },
+    { key: 'description', title: tk('descriptionColumn'), render: r => <span className="text-slate-500">{r.description || '-'}</span> },
+    {
+      key: 'accessMode',
+      title: '准入',
+      width: 100,
+      render: r => r.accessMode === 'MEMBER_ONLY'
+        ? <Badge variant="gold" icon={<Lock className="w-3 h-3" />}>仅会员</Badge>
+        : <Badge>公开</Badge>,
+    },
+    {
+      key: 'checkoutMode',
+      title: '结账方式',
+      width: 120,
+      render: r => r.checkoutMode === 'CREDIT_ACCOUNT'
+        ? (
+          <span title={r.creditConfig ? `周期：${BILLING_CYCLE_LABELS[r.creditConfig.billingCycle]}  限额：$${(r.creditConfig.cycleLimit / 100).toFixed(2)}` : '未配置记账周期'}>
+            <Badge variant="blue">记账</Badge>
+          </span>
+        )
+        : <Badge variant="green">正常结账</Badge>,
+    },
+    {
+      key: 'discount',
+      title: '整单折扣',
+      width: 110,
+      render: r => {
+        const d = r.checkoutRules?.orderDiscount
+        if (!d?.enabled) return <span className="text-slate-400">-</span>
+        return (
+          <Badge variant="blue" icon={<Percent className="w-3 h-3" />}>
+            {d.type === 'PERCENTAGE' ? `${d.value}% off` : `$${(d.value / 100).toFixed(2)} off`}
+          </Badge>
+        )
+      },
+    },
+    {
+      key: 'isActive',
+      title: tk('status'),
+      width: 80,
+      render: r => <Badge variant={r.isActive ? 'green' : 'red'}>{r.isActive ? tk('active') : tk('inactive')}</Badge>,
+    },
+    {
+      key: 'actions',
+      title: tk('actions'),
+      width: 220,
+      render: r => (
+        <div className="flex items-center gap-1">
+          <Btn variant="ghost" size="sm" icon={<DollarSign className="w-3.5 h-3.5" />} onClick={() => navigate(`/order-config/pricing?channelId=${r.id}`)}>
+            {tk('managePricing')}
+          </Btn>
+          {!r.isSystemChannel && (
+            <>
+              <span className="w-px h-4 bg-slate-200 mx-0.5" />
+              <button title="成员管理" onClick={() => openMemberModal(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
+                <Users className="w-4 h-4" />
+              </button>
+              <button title={tk('edit')} onClick={() => openModal(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
+                <Pencil className="w-4 h-4" />
+              </button>
+              <button title={tk('delete')} onClick={() => setDeleteTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </div>
+      ),
+    },
   ]
 
+  // ── 渲染 ───────────────────────────────────────────────────
+
   return (
-    <div>
-      <Card
-        title={
-          <Space>
-            <ShoppingCartOutlined />
-            <Title level={3} style={{ margin: 0 }}>
-              {tk('channelManagementTitle')}
-            </Title>
-          </Space>
+    <div className="px-1 py-2">
+      <PageHeader
+        title={<span className="inline-flex items-center gap-2"><ShoppingCart className="w-5 h-5 text-slate-400" />{tk('channelManagementTitle')}</span>}
+        description={tk('channelManagementDesc')}
+        actions={
+          <>
+            <Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading} onClick={loadSources} />
+            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openModal()}>{tk('createSource')}</Btn>
+          </>
         }
-        extra={
-          <Space>
-            <Tooltip title={tk('refresh')}>
-              <Button
-                type="primary"
-                icon={<ReloadOutlined />}
-                onClick={loadOrderSources}
-                loading={loading}
-              />
-            </Tooltip>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => openModal()}
-            >
-              {tk('createSource')}
-            </Button>
-          </Space>
-        }
-        style={{ marginBottom: 16 }}
-      >
-        <Paragraph>{tk('channelManagementDesc')}</Paragraph>
-      </Card>
+      />
 
-      {/* 搜索栏 */}
-      <Card style={{ marginBottom: 16 }}>
-        <Space.Compact style={{ width: '100%' }}>
-          <Input
-            placeholder={tk('search')}
-            prefix={<SearchOutlined />}
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            style={{ width: 300 }}
-          />
-        </Space.Compact>
-      </Card>
+      <div className="space-y-4">
+        {flash && <AlertBox type={flash.type} title={flash.msg} />}
 
-      {/* 订单渠道列表 */}
-      <Card
-        loading={loading}
-        style={{ marginBottom: 16 }}
-      >
-        {filteredSources.length === 0 && !loading ? (
-          <Empty
-            description={tk('empty')}
-            style={{ marginTop: 48, marginBottom: 48 }}
-          >
-            <Button type="primary" onClick={() => openModal()}>
-              {tk('createSource')}
-            </Button>
-          </Empty>
-        ) : (
-          <Table
-            columns={columns}
-            dataSource={filteredSources}
-            rowKey="id"
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total) => `${tk('total')} ${total} ${tk('items')}`
-            }}
-            scroll={{ x: true }}
-          />
-        )}
-      </Card>
-
-      {/* 创建/编辑模态框 */}
-      <Modal
-        title={editingSource ? tk('editSource') : tk('createSource')}
-        open={isModalVisible}
-        onCancel={closeModal}
-        onOk={() => form.submit()}
-        confirmLoading={loading}
-        width={600}
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSave}
-          autoComplete="off"
+        {/* 外卖平台销售渠道 */}
+        <SectionCard
+          title={<span className="inline-flex items-center gap-2"><Car className="w-4 h-4 text-slate-400" />外卖平台销售渠道</span>}
+          description="系统预设，启用后配置佣金率即可手动录单，日后平台接入后将自动对接"
         >
-          <Form.Item
-            label={tk('sourceName')}
-            name="sourceName"
-            rules={[
-              {
-                required: true,
-                message: tk('sourceNameRequired')
-              },
-              {
-                min: 2,
-                message: tk('sourceNameMinLength')
-              },
-              {
-                max: 100,
-                message: tk('sourceNameMaxLength')
-              }
-            ]}
-          >
-            <Input
-              placeholder={tk('sourceNamePlaceholder')}
-            />
-          </Form.Item>
+          {deliveryChannels.length === 0 ? (
+            <div className="py-8 text-center text-sm text-slate-400">暂无外卖平台渠道</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {deliveryChannels.map(ch => {
+                const rate = ch.commissionRate ? parseFloat(ch.commissionRate) * 100 : null
+                return (
+                  <div key={ch.id} className={clsxCard(ch.isActive)}>
+                    <div className="flex items-center gap-3 p-3">
+                      <PlatformLogo platform={ch.sourceType} size={28} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-slate-800 text-sm truncate">{ch.sourceName}</span>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ch.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                        </div>
+                        <div className="mt-1">
+                          {rate != null
+                            ? <Badge variant="gold" icon={<Percent className="w-3 h-3" />}>佣金 {rate.toFixed(1)}%</Badge>
+                            : <span className="text-xs text-slate-400">未配置佣金率</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex border-t border-slate-100 divide-x divide-slate-100">
+                      <button onClick={() => openDeliveryModal(ch)} className="flex-1 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
+                        <Pencil className="w-3 h-3" />配置
+                      </button>
+                      <button onClick={() => navigate(`/order-config/pricing?channelId=${ch.id}`)} className="flex-1 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
+                        <DollarSign className="w-3 h-3" />定价
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </SectionCard>
 
-          <Form.Item
-            label={tk('descriptionLabel')}
-            name="description"
-          >
-            <Input.TextArea
-              placeholder={tk('descriptionPlaceholder')}
-              rows={3}
-              maxLength={500}
-              showCount
-            />
-          </Form.Item>
+        {/* 自定义销售渠道 */}
+        <SectionCard
+          title={<span className="inline-flex items-center gap-2"><Store className="w-4 h-4 text-slate-400" />自定义渠道</span>}
+          action={
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                placeholder={tk('search')}
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                className="w-full text-sm bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-slate-700 placeholder:text-slate-300 focus:outline-2 focus:outline-slate-900"
+              />
+            </div>
+          }
+          bodyClassName="p-0"
+        >
+          <div className="p-4">
+            {loading ? (
+              <Spinner />
+            ) : filteredCustom.length === 0 ? (
+              <EmptyState
+                title={tk('empty')}
+                action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openModal()}>{tk('createSource')}</Btn>}
+              />
+            ) : (
+              <Table columns={customColumns} data={filteredCustom} rowKey={r => r.id} />
+            )}
+          </div>
+        </SectionCard>
+      </div>
 
-          <Form.Item
-            label={tk('displayOrder')}
-            name="displayOrder"
-            rules={[
-              {
-                required: true,
-                message: tk('displayOrderRequired')
-              }
-            ]}
-          >
-            <InputNumber
-              min={1}
-              max={1000}
-              placeholder={tk('displayOrderPlaceholder')}
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
+      {/* 自定义渠道创建/编辑弹窗 */}
+      <Modal
+        open={modalVisible}
+        onOpenChange={v => !v && closeModal()}
+        title={editingSource ? tk('editSource') : tk('createSource')}
+        size="lg"
+        footer={
+          <>
+            <Btn variant="secondary" onClick={closeModal}>{tk('cancel')}</Btn>
+            <Btn variant="primary" loading={saving} onClick={handleSave}>{tk('confirm')}</Btn>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <SectionLabel>基本信息</SectionLabel>
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-7">
+              <Field label={tk('sourceName')} required error={errors.channelName}>
+                <TextInput value={channelForm.channelName} onChange={v => setField('channelName', v)} placeholder={tk('sourceNamePlaceholder')} />
+              </Field>
+            </div>
+            <div className="col-span-3">
+              <Field label={tk('displayOrder')} required>
+                <NumberInput value={channelForm.displayOrder} onChange={v => setField('displayOrder', v)} min={1} max={1000} className="w-full" />
+              </Field>
+            </div>
+            <div className="col-span-2">
+              <Field label={tk('status')}>
+                <div className="pt-1.5"><Switch checked={channelForm.isActive} onCheckedChange={v => setField('isActive', v)} /></div>
+              </Field>
+            </div>
+          </div>
 
-          <Form.Item
-            label={tk('status')}
-            name="isActive"
-            valuePropName="checked"
-          >
-            <Switch
-              checkedChildren={tk('active')}
-              unCheckedChildren={tk('inactive')}
+          <Field label={tk('descriptionLabel')} hint={`${channelForm.description.length}/500`}>
+            <Textarea value={channelForm.description} onChange={v => setField('description', v.slice(0, 500))} rows={2} placeholder={tk('descriptionPlaceholder')} />
+          </Field>
+
+          <SectionLabel>准入设置</SectionLabel>
+          <Field label="渠道准入" hint="仅会员模式需要商家开启会员功能，通过 member 系统管理可用人员名单">
+            <SelectInput
+              value={channelForm.accessMode}
+              onChange={v => setField('accessMode', v)}
+              className="w-full"
+              options={[
+                { label: '公开 — 任何人可使用', value: 'PUBLIC' },
+                { label: '仅会员 — 需验证会员身份', value: 'MEMBER_ONLY' },
+              ]}
             />
-          </Form.Item>
-        </Form>
+          </Field>
+
+          <SectionLabel>结账设置</SectionLabel>
+          <Field label="结账方式">
+            <SelectInput
+              value={channelForm.checkoutMode}
+              onChange={v => setField('checkoutMode', v)}
+              className="w-full"
+              options={[
+                { label: '正常结账（信用卡、现金等）', value: 'NORMAL' },
+                { label: '记账（周期结算）', value: 'CREDIT_ACCOUNT' },
+              ]}
+            />
+          </Field>
+
+          {channelForm.checkoutMode === 'CREDIT_ACCOUNT' && (
+            <>
+              <AlertBox type="info" title="记账模式" description="下单时无需即时支付，系统按设定周期汇总账单，到期后统一结算。" />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="结账周期" required error={errors.billingCycle}>
+                  <SelectInput
+                    value={channelForm.billingCycle ?? ''}
+                    onChange={v => setField('billingCycle', v)}
+                    className="w-full"
+                    options={[
+                      { label: '请选择', value: '' },
+                      { label: '每周结', value: 'WEEKLY' },
+                      { label: '每两周结', value: 'BIWEEKLY' },
+                      { label: '每月结', value: 'MONTHLY' },
+                    ]}
+                  />
+                </Field>
+                <Field label="周期限额 ($)" required error={errors.cycleLimit} hint="超出限额后该渠道将暂停下单">
+                  <NumberInput value={channelForm.cycleLimit ?? NaN} onChange={v => setField('cycleLimit', v)} min={0} className="w-full" />
+                </Field>
+              </div>
+            </>
+          )}
+
+          <SectionLabel>结账规则</SectionLabel>
+          <FieldRow label="整单折扣">
+            <Switch checked={channelForm.discountEnabled} onCheckedChange={v => setField('discountEnabled', v)} />
+          </FieldRow>
+
+          {channelForm.discountEnabled && (
+            <div className="grid grid-cols-12 gap-3">
+              <div className="col-span-5">
+                <Field label="折扣类型">
+                  <SelectInput
+                    value={channelForm.discountType}
+                    onChange={v => setField('discountType', v)}
+                    className="w-full"
+                    options={[
+                      { label: '百分比折扣', value: 'PERCENTAGE' },
+                      { label: '固定金额减免', value: 'FIXED' },
+                    ]}
+                  />
+                </Field>
+              </div>
+              <div className="col-span-7">
+                <Field
+                  label="折扣值"
+                  required
+                  error={errors.discountValue}
+                  hint={channelForm.discountType === 'PERCENTAGE' ? '0–100，如 15 表示打 85 折' : '固定减免金额（元），如 5 表示减 $5'}
+                >
+                  <NumberInput value={channelForm.discountValue ?? NaN} onChange={v => setField('discountValue', v)} min={0} className="w-full" />
+                </Field>
+              </div>
+            </div>
+          )}
+        </div>
       </Modal>
+
+      {/* 外卖平台配置弹窗 */}
+      <Modal
+        open={deliveryModalVisible}
+        onOpenChange={v => !v && setDeliveryModalVisible(false)}
+        title={`配置 ${editingDelivery?.sourceName ?? ''}`}
+        footer={
+          <>
+            <Btn variant="secondary" onClick={() => setDeliveryModalVisible(false)}>{tk('cancel')}</Btn>
+            <Btn variant="primary" loading={saving} onClick={handleDeliverySave}>{tk('confirm')}</Btn>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FieldRow label="启用状态">
+            <Switch checked={deliveryActive} onCheckedChange={setDeliveryActive} />
+          </FieldRow>
+          <Field label="平台佣金率 (%)" hint="用于在报表中计算扣佣后的实际净收入，不影响前台价格显示">
+            <NumberInput value={deliveryCommission ?? NaN} onChange={setDeliveryCommission} min={0} max={100} suffix="%" className="w-full" />
+          </Field>
+        </div>
+      </Modal>
+
+      {/* 成员管理弹窗 */}
+      <Modal
+        open={!!memberModalChannel}
+        onOpenChange={v => !v && (setMemberModalChannel(null), setMembers([]))}
+        title={`成员管理 — ${memberModalChannel?.sourceName ?? ''}`}
+        size="lg"
+      >
+        <div className="space-y-4">
+          {/* 添加成员 */}
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <TextInput value={memberPhone} onChange={setMemberPhone} placeholder="手机号（如 +14161234567）" />
+            </div>
+            <div className="w-28">
+              <TextInput value={memberName} onChange={setMemberName} placeholder="姓名（选填）" />
+            </div>
+            <div className="w-28">
+              <TextInput value={memberNote} onChange={setMemberNote} placeholder="备注（选填）" />
+            </div>
+            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} loading={addingMember} onClick={handleAddMember}>添加</Btn>
+          </div>
+
+          {/* 成员列表 */}
+          {membersLoading ? (
+            <Spinner />
+          ) : (
+            <Table
+              columns={[
+                { key: 'phone', title: '手机号', render: (m: ChannelMember) => m.phone },
+                { key: 'name', title: '姓名', render: (m: ChannelMember) => m.name || '-' },
+                { key: 'note', title: '备注', render: (m: ChannelMember) => m.note || '-' },
+                { key: 'isActive', title: '状态', render: (m: ChannelMember) => <Switch checked={m.isActive} onCheckedChange={c => handleToggleMember(m, c)} /> },
+                {
+                  key: 'actions', title: '操作',
+                  render: (m: ChannelMember) => (
+                    <Btn variant="ghost" size="sm" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setRemoveMemberTarget(m)}>移除</Btn>
+                  ),
+                },
+              ]}
+              data={members}
+              rowKey={(m: ChannelMember) => m.id}
+              empty="暂无成员，在上方添加手机号"
+            />
+          )}
+        </div>
+      </Modal>
+
+      {/* 删除渠道确认 */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={v => !v && setDeleteTarget(null)}
+        title={tk('deleteConfirm')}
+        description={tk('deleteWarning')}
+        confirmText={tk('confirm')}
+        cancelText={tk('cancel')}
+        danger
+        loading={saving}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+      />
+
+      {/* 移除成员确认 */}
+      <ConfirmDialog
+        open={!!removeMemberTarget}
+        onOpenChange={v => !v && setRemoveMemberTarget(null)}
+        title="确认移除该成员？"
+        confirmText="移除"
+        danger
+        onConfirm={() => removeMemberTarget && handleRemoveMember(removeMemberTarget)}
+      />
     </div>
   )
+}
+
+// 弹窗内小节标题
+const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="flex items-center gap-2 pt-1">
+    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{children}</span>
+    <span className="flex-1 h-px bg-slate-100" />
+  </div>
+)
+
+// 弹窗内左右布局行
+const FieldRow: React.FC<{ label: React.ReactNode; children: React.ReactNode }> = ({ label, children }) => (
+  <div className="flex items-center justify-between gap-4">
+    <span className="text-sm font-medium text-slate-700">{label}</span>
+    {children}
+  </div>
+)
+
+// 外卖平台卡片外壳样式
+function clsxCard(active: boolean) {
+  return `rounded-xl border overflow-hidden transition-all ${active ? 'border-slate-200' : 'border-slate-200 opacity-60'}`
 }
 
 export default ChannelManagement

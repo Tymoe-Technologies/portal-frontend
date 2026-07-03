@@ -500,7 +500,16 @@ const MenuCenter: React.FC = () => {
   const [aoErr, setAoErr] = useState<{ value?: string; displayName?: string }>({})
   const [modifierGroupForm] = Form.useForm<CreateModifierGroupPayload & { options: ModifierOption[] }>()
   const [modifierOptionForm] = Form.useForm<CreateModifierOptionPayload>()
-  const [comboForm] = Form.useForm<CreateComboPayload>()
+  // 套餐表单（受控，基础字段；图片/分组/时段/类型另有独立 state）
+  const [cbName, setCbName] = useState('')
+  const [cbDescription, setCbDescription] = useState('')
+  const [cbCategoryId, setCbCategoryId] = useState<string | undefined>(undefined)
+  const [cbBasePrice, setCbBasePrice] = useState<number>(0)
+  const [cbDiscount, setCbDiscount] = useState<number>(0)
+  const [cbDiscountType, setCbDiscountType] = useState<'fixed' | 'percentage'>('fixed')
+  const [cbIsActive, setCbIsActive] = useState(true)
+  const [cbComboItems, setCbComboItems] = useState<CreateComboItemPayload[]>([])
+  const [cbErr, setCbErr] = useState<{ name?: string; categoryId?: string; basePrice?: string }>({})
 
   // 初始化数据
   
@@ -751,7 +760,8 @@ const MenuCenter: React.FC = () => {
   // 创建Combo
   const handleCreateCombo = () => {
     setEditingCombo(null)
-    comboForm.resetFields()
+    setCbName(''); setCbDescription(''); setCbCategoryId(undefined); setCbBasePrice(0)
+    setCbDiscount(0); setCbDiscountType('fixed'); setCbIsActive(true); setCbComboItems([]); setCbErr({})
     setComboImageUrl(undefined)
     setComboImageFile(null)
     setComboItemGroups([])
@@ -790,16 +800,15 @@ const MenuCenter: React.FC = () => {
       }
     }
 
-    comboForm.setFieldsValue({
-      name: combo.name,
-      description: combo.description,
-      categoryId: combo.categoryId,
-      basePrice: fromMinorUnit(combo.basePrice),
-      discount: discountValue,
-      discountType: combo.discountType,
-      isActive: combo.isActive,
-      comboItems: comboItems
-    })
+    setCbName(combo.name)
+    setCbDescription(combo.description || '')
+    setCbCategoryId(combo.categoryId)
+    setCbBasePrice(fromMinorUnit(combo.basePrice))
+    setCbDiscount(discountValue ?? 0)
+    setCbDiscountType((combo.discountType as 'fixed' | 'percentage') || 'fixed')
+    setCbIsActive(combo.isActive)
+    setCbComboItems(comboItems)
+    setCbErr({})
 
     // 加载增强功能字段
     setComboImageUrl(combo.imageUrl)
@@ -827,7 +836,14 @@ const MenuCenter: React.FC = () => {
   }
 
   // 保存Combo
-  const handleSaveCombo = async (values: CreateComboPayload) => {
+  const handleSaveCombo = async () => {
+    const err: { name?: string; categoryId?: string; basePrice?: string } = {}
+    if (!cbName.trim()) err.name = t('pages.menuCenter.comboNameRequired')
+    if (!cbCategoryId) err.categoryId = '请选择分类'
+    if (comboType === 'selection' && (cbBasePrice == null || Number.isNaN(cbBasePrice))) err.basePrice = '请填写套餐价格'
+    setCbErr(err)
+    if (Object.keys(err).length) return
+
     setLoading(prev => ({ ...prev, creating: true }))
     try {
       // 可选套餐：验证分组配置
@@ -843,9 +859,8 @@ const MenuCenter: React.FC = () => {
           setLoading(prev => ({ ...prev, creating: false }));
           return;
         }
-        const comboItemsForValidation = values.comboItems || [];
         comboItemGroups.forEach(group => {
-          const groupItems = comboItemsForValidation.filter(ci => ci.groupId === group.id);
+          const groupItems = cbComboItems.filter(ci => ci.groupId === group.id);
           if (groupItems.length === 0) {
             throw new Error(`分组 "${group.name}" 中没有商品，请添加商品`);
           }
@@ -854,8 +869,14 @@ const MenuCenter: React.FC = () => {
 
       // 直接使用 camelCase，后端负责所有 snake_case 转换
       const payload: any = {
-        ...values,
-        comboItems: values.comboItems || [],
+        name: cbName,
+        description: cbDescription,
+        categoryId: cbCategoryId,
+        basePrice: cbBasePrice,
+        discount: cbDiscount,
+        discountType: cbDiscountType,
+        isActive: cbIsActive,
+        comboItems: cbComboItems || [],
         imageUrl: comboImageUrl,
         // 可选套餐才发送 itemGroups
         itemGroups: comboType === 'selection' ? comboItemGroups : undefined,
@@ -3042,83 +3063,43 @@ const MenuCenter: React.FC = () => {
       {/* 加料模态框已移除（Addon 已废弃，迁移至 Modifier v2.0，且该弹窗无入口） */}
 
       {/* 套餐创建/编辑模态框 */}
-      <Modal
-        title={editingCombo ? t('pages.menuCenter.editCombo') : t('pages.menuCenter.createCombo')}
+      <UI.Modal
         open={comboModalVisible}
-        onCancel={() => setComboModalVisible(false)}
-        footer={null}
-        width={800}
+        onOpenChange={(v) => !v && setComboModalVisible(false)}
+        title={editingCombo ? t('pages.menuCenter.editCombo') : t('pages.menuCenter.createCombo')}
+        size="lg"
+        footer={
+          <>
+            <UI.Btn variant="secondary" onClick={() => setComboModalVisible(false)}>取消</UI.Btn>
+            <UI.Btn variant="primary" loading={loading.creating} onClick={handleSaveCombo}>{editingCombo ? '更新' : '创建'}</UI.Btn>
+          </>
+        }
       >
-        <Form
-          form={comboForm}
-          layout="vertical"
-          onFinish={handleSaveCombo}
-          initialValues={{
-            name: '',
-            description: '',
-            categoryId: undefined,
-            basePrice: 0,
-            discount: 0,
-            discountType: 'fixed',
-            isActive: true,
-            comboItems: [],
-            imageUrl: undefined,
-            itemGroups: [],
-            availabilityRules: undefined
-          }}
-        >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="name"
-                label={t('pages.menuCenter.comboName')}
-                rules={[{ required: true, message: t('pages.menuCenter.comboNameRequired') }]}
-              >
-                <Input placeholder={t('pages.menuCenter.comboNamePlaceholder')} maxLength={100} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="categoryId"
-                label="所属分类"
-                rules={[{ required: true, message: '请选择分类' }]}
-              >
-                <Select placeholder="请选择分类">
-                  {flatCategories.map(cat => (
-                    <Select.Option key={cat.id} value={cat.id}>
-                      {cat.level && cat.level > 0 ? (
-                        <span style={{ color: '#666' }}>
-                          　└─ {cat.name}
-                        </span>
-                      ) : (
-                        <span style={{ fontWeight: 500 }}>
-                          {cat.name}
-                        </span>
-                      )}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <UI.Field label={t('pages.menuCenter.comboName')} required error={cbErr.name}>
+              <UI.TextInput value={cbName} onChange={setCbName} placeholder={t('pages.menuCenter.comboNamePlaceholder')} maxLength={100} />
+            </UI.Field>
+            <UI.Field label="所属分类" required error={cbErr.categoryId}>
+              <UI.SelectInput
+                value={cbCategoryId ?? ''}
+                onChange={(v) => setCbCategoryId(v || undefined)}
+                className="w-full"
+                options={[
+                  { label: '请选择分类', value: '' },
+                  ...flatCategories.map(cat => ({ label: (cat.level && cat.level > 0 ? '　└─ ' : '') + cat.name, value: cat.id })),
+                ]}
+              />
+            </UI.Field>
+          </div>
 
-          <Form.Item
-            name="description"
-            label="描述"
-          >
-            <Input.TextArea
-              placeholder={t('pages.menuCenter.comboDescriptionPlaceholder')}
-              rows={3}
-              maxLength={500}
-              showCount
-            />
-          </Form.Item>
+          <UI.Field label="描述">
+            <UI.Textarea value={cbDescription} onChange={setCbDescription} rows={3} placeholder={t('pages.menuCenter.comboDescriptionPlaceholder')} />
+          </UI.Field>
 
           {/* 套餐图片上传 */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
-              套餐图片
-            </label>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">套餐图片</label>
             <ComboImageUpload
               comboId={editingCombo?.id}
               imageUrl={comboImageUrl}
@@ -3127,197 +3108,115 @@ const MenuCenter: React.FC = () => {
             />
           </div>
 
-          <Form.Item name="isActive" valuePropName="checked">
-            <Space>
-              <Switch defaultChecked />
-              <span>{t('pages.menuCenter.activeStatus')}</span>
-            </Space>
-          </Form.Item>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm font-medium text-slate-700">{t('pages.menuCenter.activeStatus')}</span>
+            <UI.Switch checked={cbIsActive} onCheckedChange={setCbIsActive} />
+          </div>
 
-          {/* 套餐类型选择 */}
-          <Form.Item label="套餐类型">
-            <Radio.Group
-              value={comboType}
-              disabled={!!editingCombo}
-              onChange={(e) => {
-                const newType = e.target.value as 'fixed' | 'selection';
-                setComboType(newType);
-                // 切换类型时清空对应数据，避免数据混用
-                if (newType === 'fixed') {
-                  setComboItemGroups([]);
-                  // 清除 comboItems 中的 groupId
-                  const items = comboForm.getFieldValue('comboItems') || [];
-                  comboForm.setFieldsValue({
-                    comboItems: items.map((i: any) => ({ ...i, groupId: undefined }))
-                  });
-                } else {
-                  // 切到可选套餐时清空固定商品列表，用户从分组重新配置
-                  comboForm.setFieldsValue({ comboItems: [] });
-                }
-              }}
-            >
-              <Radio.Button value="fixed">固定套餐</Radio.Button>
-              <Radio.Button value="selection">可选套餐</Radio.Button>
-            </Radio.Group>
-            <div style={{ color: '#999', fontSize: 12, marginTop: 6 }}>
-              {editingCombo ? (
-                <span style={{ color: '#ff4d4f' }}>
-                  ⚠️ 套餐创建后不能修改类型
-                </span>
-              ) : (
-                <>
-                  {comboType === 'fixed'
-                    ? '包含固定商品，价格由各商品自动汇总'
-                    : '顾客从各分组中自行选择，套餐价格手动设定'}
-                </>
-              )}
+          {/* 套餐类型 */}
+          <div>
+            <div className="text-sm font-medium text-slate-700 mb-1.5">套餐类型</div>
+            <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+              {([['fixed', '固定套餐'], ['selection', '可选套餐']] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  disabled={!!editingCombo}
+                  onClick={() => {
+                    setComboType(v)
+                    if (v === 'fixed') { setComboItemGroups([]); setCbComboItems(prev => prev.map(i => ({ ...i, groupId: undefined }))) }
+                    else { setCbComboItems([]) }
+                  }}
+                  className={`px-3.5 py-1.5 text-sm transition-colors ${comboType === v ? 'bg-slate-900 text-white!' : 'bg-white text-slate-600 hover:bg-slate-50'} ${editingCombo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-          </Form.Item>
+            <div className="text-xs mt-1.5">
+              {editingCombo
+                ? <span className="text-red-500">⚠️ 套餐创建后不能修改类型</span>
+                : <span className="text-slate-400">{comboType === 'fixed' ? '包含固定商品，价格由各商品自动汇总' : '顾客从各分组中自行选择，套餐价格手动设定'}</span>}
+            </div>
+          </div>
 
-          <Divider>{t('pages.menuCenter.comboItemsConfig')}</Divider>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">{t('pages.menuCenter.comboItemsConfig')}</span>
+            <span className="flex-1 h-px bg-slate-100" />
+          </div>
 
           {comboType === 'fixed' ? (
             <>
-              {/* 固定套餐：商品列表 + 自动计算价格 */}
-              <Form.Item name="comboItems" label="">
-                <ComboItemsInput
-                  allItems={allItems}
-                  onPriceChange={(totalPrice) => {
-                    comboForm.setFieldsValue({ basePrice: fromMinorUnit(totalPrice) });
-                  }}
-                  t={t}
-                />
-              </Form.Item>
+              <ComboItemsInput
+                value={cbComboItems}
+                onChange={setCbComboItems}
+                allItems={allItems}
+                onPriceChange={(totalPrice) => setCbBasePrice(fromMinorUnit(totalPrice))}
+                t={t}
+              />
 
-              <Divider>套餐定价</Divider>
-
-              <Form.Item noStyle shouldUpdate={(prev, curr) =>
-                prev.basePrice !== curr.basePrice ||
-                prev.discount !== curr.discount ||
-                prev.discountType !== curr.discountType
-              }>
-                {({ getFieldValue }) => {
-                  const basePrice = Number(getFieldValue('basePrice')) || 0;
-                  const discount = Number(getFieldValue('discount')) || 0;
-                  const discountType = getFieldValue('discountType') || 'fixed';
-                  let discountAmount = discountType === 'fixed' ? discount : basePrice * (discount / 100);
-                  const finalPrice = Math.max(0, basePrice - discountAmount);
-
-                  return (
-                    <div>
-                      {/* 商品总价展示 */}
-                      <div style={{ padding: '12px 16px', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6, marginBottom: 16 }}>
-                        <Row align="middle">
-                          <Col span={12}><Typography.Text type="secondary">商品总价（自动计算）</Typography.Text></Col>
-                          <Col span={12} style={{ textAlign: 'right' }}>
-                            <Typography.Text strong style={{ fontSize: 18, color: '#0369a1' }}>${basePrice.toFixed(2)}</Typography.Text>
-                          </Col>
-                        </Row>
-                      </div>
-
-                      {/* 折扣设置（可选） */}
-                      <div style={{ marginBottom: 16 }}>
-                        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-                          折扣设置（可选）
-                        </Typography.Text>
-                        <Row gutter={16}>
-                          <Col span={12}>
-                            <Form.Item name="discountType" label="折扣类型" style={{ marginBottom: 0 }}>
-                              <Select onChange={() => comboForm.setFieldValue('discount', 0)}>
-                                <Select.Option value="fixed">固定金额</Select.Option>
-                                <Select.Option value="percentage">百分比</Select.Option>
-                              </Select>
-                            </Form.Item>
-                          </Col>
-                          <Col span={12}>
-                            <Form.Item name="discount" label={discountType === 'percentage' ? '折扣 (%)' : '折扣 ($)'} rules={[{ type: 'number', min: 0 }]} style={{ marginBottom: 0 }}>
-                              {discountType === 'percentage' ? (
-                                <InputNumber style={{ width: '100%' }} precision={0} min={0} max={100} placeholder="0" />
-                              ) : (
-                                <InputNumber style={{ width: '100%' }} precision={2} min={0} placeholder="0.00" />
-                              )}
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                      </div>
-
-                      {/* 最终售价展示 */}
-                      {basePrice > 0 && (
-                        <div style={{ padding: 16, backgroundColor: '#f6ffed', border: '2px solid #52c41a', borderRadius: 6 }}>
-                          <Row align="middle">
-                            <Col span={12}>
-                              <Typography.Text strong style={{ fontSize: 16 }}>最终售价</Typography.Text>
-                              {discountAmount > 0 && (
-                                <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                                  原价 ${basePrice.toFixed(2)} - 折扣 {discountType === 'percentage' ? `${discount}%` : `$${discount.toFixed(2)}`}
-                                </div>
-                              )}
-                            </Col>
-                            <Col span={12} style={{ textAlign: 'right' }}>
-                              <Typography.Text strong style={{ fontSize: 24, color: '#52c41a' }}>${finalPrice.toFixed(2)}</Typography.Text>
-                            </Col>
-                          </Row>
-                        </div>
-                      )}
+              {(() => {
+                const basePrice = Number(cbBasePrice) || 0
+                const discount = Number(cbDiscount) || 0
+                const discountAmount = cbDiscountType === 'fixed' ? discount : basePrice * (discount / 100)
+                const finalPrice = Math.max(0, basePrice - discountAmount)
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between rounded-lg bg-blue-50 border border-blue-200 px-4 py-3">
+                      <span className="text-sm text-slate-500">商品总价（自动计算）</span>
+                      <span className="text-lg font-semibold text-blue-700">${basePrice.toFixed(2)}</span>
                     </div>
-                  );
-                }}
-              </Form.Item>
-
-              {/* 隐藏字段存储自动计算的价格 */}
-              <Form.Item name="basePrice" hidden><InputNumber /></Form.Item>
+                    <div>
+                      <p className="text-sm text-slate-500 mb-2">折扣设置（可选）</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <UI.Field label="折扣类型">
+                          <UI.SelectInput
+                            value={cbDiscountType}
+                            onChange={(v) => { setCbDiscountType(v); setCbDiscount(0) }}
+                            className="w-full"
+                            options={[{ label: '固定金额', value: 'fixed' }, { label: '百分比', value: 'percentage' }]}
+                          />
+                        </UI.Field>
+                        <UI.Field label={cbDiscountType === 'percentage' ? '折扣 (%)' : '折扣 ($)'}>
+                          <UI.NumberInput value={cbDiscount} onChange={setCbDiscount} min={0} max={cbDiscountType === 'percentage' ? 100 : undefined} className="w-full" />
+                        </UI.Field>
+                      </div>
+                    </div>
+                    {basePrice > 0 && (
+                      <div className="flex items-center justify-between rounded-lg bg-emerald-50 border-2 border-emerald-500 px-4 py-3">
+                        <div>
+                          <span className="text-base font-semibold text-slate-800">最终售价</span>
+                          {discountAmount > 0 && (
+                            <div className="text-xs text-slate-500 mt-0.5">原价 ${basePrice.toFixed(2)} - 折扣 {cbDiscountType === 'percentage' ? `${discount}%` : `$${discount.toFixed(2)}`}</div>
+                          )}
+                        </div>
+                        <span className="text-2xl font-bold text-emerald-600">${finalPrice.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </>
           ) : (
             <>
-              {/* 分组配置：用 shouldUpdate 确保 comboItems 变化时重新渲染 */}
-              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.comboItems !== curr.comboItems}>
-                {({ getFieldValue }) => (
-                  <ComboItemGroupsConfig
-                    groups={comboItemGroups}
-                    onGroupsChange={setComboItemGroups}
-                    comboItems={getFieldValue('comboItems') || []}
-                    onComboItemsChange={(items) => comboForm.setFieldsValue({ comboItems: items })}
-                    allItems={allItems}
-                  />
-                )}
-              </Form.Item>
-              {/* comboItems 隐藏字段（分组配置通过 onComboItemsChange 写入） */}
-              <Form.Item name="comboItems" hidden><Input /></Form.Item>
-
-              <Divider>套餐定价</Divider>
-
-              {/* 可选套餐：只设置基础价格 */}
-              <Form.Item
-                name="basePrice"
-                label="套餐价格"
-                rules={[{ required: true, message: '请填写套餐价格' }, { type: 'number', min: 0 }]}
-              >
-                <InputNumber precision={2} min={0} style={{ width: 200 }} placeholder="0.00" />
-              </Form.Item>
-              <div style={{ color: '#999', fontSize: 12, marginTop: -12, marginBottom: 16 }}>
-                顾客选择分组商品后，各选项的额外费用将在此价格基础上累加
-              </div>
+              <ComboItemGroupsConfig
+                groups={comboItemGroups}
+                onGroupsChange={setComboItemGroups}
+                comboItems={cbComboItems}
+                onComboItemsChange={setCbComboItems}
+                allItems={allItems}
+              />
+              <UI.Field label="套餐价格" required error={cbErr.basePrice} hint="顾客选择分组商品后，各选项的额外费用将在此价格基础上累加">
+                <div className="w-52">
+                  <UI.NumberInput value={cbBasePrice} onChange={setCbBasePrice} min={0} className="w-full" />
+                </div>
+              </UI.Field>
             </>
           )}
 
           {/* 时段限制配置 */}
-          <ComboAvailabilityConfig
-            value={comboAvailabilityRules}
-            onChange={setComboAvailabilityRules}
-          />
-
-          <Form.Item style={{ textAlign: 'right', marginBottom: 0, marginTop: 16 }}>
-            <Space>
-              <Button onClick={() => setComboModalVisible(false)}>
-                取消
-              </Button>
-              <Button type="primary" htmlType="submit" loading={loading.creating}>
-                {editingCombo ? '更新' : '创建'}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+          <ComboAvailabilityConfig value={comboAvailabilityRules} onChange={setComboAvailabilityRules} />
+        </div>
+      </UI.Modal>
 
       {channelModal && (
         <ItemChannelConfig

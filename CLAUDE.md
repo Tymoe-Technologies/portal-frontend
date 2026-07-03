@@ -5,6 +5,12 @@
 本项目的API文档和设计文档位于父级目录的 PROJECT_SUMMARY.md 中：
 路径: /Users/meng/Desktop/CODE/Tymoe/PROJECT_SUMMARY.md
 
+## 前端 UI 规范
+
+新增或重写任何页面前，先读 `src/components/UI_GUIDELINES.md`（前端 UI 唯一权威规范）：
+基础组件只从 `@/components/ui-kit` import，配色用 slate + 少量语义色，**严禁紫色**，不再新增 antd。
+组件源码：`src/components/ui-kit.tsx`（与文档冲突时以源码为准）。
+
 ## API 文档维护规则
 
 重要: 任何 API 接口的修改、新增、删除都必须更新以下两个文件：

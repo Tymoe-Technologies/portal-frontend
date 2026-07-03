@@ -444,7 +444,6 @@ const MenuCenter: React.FC = () => {
   const [channelModal, setChannelModal] = useState<{ id: string; name: string } | null>(null)
   const [attributeTypeModalVisible, setAttributeTypeModalVisible] = useState(false)
   const [attributeOptionModalVisible, setAttributeOptionModalVisible] = useState(false)
-  const [addonModalVisible, setAddonModalVisible] = useState(false)
   const [modifierGroupModalVisible, setModifierGroupModalVisible] = useState(false)
   const [modifierOptionModalVisible, setModifierOptionModalVisible] = useState(false)
   const [comboModalVisible, setComboModalVisible] = useState(false)
@@ -452,7 +451,6 @@ const MenuCenter: React.FC = () => {
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [editingAttributeType, setEditingAttributeType] = useState<ItemAttributeType | null>(null)
   const [editingAttributeOption, setEditingAttributeOption] = useState<ItemAttributeOption | null>(null)
-  const [editingAddon, setEditingAddon] = useState<Addon | null>(null)
   const [editingModifierGroup, setEditingModifierGroup] = useState<ModifierGroup | null>(null)
   const [editingModifierOption, setEditingModifierOption] = useState<ModifierOption | null>(null)
   const [editingCombo, setEditingCombo] = useState<Combo | null>(null)
@@ -1641,35 +1639,7 @@ const MenuCenter: React.FC = () => {
     }
   }
 
-  // 保存加料（创建或更新）
-  // Modifier v2.0: 迁移到使用 createModifierGroup/updateModifierGroup
-  const handleSaveAddon = async (values: any) => {
-    setLoading(prev => ({ ...prev, creating: true }))
-    try {
-      const payload: CreateModifierGroupPayload = {
-        name: values.description || values.name,
-        displayName: values.name,
-      }
-
-      if (editingAddon) {
-        // Modifier v2.0: 使用 updateModifierGroup
-        await itemManagementService.updateModifierGroup(editingAddon.id, payload)
-        UI.toast.success(t('pages.menuCenter.updateModifierSuccess'))
-      } else {
-        // 创建新的 ModifierGroup
-        await itemManagementService.createModifierGroup(payload)
-        UI.toast.success(t('pages.menuCenter.createModifierSuccess'))
-      }
-      setAddonModalVisible(false)
-      setEditingAddon(null)
-      loadAddons()
-    } catch (error) {
-      console.error('Failed to save addon:', error)
-      UI.toast.error(editingAddon ? t('pages.menuCenter.updateModifierFailed') : t('pages.menuCenter.createModifierFailed'))
-    } finally {
-      setLoading(prev => ({ ...prev, creating: false }))
-    }
-  }
+  // 加料保存逻辑已随废弃弹窗移除（Modifier v2.0 用 ModifierGroupManager）
 
   // 添加商品加料关联
   // Modifier v2.0: 使用 addModifierGroupToItem
@@ -3069,139 +3039,7 @@ const MenuCenter: React.FC = () => {
         </div>
       </UI.Modal>
 
-      {/* 加料创建/编辑模态框 */}
-      <Modal
-        title={editingAddon ? t('pages.menuCenter.editModifier') : t('pages.menuCenter.createModifier')}
-        open={addonModalVisible}
-        onCancel={() => setAddonModalVisible(false)}
-        footer={null}
-        width={600}
-      >
-        <Form
-          layout="vertical"
-          onFinish={handleSaveAddon}
-          initialValues={editingAddon || {
-            name: '',
-            description: '',
-            price: 0,
-            cost: 0,
-            trackInventory: false,
-            currentStock: 0,
-            isActive: true
-          }}
-        >
-          <Form.Item
-            name="name"
-            label={t('pages.menuCenter.modifierName')}
-            rules={[{ required: true, message: t('pages.menuCenter.modifierNameRequired') }]}
-          >
-            <Input placeholder={t('pages.menuCenter.modifierNamePlaceholder')} maxLength={50} />
-          </Form.Item>
-
-          <Form.Item
-            name="description"
-            label={t('pages.menuCenter.description')}
-            rules={[{ required: true, message: t('pages.menuCenter.descriptionRequired') }]}
-          >
-            <Input.TextArea 
-              placeholder={t('pages.menuCenter.descriptionPlaceholder')} 
-              rows={3} 
-              maxLength={200}
-              showCount
-            />
-          </Form.Item>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="price"
-                label={t('pages.menuCenter.priceLabel')}
-                rules={[
-                  { required: true, message: t('pages.menuCenter.priceRequired') },
-                  { type: 'number', min: 0, message: t('pages.menuCenter.priceCannotBeNegative') }
-                ]}
-              >
-                <InputNumber
-                  style={{ width: '100%' }}
-                  placeholder={t('pages.menuCenter.pricePlaceholder')}
-                  precision={2}
-                  min={0}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="cost"
-                label={t('pages.menuCenter.costLabel')}
-                rules={[
-                  { required: true, message: t('pages.menuCenter.costRequired') },
-                  { type: 'number', min: 0, message: t('pages.menuCenter.costCannotBeNegative') }
-                ]}
-              >
-                <InputNumber
-                  style={{ width: '100%' }}
-                  placeholder={t('pages.menuCenter.costPlaceholder')}
-                  precision={2}
-                  min={0}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item name="trackInventory" valuePropName="checked">
-            <Space>
-              <Switch />
-              <span>{t('pages.menuCenter.enableInventory')}</span>
-            </Space>
-          </Form.Item>
-
-          <Form.Item
-            noStyle
-            shouldUpdate={(prevValues, currentValues) => 
-              prevValues.trackInventory !== currentValues.trackInventory
-            }
-          >
-            {({ getFieldValue }) => {
-              const trackInventory = getFieldValue('trackInventory')
-              return trackInventory ? (
-                <Form.Item
-                  name="currentStock"
-                  label={t('pages.menuCenter.currentStock')}
-                  rules={[
-                    { required: true, message: t('pages.menuCenter.currentStockRequired') },
-                    { type: 'number', min: 0, message: t('pages.menuCenter.stockCannotBeNegative') }
-                  ]}
-                >
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    placeholder={t('pages.menuCenter.currentStockPlaceholder')}
-                    min={0}
-                    precision={0}
-                  />
-                </Form.Item>
-              ) : null
-            }}
-          </Form.Item>
-
-          <Form.Item name="isActive" valuePropName="checked">
-            <Space>
-              <Switch defaultChecked />
-              <span>{t('pages.menuCenter.activeStatus')}</span>
-            </Space>
-          </Form.Item>
-
-          <Form.Item style={{ textAlign: 'right', marginBottom: 0 }}>
-            <Space>
-              <Button onClick={() => setAddonModalVisible(false)}>
-                {t('pages.menuCenter.cancel')}
-              </Button>
-              <Button type="primary" htmlType="submit" loading={loading.creating}>
-                {editingAddon ? t('pages.menuCenter.update') : t('pages.menuCenter.create')}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+      {/* 加料模态框已移除（Addon 已废弃，迁移至 Modifier v2.0，且该弹窗无入口） */}
 
       {/* 套餐创建/编辑模态框 */}
       <Modal

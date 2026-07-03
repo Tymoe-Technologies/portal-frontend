@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Button, Card, Typography, Layout, Form, Input, Alert, Space, Divider, Row, Col } from 'antd'
-import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons'
+import { User, Lock, Mail } from 'lucide-react'
 import { Turnstile } from '@marsidev/react-turnstile'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -8,44 +7,64 @@ import { useAuthContext } from '../../auth/AuthProvider'
 import { login, getCaptchaStatus, forgotPassword, resetPassword, getOAuthToken, type LoginPayload, type CaptchaStatus, type UserTokenRequest } from '../../services/auth'
 import LanguageSwitcher from '../../components/LanguageSwitcher'
 import AuthBackground from '../../components/AuthBackground'
+import { Btn, AlertBox } from '@/components/ui-kit'
 
-const { Content } = Layout
-const { Title, Text } = Typography
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-interface LoginFormData {
-  email: string
-  password: string
+// 带左侧图标的输入框（替代 antd Input prefix）
+function IconInput({ icon, type = 'text', value, onChange, placeholder, maxLength, onRawChange }: {
+  icon?: React.ReactNode
+  type?: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  maxLength?: number
+  onRawChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
+}) {
+  return (
+    <div className="relative">
+      {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{icon}</span>}
+      <input
+        type={type}
+        value={value}
+        maxLength={maxLength}
+        onChange={e => { onChange(e.target.value); onRawChange?.(e) }}
+        placeholder={placeholder}
+        className={`w-full h-11 rounded-lg border border-slate-200 bg-white ${icon ? 'pl-10' : 'pl-3'} pr-3 text-sm text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0`}
+      />
+    </div>
+  )
 }
 
-interface ForgotPasswordFormData {
-  email: string
-}
-
-interface ResetPasswordFormData {
-  verificationCode: string
-  newPassword: string
-  confirmPassword: string
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <div className="text-sm text-slate-600 mb-1.5">{children}</div>
 }
 
 const Login: React.FC = () => {
-  const [form] = Form.useForm<LoginFormData>()
-  const [forgotForm] = Form.useForm<ForgotPasswordFormData>()
-  const [resetForm] = Form.useForm<ResetPasswordFormData>()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const { login: authLogin } = useAuthContext()
-  
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
   const [success, setSuccess] = useState<string>('')
-  const [captchaStatus, setCaptchaStatus] = useState<CaptchaStatus | null>(null)
-  const [captchaToken, setCaptchaToken] = useState<string>('')
+  const [, setCaptchaStatus] = useState<CaptchaStatus | null>(null)
+  const [, setCaptchaToken] = useState<string>('')
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [forgotPasswordStep, setForgotPasswordStep] = useState<'email' | 'reset'>('email')
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState<string>('')
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false)
   const [forgotPasswordMessage, setForgotPasswordMessage] = useState<string>('')
+
+  // 表单字段（受控）
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [fieldError, setFieldError] = useState('')
+  const [fpEmail, setFpEmail] = useState('')
+  const [rsCode, setRsCode] = useState('')
+  const [rsNew, setRsNew] = useState('')
+  const [rsConfirm, setRsConfirm] = useState('')
 
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string
 
@@ -54,16 +73,13 @@ const Login: React.FC = () => {
     const state = location.state as { message?: string; email?: string }
     if (state?.message) {
       setSuccess(state.message)
-      if (state.email) {
-        form.setFieldsValue({ email: state.email })
-      }
+      if (state.email) setEmail(state.email)
     }
-  }, [location.state, form])
+  }, [location.state])
 
   // 检查是否需要验证码
   const checkCaptchaRequired = async (email: string) => {
     if (!email) return
-    
     try {
       const status = await getCaptchaStatus(email)
       setCaptchaStatus(status)
@@ -73,123 +89,91 @@ const Login: React.FC = () => {
   }
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const email = e.target.value
-    if (email.includes('@')) {
-      checkCaptchaRequired(email)
-    }
+    const v = e.target.value
+    if (v.includes('@')) checkCaptchaRequired(v)
   }
 
-  const handleLogin = async (values: LoginFormData) => {
+  const handleLogin = async () => {
+    // 校验
+    if (!email) { setFieldError(t('auth.login.emailRequired')); return }
+    if (!EMAIL_RE.test(email)) { setFieldError(t('auth.login.emailInvalid')); return }
+    if (!password) { setFieldError(t('auth.login.passwordRequired')); return }
+    setFieldError('')
     setLoading(true)
     setError('')
     setSuccess('')
 
     try {
-      const payload: LoginPayload = {
-        email: values.email,
-        password: values.password
-      }
-
-      // 第一步：调用登录API获取用户信息和组织列表
+      const payload: LoginPayload = { email, password }
       const loginResponse = await login(payload, 'beverage')
-      console.log('Login response:', loginResponse)
-      
+
       if (!loginResponse.success) {
         setError('登录失败，请检查邮箱和密码')
         return
       }
 
-      // 第二步：调用OAuth Token API获取access_token和refresh_token
       const tokenRequest: UserTokenRequest = {
         grant_type: 'password',
-        username: values.email, // 使用邮箱作为username
-        password: values.password,
-        client_id: 'tymoe-web'
+        username: email,
+        password,
+        client_id: 'tymoe-web',
       }
-
       const tokenResponse = await getOAuthToken(tokenRequest, 'beverage')
-      console.log('Token response:', tokenResponse)
-      
       const { access_token, refresh_token } = tokenResponse
-      
+
       if (access_token) {
-        // 保存tokens到localStorage
         localStorage.setItem('access_token', access_token)
-        if (refresh_token) {
-          localStorage.setItem('refresh_token', refresh_token)
-        }
-        
-        // 调用AuthProvider的login方法设置用户状态，将组织信息合并到用户对象中
-        const userWithOrgs = {
-          ...loginResponse.user,
-          organizations: loginResponse.organizations
-        }
+        if (refresh_token) localStorage.setItem('refresh_token', refresh_token)
+
+        const userWithOrgs = { ...loginResponse.user, organizations: loginResponse.organizations }
         await authLogin(access_token, userWithOrgs)
-        
-        // 正常跳转，路由保护会自动处理组织检查
+
         const from = (location.state as any)?.from || '/'
         navigate(from, { replace: true })
       } else {
-        console.log('⚠️ No access_token found in token response')
         setError('登录成功但未收到访问令牌，请重试')
       }
     } catch (error: any) {
       console.error('Login error:', error)
-      if (error?.response?.data?.detail) {
-        setError(error.response.data.detail)
-      } else if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError('登录失败，请稍后重试')
-      }
+      if (error?.response?.data?.detail) setError(error.response.data.detail)
+      else if (error instanceof Error) setError(error.message)
+      else setError('登录失败，请稍后重试')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleForgotPassword = async (values: ForgotPasswordFormData) => {
+  const handleForgotPassword = async () => {
+    if (!fpEmail) { setForgotPasswordMessage(t('auth.login.emailRequired')); return }
+    if (!EMAIL_RE.test(fpEmail)) { setForgotPasswordMessage(t('auth.login.emailInvalid')); return }
     setForgotPasswordLoading(true)
     setForgotPasswordMessage('')
-
     try {
-      const response = await forgotPassword(values.email)
-      console.log('Forgot password response:', response)
-      
+      const response = await forgotPassword(fpEmail)
       if (response.success) {
-        setForgotPasswordEmail(values.email)
+        setForgotPasswordEmail(fpEmail)
         setForgotPasswordStep('reset')
         setForgotPasswordMessage(response.message || t('auth.forgotPassword.emailSent'))
       } else {
         setForgotPasswordMessage('发送失败，请稍后重试')
       }
     } catch (error: any) {
-      console.error('Forgot password error:', error)
-      if (error?.response?.data?.detail) {
-        setForgotPasswordMessage(error.response.data.detail)
-      } else if (error instanceof Error) {
-        setForgotPasswordMessage(error.message)
-      } else {
-        setForgotPasswordMessage('发送失败，请稍后重试')
-      }
+      if (error?.response?.data?.detail) setForgotPasswordMessage(error.response.data.detail)
+      else if (error instanceof Error) setForgotPasswordMessage(error.message)
+      else setForgotPasswordMessage('发送失败，请稍后重试')
     } finally {
       setForgotPasswordLoading(false)
     }
   }
 
-  const handleResetPassword = async (values: ResetPasswordFormData) => {
-    if (values.newPassword !== values.confirmPassword) {
-      setForgotPasswordMessage('两次输入的密码不一致')
-      return
-    }
-
+  const handleResetPassword = async () => {
+    if (!rsCode || rsCode.length !== 6) { setForgotPasswordMessage('验证码为6位数字'); return }
+    if (!rsNew || rsNew.length < 8) { setForgotPasswordMessage('密码至少8位'); return }
+    if (rsNew !== rsConfirm) { setForgotPasswordMessage('两次输入的密码不一致'); return }
     setForgotPasswordLoading(true)
     setForgotPasswordMessage('')
-
     try {
-      // 使用正确的API参数：email, code, password
-      const response = await resetPassword(forgotPasswordEmail, values.verificationCode, values.newPassword)
-      console.log('Reset password response:', response)
-      
+      const response = await resetPassword(forgotPasswordEmail, rsCode, rsNew)
       if (response.success) {
         setForgotPasswordMessage(response.message || '密码重置成功，请使用新密码登录')
         setTimeout(() => {
@@ -197,239 +181,80 @@ const Login: React.FC = () => {
           setForgotPasswordStep('email')
           setForgotPasswordEmail('')
           setForgotPasswordMessage('')
+          setRsCode(''); setRsNew(''); setRsConfirm('')
         }, 2000)
       } else {
         setForgotPasswordMessage('密码重置失败，请重试')
       }
     } catch (error: any) {
-      console.error('Reset password error:', error)
-      if (error?.response?.data?.detail) {
-        setForgotPasswordMessage(error.response.data.detail)
-      } else if (error instanceof Error) {
-        setForgotPasswordMessage(error.message)
-      } else {
-        setForgotPasswordMessage('密码重置失败，请重试')
-      }
+      if (error?.response?.data?.detail) setForgotPasswordMessage(error.response.data.detail)
+      else if (error instanceof Error) setForgotPasswordMessage(error.message)
+      else setForgotPasswordMessage('密码重置失败，请重试')
     } finally {
       setForgotPasswordLoading(false)
     }
   }
 
-  const handleCaptchaSuccess = (token: string) => {
-    setCaptchaToken(token)
-  }
+  const handleCaptchaSuccess = (token: string) => setCaptchaToken(token)
+  const handleCaptchaError = () => { setCaptchaToken(''); setError(t('auth.login.captchaFailed')) }
 
-  const handleCaptchaError = () => {
-    setCaptchaToken('')
-    setError(t('auth.login.captchaFailed'))
-  }
+  const cardCls = 'w-[400px] max-w-[90vw] bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.1)] p-6'
 
   if (showForgotPassword) {
+    const fpSuccess = forgotPasswordMessage.includes('发送') || forgotPasswordMessage.includes('已发送') || forgotPasswordMessage.includes('成功')
     return (
       <>
         <AuthBackground />
-        <Layout style={{ minHeight: '100vh', background: 'transparent' }}>
-          {/* 语言切换器 */}
-          <div style={{ 
-            position: 'fixed', 
-            top: 24, 
-            right: 24, 
-            zIndex: 1000 
-          }}>
-            <LanguageSwitcher size="small" />
-          </div>
-          
-          <Content style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            padding: '0 16px'
-          }}>
-            <Card 
-              style={{ 
-                width: 400, 
-                maxWidth: '90vw',
-                background: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(10px)',
-                border: 'none',
-                borderRadius: '16px',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-              }}
-            >
-              <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                <Title level={3} style={{ margin: 0, color: '#1f2937' }}>
+        <div className="min-h-screen bg-transparent">
+          <div className="fixed top-6 right-6 z-[1000]"><LanguageSwitcher /></div>
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div className={cardCls}>
+              <div className="text-center mb-6">
+                <h3 className="text-xl font-semibold text-slate-800 m-0">
                   {forgotPasswordStep === 'email' ? t('auth.forgotPassword.title') : '重置密码'}
-                </Title>
-                <Text type="secondary" style={{ fontSize: '14px' }}>
-                  {forgotPasswordStep === 'email' 
-                    ? t('auth.forgotPassword.description') 
-                    : `验证码已发送到 ${forgotPasswordEmail}`
-                  }
-                </Text>
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  {forgotPasswordStep === 'email' ? t('auth.forgotPassword.description') : `验证码已发送到 ${forgotPasswordEmail}`}
+                </p>
               </div>
-              
+
               {forgotPasswordStep === 'email' ? (
-                <Form
-                  form={forgotForm}
-                  onFinish={handleForgotPassword}
-                  layout="vertical"
-                  requiredMark={false}
-                  size="large"
-                >
-                  <Form.Item
-                    name="email"
-                    label={t('auth.login.email')}
-                    rules={[
-                      { required: true, message: t('auth.login.emailRequired') },
-                      { type: 'email', message: t('auth.login.emailInvalid') }
-                    ]}
-                  >
-                    <Input
-                      prefix={<MailOutlined style={{ color: '#9ca3af' }} />}
-                      placeholder={t('auth.login.emailPlaceholder')}
-                      style={{ borderRadius: '8px', height: '44px' }}
-                    />
-                  </Form.Item>
-
-                  {forgotPasswordMessage && (
-                    <Alert
-                      message={forgotPasswordMessage}
-                      type={forgotPasswordMessage.includes('发送') || forgotPasswordMessage.includes('已发送') ? 'success' : 'error'}
-                      style={{ marginBottom: 16, borderRadius: '8px' }}
-                    />
-                  )}
-
-                  <Form.Item style={{ marginBottom: 16 }}>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      block
-                      loading={forgotPasswordLoading}
-                      style={{ 
-                        height: '44px',
-                        borderRadius: '8px',
-                        background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-                        border: 'none'
-                      }}
-                    >
-                      {t('auth.forgotPassword.sendButton')}
-                    </Button>
-                  </Form.Item>
-
-                  <Button
-                    type="link"
-                    block
-                    onClick={() => setShowForgotPassword(false)}
-                    style={{ height: '44px' }}
-                  >
-                    {t('auth.forgotPassword.backToLogin')}
-                  </Button>
-                </Form>
+                <div className="space-y-5">
+                  <div>
+                    <FieldLabel>{t('auth.login.email')}</FieldLabel>
+                    <IconInput icon={<Mail className="w-4 h-4" />} value={fpEmail} onChange={setFpEmail} placeholder={t('auth.login.emailPlaceholder')} />
+                  </div>
+                  {forgotPasswordMessage && <AlertBox type={fpSuccess ? 'success' : 'error'} description={forgotPasswordMessage} />}
+                  <Btn variant="primary" className="w-full h-11" loading={forgotPasswordLoading} onClick={handleForgotPassword}>
+                    {t('auth.forgotPassword.sendButton')}
+                  </Btn>
+                  <Btn variant="link" className="w-full" onClick={() => setShowForgotPassword(false)}>{t('auth.forgotPassword.backToLogin')}</Btn>
+                </div>
               ) : (
-                <Form
-                  form={resetForm}
-                  onFinish={handleResetPassword}
-                  layout="vertical"
-                  requiredMark={false}
-                  size="large"
-                >
-                  <Form.Item
-                    name="verificationCode"
-                    label="验证码"
-                    rules={[
-                      { required: true, message: '请输入验证码' },
-                      { len: 6, message: '验证码为6位数字' }
-                    ]}
-                  >
-                    <Input
-                      placeholder="请输入6位验证码"
-                      maxLength={6}
-                      style={{ borderRadius: '8px', height: '44px' }}
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    name="newPassword"
-                    label="新密码"
-                    rules={[
-                      { required: true, message: '请输入新密码' },
-                      { min: 8, message: '密码至少8位' }
-                    ]}
-                  >
-                    <Input.Password
-                      prefix={<LockOutlined style={{ color: '#9ca3af' }} />}
-                      placeholder="请输入新密码"
-                      style={{ borderRadius: '8px', height: '44px' }}
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    name="confirmPassword"
-                    label="确认密码"
-                    rules={[
-                      { required: true, message: '请确认新密码' }
-                    ]}
-                  >
-                    <Input.Password
-                      prefix={<LockOutlined style={{ color: '#9ca3af' }} />}
-                      placeholder="请再次输入新密码"
-                      style={{ borderRadius: '8px', height: '44px' }}
-                    />
-                  </Form.Item>
-
-                  {forgotPasswordMessage && (
-                    <Alert
-                      message={forgotPasswordMessage}
-                      type={forgotPasswordMessage.includes('成功') ? 'success' : 'error'}
-                      style={{ marginBottom: 16, borderRadius: '8px' }}
-                    />
-                  )}
-
-                  <Form.Item style={{ marginBottom: 16 }}>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      block
-                      loading={forgotPasswordLoading}
-                      style={{ 
-                        height: '44px',
-                        borderRadius: '8px',
-                        background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-                        border: 'none'
-                      }}
-                    >
-                      重置密码
-                    </Button>
-                  </Form.Item>
-
-                  <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                    <Button
-                      type="link"
-                      onClick={() => {
-                        setForgotPasswordStep('email')
-                        setForgotPasswordMessage('')
-                      }}
-                      style={{ padding: 0 }}
-                    >
-                      返回上一步
-                    </Button>
-                    <Button
-                      type="link"
-                      onClick={() => {
-                        setShowForgotPassword(false)
-                        setForgotPasswordStep('email')
-                        setForgotPasswordMessage('')
-                      }}
-                      style={{ padding: 0 }}
-                    >
-                      返回登录
-                    </Button>
-                  </Space>
-                </Form>
+                <div className="space-y-5">
+                  <div>
+                    <FieldLabel>验证码</FieldLabel>
+                    <IconInput value={rsCode} onChange={setRsCode} placeholder="请输入6位验证码" maxLength={6} />
+                  </div>
+                  <div>
+                    <FieldLabel>新密码</FieldLabel>
+                    <IconInput icon={<Lock className="w-4 h-4" />} type="password" value={rsNew} onChange={setRsNew} placeholder="请输入新密码" />
+                  </div>
+                  <div>
+                    <FieldLabel>确认密码</FieldLabel>
+                    <IconInput icon={<Lock className="w-4 h-4" />} type="password" value={rsConfirm} onChange={setRsConfirm} placeholder="请再次输入新密码" />
+                  </div>
+                  {forgotPasswordMessage && <AlertBox type={forgotPasswordMessage.includes('成功') ? 'success' : 'error'} description={forgotPasswordMessage} />}
+                  <Btn variant="primary" className="w-full h-11" loading={forgotPasswordLoading} onClick={handleResetPassword}>重置密码</Btn>
+                  <div className="flex justify-between">
+                    <Btn variant="link" onClick={() => { setForgotPasswordStep('email'); setForgotPasswordMessage('') }}>返回上一步</Btn>
+                    <Btn variant="link" onClick={() => { setShowForgotPassword(false); setForgotPasswordStep('email'); setForgotPasswordMessage('') }}>返回登录</Btn>
+                  </div>
+                </div>
               )}
-            </Card>
-          </Content>
-        </Layout>
+            </div>
+          </div>
+        </div>
       </>
     )
   }
@@ -437,158 +262,47 @@ const Login: React.FC = () => {
   return (
     <>
       <AuthBackground />
-      <Layout style={{ minHeight: '100vh', background: 'transparent' }}>
-        {/* 语言切换器 */}
-        <div style={{ 
-          position: 'fixed', 
-          top: 24, 
-          right: 24, 
-          zIndex: 1000 
-        }}>
-          <LanguageSwitcher size="small" />
-        </div>
-        
-        <Content style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          padding: '0 16px'
-        }}>
-          <Card 
-            style={{ 
-              width: 400, 
-              maxWidth: '90vw',
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(10px)',
-              border: 'none',
-              borderRadius: '16px',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-            }}
-          >
-            <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              <Title level={2} style={{ margin: 0, color: '#1f2937' }}>
-                {t('auth.login.title')}
-              </Title>
-              <Text type="secondary" style={{ fontSize: '14px' }}>
-                {t('auth.login.subtitle')}
-              </Text>
+      <div className="min-h-screen bg-transparent">
+        <div className="fixed top-6 right-6 z-[1000]"><LanguageSwitcher /></div>
+        <div className="flex items-center justify-center min-h-screen px-4">
+          <div className={cardCls}>
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-semibold text-slate-800 m-0">{t('auth.login.title')}</h2>
+              <p className="text-sm text-slate-500 mt-1">{t('auth.login.subtitle')}</p>
             </div>
 
-            <Form
-              form={form}
-              onFinish={handleLogin}
-              layout="vertical"
-              requiredMark={false}
-              size="large"
-            >
-              <Form.Item
-                name="email"
-                label={t('auth.login.email')}
-                rules={[
-                  { required: true, message: t('auth.login.emailRequired') },
-                  { type: 'email', message: t('auth.login.emailInvalid') }
-                ]}
-                style={{ marginBottom: 20 }}
-              >
-                <Input
-                  prefix={<UserOutlined style={{ color: '#9ca3af' }} />}
-                  placeholder={t('auth.login.emailPlaceholder')}
-                  onChange={handleEmailChange}
-                  style={{ borderRadius: '8px', height: '44px' }}
-                />
-              </Form.Item>
+            <div className="space-y-5">
+              <div>
+                <FieldLabel>{t('auth.login.email')}</FieldLabel>
+                <IconInput icon={<User className="w-4 h-4" />} value={email} onChange={setEmail} onRawChange={handleEmailChange} placeholder={t('auth.login.emailPlaceholder')} />
+              </div>
 
-              <Form.Item
-                name="password"
-                label={t('auth.login.password')}
-                rules={[
-                  { required: true, message: t('auth.login.passwordRequired') }
-                ]}
-                style={{ marginBottom: 20 }}
-              >
-                <Input.Password
-                  prefix={<LockOutlined style={{ color: '#9ca3af' }} />}
-                  placeholder={t('auth.login.passwordPlaceholder')}
-                  style={{ borderRadius: '8px', height: '44px' }}
-                />
-              </Form.Item>
+              <div>
+                <FieldLabel>{t('auth.login.password')}</FieldLabel>
+                <IconInput icon={<Lock className="w-4 h-4" />} type="password" value={password} onChange={setPassword} placeholder={t('auth.login.passwordPlaceholder')} />
+              </div>
 
-              {/* 验证码组件 - 紧凑显示 */}
+              {/* 验证码组件 */}
               {turnstileSiteKey && (
-                <Form.Item style={{ marginBottom: 20 }}>
-                  <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <Turnstile
-                      siteKey={turnstileSiteKey}
-                      onSuccess={handleCaptchaSuccess}
-                      onError={handleCaptchaError}
-                      theme="light"
-                      size="compact"
-                    />
-                  </div>
-                </Form.Item>
+                <div className="flex justify-center">
+                  <Turnstile siteKey={turnstileSiteKey} onSuccess={handleCaptchaSuccess} onError={handleCaptchaError} options={{ theme: 'light', size: 'flexible' }} />
+                </div>
               )}
 
-              {(error || success) && (
-                <Form.Item style={{ marginBottom: 20 }}>
-                  {error && <Alert message={error} type="error" showIcon style={{ borderRadius: '8px' }} />}
-                  {success && <Alert message={success} type="success" showIcon style={{ borderRadius: '8px' }} />}
-                </Form.Item>
-              )}
+              {fieldError && <AlertBox type="error" description={fieldError} />}
+              {error && <AlertBox type="error" description={error} />}
+              {success && <AlertBox type="success" description={success} />}
 
-              <Form.Item style={{ marginBottom: 20 }}>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  block
-                  loading={loading}
-                  style={{ 
-                    height: '44px',
-                    borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-                    border: 'none',
-                    fontSize: '16px',
-                    fontWeight: 500
-                  }}
-                >
-                  {t('auth.login.loginButton')}
-                </Button>
-              </Form.Item>
+              <Btn variant="primary" className="w-full h-11 text-base" loading={loading} onClick={handleLogin}>{t('auth.login.loginButton')}</Btn>
 
-              <Row gutter={16} style={{ marginBottom: 16 }}>
-                <Col span={12}>
-                  <Button
-                    type="link"
-                    block
-                    onClick={() => setShowForgotPassword(true)}
-                    style={{ 
-                      height: '36px', 
-                      padding: 0,
-                      color: '#6b7280'
-                    }}
-                  >
-                    {t('auth.login.forgotPassword')}
-                  </Button>
-                </Col>
-                <Col span={12}>
-                  <Button
-                    type="link"
-                    block
-                    onClick={() => navigate('/register')}
-                    style={{ 
-                      height: '36px', 
-                      padding: 0,
-                      color: '#4f46e5',
-                      fontWeight: 500
-                    }}
-                  >
-                    {t('auth.login.registerNow')}
-                  </Button>
-                </Col>
-              </Row>
-            </Form>
-          </Card>
-        </Content>
-      </Layout>
+              <div className="flex">
+                <Btn variant="link" className="flex-1" onClick={() => setShowForgotPassword(true)}>{t('auth.login.forgotPassword')}</Btn>
+                <Btn variant="link" className="flex-1" onClick={() => navigate('/register')}>{t('auth.login.registerNow')}</Btn>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   )
 }

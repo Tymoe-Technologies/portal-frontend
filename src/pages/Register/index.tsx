@@ -1,125 +1,122 @@
 import React, { useState } from 'react'
-import { Button, Card, Typography, Layout, Form, Input, Alert, Space, Divider, Row, Col } from 'antd'
-import { UserOutlined, LockOutlined, MailOutlined, PhoneOutlined, ShopOutlined, SafetyOutlined } from '@ant-design/icons'
+import { User, Lock, Mail, ShieldCheck } from 'lucide-react'
 import { Turnstile } from '@marsidev/react-turnstile'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import '../../styles/phone-input.css'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { register, verifyEmail, resendVerificationCode, type RegisterPayload, type RegisterResponse, type EmailVerificationResponse } from '../../services/auth'
 import LanguageSwitcher from '../../components/LanguageSwitcher'
 import AuthBackground from '../../components/AuthBackground'
+import { Btn, AlertBox } from '@/components/ui-kit'
 
-const { Content } = Layout
-const { Title, Text } = Typography
-
-interface RegisterFormData {
-  email: string
-  password: string
-  confirmPassword: string
-  name: string
-  phone: string
-}
-
-interface VerifyFormData {
-  verificationCode: string
-}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PWD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/
 
 type RegistrationStep = 'register' | 'verify'
 
+// 带左侧图标的输入框
+function IconInput({ icon, type = 'text', value, onChange, placeholder, maxLength, className }: {
+  icon?: React.ReactNode
+  type?: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  maxLength?: number
+  className?: string
+}) {
+  return (
+    <div className="relative">
+      {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{icon}</span>}
+      <input
+        type={type}
+        value={value}
+        maxLength={maxLength}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`w-full h-10 rounded-lg border border-slate-200 bg-white ${icon ? 'pl-10' : 'pl-3'} pr-3 text-sm text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0 ${className ?? ''}`}
+      />
+    </div>
+  )
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <div className="text-sm text-slate-600 mb-1.5">{children}</div>
+}
+
 const Register: React.FC = () => {
-  const [form] = Form.useForm<RegisterFormData>()
-  const [verifyForm] = Form.useForm<VerifyFormData>()
   const { t } = useTranslation()
   const navigate = useNavigate()
-  
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
   const [success, setSuccess] = useState<string>('')
-  const [captchaToken, setCaptchaToken] = useState<string>('')
+  const [, setCaptchaToken] = useState<string>('')
   const [step, setStep] = useState<RegistrationStep>('register')
   const [registeredEmail, setRegisteredEmail] = useState<string>('')
   const [resendLoading, setResendLoading] = useState(false)
 
+  // 表单字段（受控）
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [code, setCode] = useState('')
+
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string
 
-  const handleRegister = async (values: RegisterFormData) => {
-    if (values.password !== values.confirmPassword) {
-      setError(t('auth.register.confirmPasswordMismatch'))
-      return
-    }
+  const handleRegister = async () => {
+    if (!email) { setError(t('auth.register.emailRequired')); return }
+    if (!EMAIL_RE.test(email)) { setError(t('auth.register.emailInvalid')); return }
+    if (!name || name.length < 2) { setError(t('auth.register.nameMinLength')); return }
+    if (!password || password.length < 8) { setError(t('auth.register.passwordMinLength')); return }
+    if (!PWD_RE.test(password)) { setError(t('auth.register.passwordPattern')); return }
+    if (password !== confirmPassword) { setError(t('auth.register.confirmPasswordMismatch')); return }
 
     setLoading(true)
     setError('')
     setSuccess('')
-
     try {
-      const payload: RegisterPayload = {
-        email: values.email,
-        password: values.password,
-        name: values.name,
-        phone: values.phone
-      }
-
-      console.log('Sending registration payload:', payload)
+      const payload: RegisterPayload = { email, password, name, phone }
       const response: RegisterResponse = await register(payload, 'beauty')
-      console.log('Registration response:', response)
-      
       if (response.success) {
-        console.log('✅ Registration successful, switching to verify step')
         setSuccess(response.message || t('auth.register.registrationSuccess'))
-        setRegisteredEmail(values.email)
+        setRegisteredEmail(email)
         setStep('verify')
         setError('')
       } else {
         setError('注册失败，请稍后重试')
       }
     } catch (error: any) {
-      console.error('Registration error:', error)
-      if (error?.response?.data?.detail) {
-        setError(error.response.data.detail)
-      } else if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError('注册失败，请稍后重试')
-      }
+      if (error?.response?.data?.detail) setError(error.response.data.detail)
+      else if (error instanceof Error) setError(error.message)
+      else setError('注册失败，请稍后重试')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleVerify = async (values: VerifyFormData) => {
+  const handleVerify = async () => {
+    if (!code || !/^\d{6}$/.test(code)) { setError(t('auth.verify.codePattern')); return }
     setLoading(true)
     setError('')
     setSuccess('')
-
     try {
-      const response: EmailVerificationResponse = await verifyEmail(registeredEmail, values.verificationCode)
-      console.log('Verification response:', response)
-      
+      const response: EmailVerificationResponse = await verifyEmail(registeredEmail, code)
       if (response.success) {
         setSuccess(response.message || t('auth.verify.verifySuccess'))
         setTimeout(() => {
-          navigate('/login', { 
-            state: { 
-              message: t('auth.verify.loginMessage'),
-              email: registeredEmail 
-            } 
-          })
+          navigate('/login', { state: { message: t('auth.verify.loginMessage'), email: registeredEmail } })
         }, 2000)
       } else {
         setError(t('auth.verify.verifyFailed'))
       }
     } catch (error: any) {
-      console.error('Verification error:', error)
-      if (error?.response?.data?.detail) {
-        setError(error.response.data.detail)
-      } else if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError('验证失败，请稍后重试')
-      }
+      if (error?.response?.data?.detail) setError(error.response.data.detail)
+      else if (error instanceof Error) setError(error.message)
+      else setError('验证失败，请稍后重试')
     } finally {
       setLoading(false)
     }
@@ -136,424 +133,136 @@ const Register: React.FC = () => {
     setResendLoading(true)
     setError('')
     setSuccess('')
-
     try {
       const response = await resendVerificationCode(registeredEmail, 'signup')
-      console.log('Resend code response:', response)
-      
-      if (response.success) {
-        setSuccess(response.message || '验证码已重新发送，请检查您的邮箱')
-      } else {
-        setError('重新发送失败，请稍后重试')
-      }
+      if (response.success) setSuccess(response.message || '验证码已重新发送，请检查您的邮箱')
+      else setError('重新发送失败，请稍后重试')
     } catch (error: any) {
-      console.error('Resend code error:', error)
-      if (error?.response?.data?.detail) {
-        setError(error.response.data.detail)
-      } else if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError('重新发送失败，请稍后重试')
-      }
+      if (error?.response?.data?.detail) setError(error.response.data.detail)
+      else if (error instanceof Error) setError(error.message)
+      else setError('重新发送失败，请稍后重试')
     } finally {
       setResendLoading(false)
     }
   }
 
-  const handleCaptchaSuccess = (token: string) => {
-    setCaptchaToken(token)
-  }
+  const handleCaptchaSuccess = (token: string) => setCaptchaToken(token)
+  const handleCaptchaError = () => { setCaptchaToken(''); setError(t('auth.register.captchaFailed')) }
 
-  const handleCaptchaError = () => {
-    setCaptchaToken('')
-    setError(t('auth.register.captchaFailed'))
-  }
-
-  const getCardTitle = () => {
-    switch (step) {
-      case 'register':
-        return t('auth.register.title')
-      case 'verify':
-        return t('auth.verify.title')
-      default:
-        return t('auth.register.title')
-    }
-  }
+  const cardW = step === 'register' ? 'w-[500px]' : 'w-[400px]'
 
   return (
     <>
       <AuthBackground />
-      <Layout style={{ minHeight: '100vh', background: 'transparent' }}>
-        {/* 语言切换器 */}
-        <div style={{ 
-          position: 'fixed', 
-          top: 24, 
-          right: 24, 
-          zIndex: 1000 
-        }}>
-          <LanguageSwitcher size="small" />
-        </div>
-        
-        <Content style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          padding: '20px 16px'
-        }}>
-          <Card 
-            style={{ 
-              width: step === 'register' ? 500 : 400, 
-              maxWidth: '95vw',
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(10px)',
-              border: 'none',
-              borderRadius: '16px',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-            }}
-          >
-            <div style={{ textAlign: 'center', marginBottom: step === 'register' ? 24 : 32 }}>
-              <Title level={2} style={{ margin: 0, color: '#1f2937' }}>
-                {getCardTitle()}
-              </Title>
-              <Text type="secondary" style={{ fontSize: '14px' }}>
-                {step === 'register' ? t('auth.register.subtitle') : t('auth.verify.subtitle')}
-              </Text>
+      <div className="min-h-screen bg-transparent">
+        <div className="fixed top-6 right-6 z-[1000]"><LanguageSwitcher /></div>
+        <div className="flex items-center justify-center min-h-screen px-4 py-5">
+          <div className={`${cardW} max-w-[95vw] bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.1)] p-6`}>
+            <div className={`text-center ${step === 'register' ? 'mb-6' : 'mb-8'}`}>
+              <h2 className="text-2xl font-semibold text-slate-800 m-0">{step === 'register' ? t('auth.register.title') : t('auth.verify.title')}</h2>
+              <p className="text-sm text-slate-500 mt-1">{step === 'register' ? t('auth.register.subtitle') : t('auth.verify.subtitle')}</p>
             </div>
 
             {step === 'register' ? (
-              <Form
-                form={form}
-                onFinish={handleRegister}
-                layout="vertical"
-                requiredMark={false}
-                size="large"
-              >
-                {/* 第一行：邮箱和姓名 */}
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <Form.Item
-                      name="email"
-                      label={t('auth.register.email')}
-                      rules={[
-                        { required: true, message: t('auth.register.emailRequired') },
-                        { type: 'email', message: t('auth.register.emailInvalid') }
-                      ]}
-                      style={{ marginBottom: 16 }}
-                    >
-                      <Input
-                        prefix={<MailOutlined style={{ color: '#9ca3af' }} />}
-                        placeholder={t('auth.register.emailPlaceholder')}
-                        style={{ borderRadius: '8px', height: '40px' }}
-                      />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item
-                      name="name"
-                      label={t('auth.register.name')}
-                      rules={[
-                        { required: true, message: t('auth.register.nameRequired') },
-                        { min: 2, message: t('auth.register.nameMinLength') }
-                      ]}
-                      style={{ marginBottom: 16 }}
-                    >
-                      <Input
-                        prefix={<UserOutlined style={{ color: '#9ca3af' }} />}
-                        placeholder={t('auth.register.namePlaceholder')}
-                        style={{ borderRadius: '8px', height: '40px' }}
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <FieldLabel>{t('auth.register.email')}</FieldLabel>
+                    <IconInput icon={<Mail className="w-4 h-4" />} value={email} onChange={setEmail} placeholder={t('auth.register.emailPlaceholder')} />
+                  </div>
+                  <div>
+                    <FieldLabel>{t('auth.register.name')}</FieldLabel>
+                    <IconInput icon={<User className="w-4 h-4" />} value={name} onChange={setName} placeholder={t('auth.register.namePlaceholder')} />
+                  </div>
+                </div>
 
-                {/* 第二行：手机号码 */}
-                <Row gutter={16}>
-                  <Col span={24}>
-                    <Form.Item
-                      name="phone"
-                      label={t('auth.register.phone')}
-                      rules={[
-                        { max: 32, message: t('auth.register.phoneMaxLength') }
-                      ]}
-                      style={{ marginBottom: 16 }}
-                    >
-                      <div 
-                        className="phone-input-wrapper"
-                        style={{ 
-                          border: '1px solid #d9d9d9', 
-                          borderRadius: '8px', 
-                          overflow: 'hidden',
-                          height: '40px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          transition: 'all 0.3s ease',
-                          backgroundColor: '#ffffff'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.borderColor = '#40a9ff'}
-                        onMouseLeave={(e) => e.currentTarget.style.borderColor = '#d9d9d9'}
-                        onFocusCapture={(e) => {
-                          e.currentTarget.style.borderColor = '#40a9ff'
-                          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(24, 144, 255, 0.2)'
-                        }}
-                        onBlurCapture={(e) => {
-                          e.currentTarget.style.borderColor = '#d9d9d9'
-                          e.currentTarget.style.boxShadow = 'none'
-                        }}
-                      >
-                        <PhoneInput
-                          international
-                          countryCallingCodeEditable={false}
-                          defaultCountry="CA"
-                          placeholder={t('auth.register.phonePlaceholder')}
-                          className="PhoneInput"
-                          style={{
-                            border: 'none',
-                            width: '100%',
-                            height: '38px'
-                          }}
-                          onChange={(value) => {
-                            form.setFieldsValue({ phone: value || '' })
-                          }}
-                        />
-                      </div>
-                    </Form.Item>
-                  </Col>
-                </Row>
+                <div>
+                  <FieldLabel>{t('auth.register.phone')}</FieldLabel>
+                  <div className="phone-input-wrapper border border-slate-200 rounded-lg overflow-hidden h-10 flex items-center bg-white focus-within:outline-2 focus-within:outline-slate-900 focus-within:outline-offset-0">
+                    <PhoneInput
+                      international
+                      countryCallingCodeEditable={false}
+                      defaultCountry="CA"
+                      placeholder={t('auth.register.phonePlaceholder')}
+                      className="PhoneInput"
+                      style={{ border: 'none', width: '100%', height: '38px' }}
+                      value={phone}
+                      onChange={(value) => setPhone(value || '')}
+                    />
+                  </div>
+                </div>
 
-                {/* 第三行：密码 */}
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <Form.Item
-                      name="password"
-                      label={t('auth.register.password')}
-                      rules={[
-                        { required: true, message: t('auth.register.passwordRequired') },
-                        { min: 8, message: t('auth.register.passwordMinLength') },
-                        {
-                          pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
-                          message: t('auth.register.passwordPattern')
-                        }
-                      ]}
-                      style={{ marginBottom: 16 }}
-                    >
-                      <Input.Password
-                        prefix={<LockOutlined style={{ color: '#9ca3af' }} />}
-                        placeholder={t('auth.register.passwordPlaceholder')}
-                        style={{ borderRadius: '8px', height: '40px' }}
-                      />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item
-                      name="confirmPassword"
-                      label={t('auth.register.confirmPassword')}
-                      rules={[
-                        { required: true, message: t('auth.register.confirmPasswordRequired') },
-                        ({ getFieldValue }) => ({
-                          validator(_, value) {
-                            if (!value || getFieldValue('password') === value) {
-                              return Promise.resolve()
-                            }
-                            return Promise.reject(new Error(t('auth.register.confirmPasswordMismatch')))
-                          },
-                        })
-                      ]}
-                      style={{ marginBottom: 16 }}
-                    >
-                      <Input.Password
-                        prefix={<LockOutlined style={{ color: '#9ca3af' }} />}
-                        placeholder={t('auth.register.confirmPasswordPlaceholder')}
-                        style={{ borderRadius: '8px', height: '40px' }}
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <FieldLabel>{t('auth.register.password')}</FieldLabel>
+                    <IconInput icon={<Lock className="w-4 h-4" />} type="password" value={password} onChange={setPassword} placeholder={t('auth.register.passwordPlaceholder')} />
+                  </div>
+                  <div>
+                    <FieldLabel>{t('auth.register.confirmPassword')}</FieldLabel>
+                    <IconInput icon={<Lock className="w-4 h-4" />} type="password" value={confirmPassword} onChange={setConfirmPassword} placeholder={t('auth.register.confirmPasswordPlaceholder')} />
+                  </div>
+                </div>
 
-                {/* 验证码 */}
                 {turnstileSiteKey && (
-                  <Form.Item style={{ marginBottom: 16 }}>
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                      <Turnstile
-                        siteKey={turnstileSiteKey}
-                        onSuccess={handleCaptchaSuccess}
-                        onError={handleCaptchaError}
-                        theme="light"
-                        size="compact"
-                      />
-                    </div>
-                  </Form.Item>
+                  <div className="flex justify-center">
+                    <Turnstile siteKey={turnstileSiteKey} onSuccess={handleCaptchaSuccess} onError={handleCaptchaError} options={{ theme: 'light', size: 'flexible' }} />
+                  </div>
                 )}
 
-                {(error || success) && (
-                  <Form.Item style={{ marginBottom: 16 }}>
-                    {error && <Alert message={error} type="error" showIcon style={{ borderRadius: '8px' }} />}
-                    {success && <Alert message={success} type="success" showIcon style={{ borderRadius: '8px' }} />}
-                  </Form.Item>
-                )}
+                {error && <AlertBox type="error" description={error} />}
+                {success && <AlertBox type="success" description={success} />}
 
-                <Form.Item style={{ marginBottom: 16 }}>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    block
-                    loading={loading}
-                    style={{ 
-                      height: '44px',
-                      borderRadius: '8px',
-                      background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-                      border: 'none',
-                      fontSize: '16px',
-                      fontWeight: 500
-                    }}
-                  >
-                    {t('auth.register.registerButton')}
-                  </Button>
-                </Form.Item>
+                <Btn variant="primary" className="w-full h-11 text-base" loading={loading} onClick={handleRegister}>{t('auth.register.registerButton')}</Btn>
 
                 {/* 临时测试按钮 */}
-                <Form.Item style={{ marginBottom: 16 }}>
-                  <Button
-                    type="dashed"
-                    block
-                    onClick={() => {
-                      const testEmail = form.getFieldValue('email') || 'test@example.com'
-                      setRegisteredEmail(testEmail)
-                      setStep('verify')
-                      setSuccess('测试模式：跳转到验证步骤')
-                    }}
-                    style={{ 
-                      height: '36px',
-                      borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  >
-                    🧪 测试验证界面
-                  </Button>
-                </Form.Item>
+                <Btn variant="secondary" className="w-full" onClick={() => {
+                  const testEmail = email || 'test@example.com'
+                  setRegisteredEmail(testEmail)
+                  setStep('verify')
+                  setSuccess('测试模式：跳转到验证步骤')
+                }}>🧪 测试验证界面</Btn>
 
-                <div style={{ textAlign: 'center' }}>
-                  <Text type="secondary" style={{ marginRight: 8 }}>
-                    {t('auth.register.hasAccount')}
-                  </Text>
-                  <Button
-                    type="link"
-                    onClick={() => navigate('/login')}
-                    style={{ 
-                      padding: 0,
-                      color: '#4f46e5',
-                      fontWeight: 500
-                    }}
-                  >
-                    {t('auth.register.backToLogin')}
-                  </Button>
+                <div className="text-center">
+                  <span className="text-slate-500 mr-2 text-sm">{t('auth.register.hasAccount')}</span>
+                  <Btn variant="link" onClick={() => navigate('/login')}>{t('auth.register.backToLogin')}</Btn>
                 </div>
-              </Form>
+              </div>
             ) : (
               // 验证码验证页面
               <div>
-                <div style={{ marginBottom: 24, textAlign: 'center' }}>
-                  <SafetyOutlined style={{ fontSize: 48, color: '#4f46e5', marginBottom: 16 }} />
-                  <div style={{ marginBottom: 8 }}>
-                    <Text strong style={{ fontSize: '16px' }}>{t('auth.verify.description')}</Text>
-                  </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <Text type="secondary" style={{ fontSize: '14px' }}>{registeredEmail}</Text>
-                  </div>
-                  <Text type="secondary" style={{ fontSize: '14px' }}>{t('auth.verify.instruction')}</Text>
+                <div className="mb-6 text-center">
+                  <ShieldCheck className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+                  <div className="mb-2"><span className="font-semibold text-base text-slate-800">{t('auth.verify.description')}</span></div>
+                  <div className="mb-4"><span className="text-sm text-slate-500">{registeredEmail}</span></div>
+                  <span className="text-sm text-slate-500">{t('auth.verify.instruction')}</span>
                 </div>
 
-                <Form
-                  form={verifyForm}
-                  onFinish={handleVerify}
-                  layout="vertical"
-                  requiredMark={false}
-                  size="large"
-                >
-                  <Form.Item
-                    name="verificationCode"
-                    label={t('auth.verify.code')}
-                    rules={[
-                      { required: true, message: t('auth.verify.codeRequired') },
-                      { len: 6, message: t('auth.verify.codeLength') },
-                      { pattern: /^\d{6}$/, message: t('auth.verify.codePattern') }
-                    ]}
-                    style={{ marginBottom: 20 }}
-                  >
-                    <Input
-                      placeholder={t('auth.verify.codePlaceholder')}
+                <div className="space-y-5">
+                  <div>
+                    <FieldLabel>{t('auth.verify.code')}</FieldLabel>
+                    <input
+                      value={code}
                       maxLength={6}
-                      style={{ 
-                        textAlign: 'center', 
-                        fontSize: '18px', 
-                        letterSpacing: '4px',
-                        borderRadius: '8px',
-                        height: '50px'
-                      }}
+                      onChange={e => setCode(e.target.value)}
+                      placeholder={t('auth.verify.codePlaceholder')}
+                      className="w-full h-[50px] rounded-lg border border-slate-200 bg-white px-3 text-center text-lg tracking-[4px] text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
                     />
-                  </Form.Item>
-
-                  {(error || success) && (
-                    <Form.Item style={{ marginBottom: 20 }}>
-                      {error && <Alert message={error} type="error" showIcon style={{ borderRadius: '8px' }} />}
-                      {success && <Alert message={success} type="success" showIcon style={{ borderRadius: '8px' }} />}
-                    </Form.Item>
-                  )}
-
-                  <Form.Item style={{ marginBottom: 16 }}>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      block
-                      loading={loading}
-                      style={{ 
-                        height: '44px',
-                        borderRadius: '8px',
-                        background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-                        border: 'none',
-                        fontSize: '16px',
-                        fontWeight: 500
-                      }}
-                    >
-                      {t('auth.verify.verifyButton')}
-                    </Button>
-                  </Form.Item>
-
-                  <Form.Item style={{ marginBottom: 16 }}>
-                    <Button
-                      type="dashed"
-                      block
-                      loading={resendLoading}
-                      onClick={handleResendCode}
-                      disabled={loading}
-                      style={{ 
-                        height: '36px',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    >
-                      重新发送验证码
-                    </Button>
-                  </Form.Item>
-                  
-                  <div style={{ textAlign: 'center' }}>
-                    <Button
-                      type="link"
-                      onClick={handleBackToRegister}
-                      disabled={loading}
-                      style={{ 
-                        color: '#6b7280',
-                        padding: 0
-                      }}
-                    >
-                      {t('auth.verify.backToRegister')}
-                    </Button>
                   </div>
-                </Form>
+
+                  {error && <AlertBox type="error" description={error} />}
+                  {success && <AlertBox type="success" description={success} />}
+
+                  <Btn variant="primary" className="w-full h-11 text-base" loading={loading} onClick={handleVerify}>{t('auth.verify.verifyButton')}</Btn>
+                  <Btn variant="secondary" className="w-full" loading={resendLoading} disabled={loading} onClick={handleResendCode}>重新发送验证码</Btn>
+                  <div className="text-center">
+                    <Btn variant="link" disabled={loading} onClick={handleBackToRegister}>{t('auth.verify.backToRegister')}</Btn>
+                  </div>
+                </div>
               </div>
             )}
-          </Card>
-        </Content>
-      </Layout>
+          </div>
+        </div>
+      </div>
     </>
   )
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import './index.css' // 添加样式文件
 import {
   Card,
@@ -26,7 +26,8 @@ import {
   Table,
   Tabs,
   Upload,
-  Image
+  Image,
+  Radio
 } from 'antd'
 import type { RcFile } from 'antd/es/upload/interface'
 import {
@@ -38,14 +39,17 @@ import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   LoadingOutlined,
-  PictureOutlined
+  PictureOutlined,
+  BranchesOutlined
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '../../auth/AuthProvider'
 import { debugOrganizationIsolation } from '../../utils/debug-org'
 import { getJWTInfo, checkJWTOrganizationInfo } from '../../utils/jwt-utils'
-import { formatPrice, fromMinorUnit } from '../../utils/priceConverter'
+import { formatPrice, fromMinorUnit, toMinorUnit } from '../../utils/priceConverter'
 import ModifierGroupManager from './ModifierGroupManager'
+import ItemChannelConfig from './components/ItemChannelConfig'
+import { storeMenuService, type StoreMenuConfig } from '../../services/store-menu'
 import {
   itemManagementService,
   type Item as APIItem,
@@ -70,8 +74,23 @@ import {
   type AddModifierGroupToItemPayload,
   type Combo,
   type CreateComboPayload,
-  type CreateComboItemPayload
+  type CreateComboItemPayload,
+  type ComboItemGroup,
+  type ComboAvailabilityRules
 } from '../../services/item-management'
+import { ComboItemGroupsConfig } from './components/ComboItemGroupsConfig'
+import { ComboAvailabilityConfig } from './components/ComboAvailabilityConfig'
+import { ComboImageUpload } from './components/ComboImageUpload'
+import ItemModifierConfigInputComponent, { type ItemModifierConfig as ItemModifierConfigType } from './components/ItemModifierConfigInput'
+import SupplyTab from '../SupplyManagement'
+import BrandLocaleSettings from '../BrandLocaleSettings'
+import { getBrandLocale, LOCALE_LABELS } from '@/services/brand-locale'
+// ─── 去 antd 迁移中：kit 命名空间导入（避免与 antd 同名冲突），逐段替换 ───
+import * as UI from '@/components/ui-kit'
+import {
+  Pencil, Trash2, Plus, RotateCcw, MoreVertical, ArrowUp, ArrowDown,
+  Image as ImageIcon, GitBranch, ChevronRight as ChevronRightIcon,
+} from 'lucide-react'
 
 // 为了兼容现有的UI，保留本地的接口定义
 type ID = string
@@ -109,479 +128,18 @@ interface HierarchicalCategory extends Category {
   level?: number
 }
 
-// 商品加料配置组件
-const ItemAddonConfigInput: React.FC<{
-  value?: ItemAddon[];
-  onChange?: (value: ItemAddon[]) => void;
-  addons: Addon[];
-  t: any;
-}> = ({ value = [], onChange, addons, t }) => {
-  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(
-    value.map(item => item.addonId) || []
-  );
-  const [quantities, setQuantities] = useState<Record<string, number>>(
-    value.reduce((acc, item) => ({ ...acc, [item.addonId]: item.maxQuantity }), {})
-  );
+// ItemModifierConfig 类型和组件从独立文件导入
+type ItemModifierConfig = ItemModifierConfigType
 
-  useEffect(() => {
-    setSelectedAddonIds(value.map(item => item.addonId) || []);
-    setQuantities(value.reduce((acc, item) => ({ ...acc, [item.addonId]: item.maxQuantity }), {}));
-  }, [value]);
-
-  const handleAddonToggle = (addonId: string, checked: boolean) => {
-    let newSelectedIds: string[];
-    let newQuantities = { ...quantities };
-
-    if (checked) {
-      newSelectedIds = [...selectedAddonIds, addonId];
-      newQuantities[addonId] = 1; // 默认数量为1
-    } else {
-      newSelectedIds = selectedAddonIds.filter(id => id !== addonId);
-      delete newQuantities[addonId];
-    }
-
-    setSelectedAddonIds(newSelectedIds);
-    setQuantities(newQuantities);
-
-    // 构建新的配置数组
-    const newConfigs: ItemAddon[] = newSelectedIds.map(id => {
-      const addon = addons.find(a => a.id === id);
-      return {
-        id: '', // 将在保存时由后端生成
-        itemId: '', // 将在保存时设置
-        addonId: id,
-        maxQuantity: newQuantities[id] || 1,
-        addon: addon
-      };
-    });
-
-    onChange?.(newConfigs);
-  };
-
-  const handleQuantityChange = (addonId: string, quantity: number) => {
-    const newQuantities = { ...quantities, [addonId]: quantity };
-    setQuantities(newQuantities);
-
-    // 更新配置
-    const newConfigs: ItemAddon[] = selectedAddonIds.map(id => {
-      const addon = addons.find(a => a.id === id);
-      return {
-        id: '', // 将在保存时由后端生成
-        itemId: '', // 将在保存时设置
-        addonId: id,
-        maxQuantity: newQuantities[id] || 1,
-        addon: addon
-      };
-    });
-
-    onChange?.(newConfigs);
-  };
-
-  const activeAddons = addons.filter(addon => addon.isActive);
-
-  return (
-    <div>
-      <Typography.Text strong style={{ marginBottom: 16, display: 'block' }}>
-        {t('pages.menuCenter.selectModifiers')}
-      </Typography.Text>
-      
-      {activeAddons.length === 0 ? (
-        <Typography.Text type="secondary">{t('pages.menuCenter.noModifiersAvailable')}</Typography.Text>
-      ) : (
-        <Row gutter={[12, 12]}>
-          {activeAddons.map(addon => {
-            const isSelected = selectedAddonIds.includes(addon.id);
-            return (
-              <Col key={addon.id} xs={24} sm={12} md={8} lg={6}>
-                <Card 
-                  size="small"
-                  style={{ 
-                    border: isSelected ? '2px solid #52c41a' : '1px solid #d9d9d9',
-                    backgroundColor: isSelected ? '#f6ffed' : '#fff',
-                    height: '100%'
-                  }}
-                  bodyStyle={{ padding: '12px' }}
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Switch
-                        size="small"
-                        checked={isSelected}
-                        onChange={(checked) => handleAddonToggle(addon.id, checked)}
-                      />
-                      <Typography.Text strong style={{ fontSize: '14px' }}>
-                        {addon.name}
-                      </Typography.Text>
-                    </div>
-                    
-                    <div style={{ fontSize: '12px', color: '#666' }}>
-                      {formatPrice(addon.price)}
-                    </div>
-                    
-                    {addon.description && (
-                      <div style={{ 
-                        fontSize: '11px', 
-                        color: '#999', 
-                        lineHeight: '1.3',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical'
-                      }}>
-                        {addon.description}
-                      </div>
-                    )}
-                    
-                    {isSelected && (
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 4,
-                        marginTop: 4,
-                        paddingTop: 8,
-                        borderTop: '1px solid #f0f0f0'
-                      }}>
-                        <Typography.Text style={{ fontSize: '11px', color: '#666' }}>
-                          {t('pages.menuCenter.maxQuantity')}
-                        </Typography.Text>
-                        <InputNumber
-                          size="small"
-                          min={1}
-                          max={10}
-                          value={quantities[addon.id] || 1}
-                          onChange={(value) => handleQuantityChange(addon.id, value || 1)}
-                          style={{ width: 50 }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </Col>
-            );
-          })}
-        </Row>
-      )}
-    </div>
-  );
-};
-
-// 新的商品修饰符配置组件（基于 Modifier v2.0 API）
-interface ItemModifierConfig {
-  groupId: string
-  isRequired: boolean
-  minSelections: number
-  maxSelections: number
-  sortOrder: number
-  enabledOptions: string[] // 启用的选项ID列表
-  defaultOptionId?: string // 默认选项ID
-  optionPrices: Record<string, number> // 选项价格覆盖
-}
-
+// 兼容旧调用（传了 t 参数），直接复用外部组件并忽略 t
 const ItemModifierConfigInput: React.FC<{
   value?: ItemModifierConfig[];
   onChange?: (value: ItemModifierConfig[]) => void;
   modifierGroups: ModifierGroup[];
-  t: any;
-}> = ({ value = [], onChange, modifierGroups, t }) => {
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(
-    value.map(config => config.groupId) || []
-  );
-
-  const [configs, setConfigs] = useState<Record<string, ItemModifierConfig>>(
-    value.reduce((acc, config) => ({ ...acc, [config.groupId]: config }), {})
-  );
-
-  // 使用 JSON.stringify 创建稳定的依赖值，避免无限循环
-  const valueJsonString = useMemo(() => JSON.stringify(value || []), [value]);
-
-  useEffect(() => {
-    setSelectedGroupIds(value.map(config => config.groupId) || []);
-    setConfigs(value.reduce((acc, config) => ({ ...acc, [config.groupId]: config }), {}));
-  }, [valueJsonString]);
-
-  const handleGroupToggle = (groupId: string, checked: boolean) => {
-    let newSelectedIds: string[];
-    let newConfigs = { ...configs };
-
-    if (checked) {
-      newSelectedIds = [...selectedGroupIds, groupId];
-      const group = modifierGroups.find(g => g.id === groupId);
-      const allOptionIds = group?.options?.map(opt => opt.id) || [];
-      newConfigs[groupId] = {
-        groupId,
-        isRequired: false,
-        minSelections: 0,
-        maxSelections: 1,
-        sortOrder: newSelectedIds.length,
-        enabledOptions: allOptionIds,
-        optionPrices: {}
-      };
-    } else {
-      newSelectedIds = selectedGroupIds.filter(id => id !== groupId);
-      delete newConfigs[groupId];
-    }
-
-    setSelectedGroupIds(newSelectedIds);
-    setConfigs(newConfigs);
-    onChange?.(Object.values(newConfigs));
-  };
-
-  const handleConfigChange = (groupId: string, updates: Partial<ItemModifierConfig>) => {
-    const newConfigs = {
-      ...configs,
-      [groupId]: { ...configs[groupId], ...updates }
-    };
-    setConfigs(newConfigs);
-    onChange?.(Object.values(newConfigs));
-  };
-
-  const handleOptionToggle = (groupId: string, optionId: string, checked: boolean) => {
-    const config = configs[groupId];
-    const enabledOptions = checked
-      ? [...config.enabledOptions, optionId]
-      : config.enabledOptions.filter(id => id !== optionId);
-    
-    handleConfigChange(groupId, { enabledOptions });
-  };
-
-  const handleOptionPriceChange = (groupId: string, optionId: string, price: number | null) => {
-    const config = configs[groupId];
-    const newPrices = { ...config.optionPrices };
-    
-    if (price === null) {
-      delete newPrices[optionId];
-    } else {
-      newPrices[optionId] = price;
-    }
-    
-    handleConfigChange(groupId, { optionPrices: newPrices });
-  };
-
-  const activeGroups = modifierGroups.filter(group => group.isActive);
-
-  return (
-    <div>
-      <Typography.Text strong style={{ marginBottom: 16, display: 'block' }}>
-        选择自定义选项组
-      </Typography.Text>
-      
-      {activeGroups.length === 0 ? (
-        <Empty description="暂无可用的自定义选项组">
-          <Typography.Text type="secondary">
-            请先在「自定义选项组管理」中创建自定义选项组
-          </Typography.Text>
-        </Empty>
-      ) : (
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
-          {activeGroups.map(group => {
-            const isSelected = selectedGroupIds.includes(group.id);
-            const config = configs[group.id];
-            const options = group.options || [];
-            
-            return (
-              <Card
-                key={group.id}
-                size="small"
-                style={{
-                  border: isSelected ? '2px solid #1890ff' : '1px solid #d9d9d9',
-                  backgroundColor: isSelected ? '#f0f5ff' : '#fff'
-                }}
-              >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {/* 组头部 */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Switch
-                        checked={isSelected}
-                        onChange={(checked) => handleGroupToggle(group.id, checked)}
-                      />
-                      <div>
-                        <Typography.Text strong>{group.displayName}</Typography.Text>
-                        <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
-                          ({group.name})
-                        </Typography.Text>
-                        <Tag color="blue" style={{ marginLeft: 8 }}>
-                          {group.groupType === 'property' ? '属性' : group.groupType === 'addon' ? '加料' : '自定义'}
-                        </Tag>
-                      </div>
-                    </div>
-                    {isSelected && (
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {options.length} 个选项
-                      </Typography.Text>
-                    )}
-                  </div>
-
-                  {/* 选择规则配置 */}
-                  {isSelected && config && (
-                    <>
-                      <Divider style={{ margin: '8px 0' }} />
-                      <Row gutter={16}>
-                        <Col span={6}>
-                          <div style={{ marginBottom: 8 }}>
-                            <Typography.Text style={{ fontSize: 12 }}>是否必选</Typography.Text>
-                          </div>
-                          <Switch
-                            checked={config.isRequired}
-                            onChange={(checked) => {
-                              // 如果切换到必选，且最少选择为0，自动设为1
-                              // 如果切换到非必选，自动设置最少选择为0
-                              const updates: Partial<ItemModifierConfig> = { isRequired: checked }
-                              if (checked && config.minSelections === 0) {
-                                updates.minSelections = 1
-                              } else if (!checked) {
-                                updates.minSelections = 0
-                              }
-                              handleConfigChange(group.id, updates)
-                            }}
-                            checkedChildren="必选"
-                            unCheckedChildren="可选"
-                          />
-                        </Col>
-                        <Col span={9}>
-                          <div style={{ marginBottom: 8 }}>
-                            <Typography.Text style={{ fontSize: 12 }}>
-                              最少选择
-                              {config.isRequired && (
-                                <Typography.Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
-                                  (必选时≥1)
-                                </Typography.Text>
-                              )}
-                            </Typography.Text>
-                          </div>
-                          <InputNumber
-                            size="small"
-                            min={config.isRequired ? 1 : 0}
-                            max={config.maxSelections}
-                            value={config.minSelections}
-                            onChange={(value) => {
-                              // 确保必选时最少选择≥1
-                              const minValue = config.isRequired ? Math.max(1, value || 1) : (value || 0)
-                              handleConfigChange(group.id, { minSelections: minValue })
-                            }}
-                            style={{ width: '100%' }}
-                            disabled={!config.isRequired}
-                          />
-                        </Col>
-                        <Col span={9}>
-                          <div style={{ marginBottom: 8 }}>
-                            <Typography.Text style={{ fontSize: 12 }}>最多选择</Typography.Text>
-                          </div>
-                          <InputNumber
-                            size="small"
-                            min={config.minSelections}
-                            value={config.maxSelections}
-                            onChange={(value) => handleConfigChange(group.id, { maxSelections: value || 1 })}
-                            style={{ width: '100%' }}
-                          />
-                        </Col>
-                      </Row>
-
-                      {/* 选项配置 - 网格卡片布局 */}
-                      {options.length > 0 && (
-                        <>
-                          <Divider style={{ margin: '8px 0' }}>选项配置</Divider>
-                          <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                            <Row gutter={[8, 8]}>
-                              {options.map(option => {
-                                const isEnabled = config.enabledOptions.includes(option.id);
-                                const isDefault = config.defaultOptionId === option.id;
-                                const hasCustomPrice = option.id in config.optionPrices;
-                                const customPrice = hasCustomPrice ? config.optionPrices[option.id] : undefined;
-                                const defaultPrice = typeof option.defaultPrice === 'string' 
-                                  ? parseFloat(option.defaultPrice) 
-                                  : option.defaultPrice;
-                                
-                                return (
-                                  <Col span={12} key={option.id}>
-                                    <Card
-                                      size="small"
-                                      style={{
-                                        backgroundColor: isEnabled ? '#fff' : '#fafafa',
-                                        border: isDefault ? '2px solid #1890ff' : '1px solid #e8e8e8',
-                                        height: '100%'
-                                      }}
-                                      bodyStyle={{ padding: 8 }}
-                                    >
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                          <Switch
-                                            size="small"
-                                            checked={isEnabled}
-                                            onChange={(checked) => handleOptionToggle(group.id, option.id, checked)}
-                                          />
-                                          <div style={{ flex: 1, overflow: 'hidden' }}>
-                                            <div style={{ fontWeight: 500, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                              {option.displayName}
-                                            </div>
-                                            <div style={{ color: '#999', fontSize: 10 }}>
-                                              {option.name}
-                                            </div>
-                                          </div>
-                                          {isDefault && <Tag color="blue" style={{ margin: 0, fontSize: 10 }}>默认</Tag>}
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                                          <span style={{ color: '#666', flexShrink: 0 }}>¥{defaultPrice.toFixed(2)}</span>
-                                          <InputNumber
-                                            size="small"
-                                            min={0}
-                                            precision={2}
-                                            value={customPrice}
-                                            placeholder="商品价"
-                                            onChange={(value) => handleOptionPriceChange(group.id, option.id, value)}
-                                            style={{ flex: 1, minWidth: 0 }}
-                                            disabled={!isEnabled}
-                                          />
-                                          {hasCustomPrice ? (
-                                            <Button
-                                              size="small"
-                                              type="text"
-                                              danger
-                                              onClick={() => handleOptionPriceChange(group.id, option.id, null)}
-                                              disabled={!isEnabled}
-                                              style={{ padding: '0 4px', minWidth: 24, fontSize: 14 }}
-                                              title="清除"
-                                            >
-                                              ×
-                                            </Button>
-                                          ) : (
-                                            <Button
-                                              size="small"
-                                              onClick={() => {
-                                                if (isEnabled && !isDefault) {
-                                                  handleConfigChange(group.id, {
-                                                    defaultOptionId: option.id
-                                                  });
-                                                }
-                                              }}
-                                              disabled={!isEnabled || isDefault}
-                                              style={{ fontSize: 10, padding: '0 6px', height: 22 }}
-                                            >
-                                              设默认
-                                            </Button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </Card>
-                                  </Col>
-                                );
-                              })}
-                            </Row>
-                          </div>
-                        </>
-                      )}
-                    </>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
-        </Space>
-      )}
-    </div>
-  );
-};
+  t?: any;
+}> = ({ value, onChange, modifierGroups }) => (
+  <ItemModifierConfigInputComponent value={value} onChange={onChange} modifierGroups={modifierGroups} />
+);
 
 // Combo子商品配置组件
 const ComboItemsInput: React.FC<{
@@ -592,9 +150,17 @@ const ComboItemsInput: React.FC<{
   t: any;
 }> = ({ value = [], onChange, allItems, onPriceChange, t }) => {
   const [selectedItems, setSelectedItems] = useState<CreateComboItemPayload[]>(value);
+  const lastPriceRef = useRef<number>(0);
+  const onPriceChangeRef = useRef(onPriceChange);
+  onPriceChangeRef.current = onPriceChange;
 
   useEffect(() => {
-    setSelectedItems(value || []);
+    // 仅当 value 内容真正变化时才更新
+    const newJson = JSON.stringify(value || []);
+    const oldJson = JSON.stringify(selectedItems);
+    if (newJson !== oldJson) {
+      setSelectedItems(value || []);
+    }
   }, [value]);
 
   // 计算总价
@@ -603,7 +169,9 @@ const ComboItemsInput: React.FC<{
     items.forEach(comboItem => {
       const item = allItems.find(i => i.id === comboItem.itemId);
       if (item) {
-        total += (Number(item.basePrice) || 0) * (comboItem.quantity || 1);
+        // 商品原价 + 额外费用，都是分，乘以数量
+        const pricePerUnit = (Math.round(Number(item.basePrice)) || 0) + (Math.round(comboItem.additionalPrice || 0));
+        total += pricePerUnit * (comboItem.quantity || 1);
       }
     });
     return total;
@@ -612,13 +180,16 @@ const ComboItemsInput: React.FC<{
   // 当商品列表变化时,通知父组件价格变化
   useEffect(() => {
     const totalPrice = calculateTotalPrice(selectedItems);
-    onPriceChange?.(totalPrice);
+    if (totalPrice !== lastPriceRef.current) {
+      lastPriceRef.current = totalPrice;
+      onPriceChangeRef.current?.(totalPrice);
+    }
   }, [selectedItems, allItems]);
 
   const handleAddItem = (itemId: string) => {
     const existingItem = selectedItems.find(item => item.itemId === itemId);
     if (existingItem) {
-      message.warning(t('pages.menuCenter.itemAlreadyAdded'));
+      UI.toast.warning(t('pages.menuCenter.itemAlreadyAdded'));
       return;
     }
 
@@ -626,7 +197,8 @@ const ComboItemsInput: React.FC<{
       itemId,
       quantity: 1,
       isRequired: true,
-      sortOrder: selectedItems.length
+      sortOrder: selectedItems.length,
+      additionalPrice: 0
     };
 
     const newSelectedItems = [...selectedItems, newItem];
@@ -685,679 +257,73 @@ const ComboItemsInput: React.FC<{
 
   return (
     <div>
-      <Typography.Text strong style={{ marginBottom: 8, display: 'block' }}>
-        {t('pages.menuCenter.selectComboItems')}
-      </Typography.Text>
+      <p className="text-sm font-semibold text-slate-800 mb-2">{t('pages.menuCenter.selectComboItems')}</p>
 
       {/* 添加商品选择器 */}
-      <Select
-        style={{ width: '100%', marginBottom: 16 }}
-        placeholder={t('pages.menuCenter.selectItemToAdd')}
-        onSelect={(itemId) => {
-          if (itemId) handleAddItem(itemId as string);
-        }}
-        value={undefined}
-        showSearch
-        filterOption={(input, option) => {
-          const children = option?.children;
-          if (typeof children === 'string') {
-            return (children as string).toLowerCase().includes(input.toLowerCase());
-          }
-          return false;
-        }}
+      <select
+        className="w-full mb-4 text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 cursor-pointer focus:outline-2 focus:outline-slate-900"
+        value=""
+        onChange={(e) => { if (e.target.value) handleAddItem(e.target.value) }}
       >
+        <option value="">{t('pages.menuCenter.selectItemToAdd')}</option>
         {availableItems.map(item => (
-          <Select.Option key={item.id} value={item.id}>
-            {item.name} - {formatPrice(item.basePrice)}
-          </Select.Option>
+          <option key={item.id} value={item.id}>{item.name} - {formatPrice(item.basePrice)}</option>
         ))}
-      </Select>
+      </select>
 
       {/* 已选商品列表 */}
       {selectedItems.length === 0 ? (
-        <div style={{
-          textAlign: 'center',
-          padding: '20px',
-          backgroundColor: '#fafafa',
-          borderRadius: '6px',
-          border: '1px dashed #d9d9d9'
-        }}>
-          <Typography.Text type="secondary">
-            {t('pages.menuCenter.noItemsInCombo')}
-          </Typography.Text>
+        <div className="text-center py-5 rounded-md border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400">
+          {t('pages.menuCenter.noItemsInCombo')}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="flex flex-col gap-3">
           {selectedItems.map((comboItem, index) => {
             const item = allItems.find(i => i.id === comboItem.itemId);
             if (!item) return null;
 
             return (
-              <Card key={comboItem.itemId} size="small" style={{ border: '1px solid #d9d9d9' }}>
-                <Row gutter={16} align="middle">
-                  <Col span={8}>
-                    <Typography.Text strong>{item.name}</Typography.Text>
-                    <div style={{ fontSize: '12px', color: '#666' }}>
-                      {formatPrice(item.basePrice)}
+              <div key={comboItem.itemId} className="rounded-lg border border-slate-200 p-3">
+                <div className="grid grid-cols-12 gap-3 items-center">
+                  <div className="col-span-3">
+                    <div className="font-medium text-slate-800">{item.name}</div>
+                    <div className="text-xs text-slate-400">{formatPrice(item.basePrice)}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-slate-400 mb-1">{t('pages.menuCenter.quantity')}</div>
+                    <input type="number" min={1} max={10} value={comboItem.quantity}
+                      onChange={(e) => handleUpdateItem(comboItem.itemId, { quantity: Number(e.target.value) || 1 })}
+                      className="w-full text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-2 focus:outline-slate-900" />
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-slate-400 mb-1">额外费用</div>
+                    <input type="number" min={0} step={0.01}
+                      value={comboItem.additionalPrice ? fromMinorUnit(comboItem.additionalPrice) : 0}
+                      onChange={(e) => handleUpdateItem(comboItem.itemId, { additionalPrice: toMinorUnit(Number(e.target.value) || 0) })}
+                      className="w-full text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-2 focus:outline-slate-900" />
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-slate-400 mb-1">{t('pages.menuCenter.required')}</div>
+                    <UI.Switch checked={comboItem.isRequired} onCheckedChange={(c) => handleUpdateItem(comboItem.itemId, { isRequired: c })} />
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-slate-400 mb-1">{t('pages.menuCenter.sortOrder')}</div>
+                    <div className="flex items-center gap-1">
+                      <button disabled={index === 0} onClick={() => handleMoveUp(index)} className="p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 cursor-pointer"><ArrowUp className="w-4 h-4" /></button>
+                      <button disabled={index === selectedItems.length - 1} onClick={() => handleMoveDown(index)} className="p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-30 cursor-pointer"><ArrowDown className="w-4 h-4" /></button>
                     </div>
-                  </Col>
-                  <Col span={4}>
-                    <div style={{ fontSize: '12px', color: '#666', marginBottom: 4 }}>{t('pages.menuCenter.quantity')}</div>
-                    <InputNumber
-                      size="small"
-                      min={1}
-                      max={10}
-                      value={comboItem.quantity}
-                      onChange={(val) => handleUpdateItem(comboItem.itemId, { quantity: val || 1 })}
-                      style={{ width: '100%' }}
-                    />
-                  </Col>
-                  <Col span={4}>
-                    <div style={{ fontSize: '12px', color: '#666', marginBottom: 4 }}>{t('pages.menuCenter.required')}</div>
-                    <Switch
-                      size="small"
-                      checked={comboItem.isRequired}
-                      onChange={(checked) => handleUpdateItem(comboItem.itemId, { isRequired: checked })}
-                    />
-                  </Col>
-                  <Col span={4}>
-                    <div style={{ fontSize: '12px', color: '#666', marginBottom: 4 }}>{t('pages.menuCenter.sortOrder')}</div>
-                    <Space>
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<ArrowUpOutlined />}
-                        disabled={index === 0}
-                        onClick={() => handleMoveUp(index)}
-                      />
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<ArrowDownOutlined />}
-                        disabled={index === selectedItems.length - 1}
-                        onClick={() => handleMoveDown(index)}
-                      />
-                    </Space>
-                  </Col>
-                  <Col span={4}>
-                    <Button
-                      type="text"
-                      danger
-                      size="small"
-                      icon={<DeleteOutlined />}
-                      onClick={() => handleRemoveItem(comboItem.itemId)}
-                    >
-                      {t('pages.menuCenter.remove')}
-                    </Button>
-                  </Col>
-                </Row>
-              </Card>
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    <button onClick={() => handleRemoveItem(comboItem.itemId)} title={t('pages.menuCenter.remove')} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>
+              </div>
             );
           })}
         </div>
       )}
     </div>
   );
-};
-
-// 商品属性配置组件
-const ItemAttributeConfigInput: React.FC<{
-  value?: ItemAttributeConfig[];
-  onChange?: (value: ItemAttributeConfig[]) => void;
-  attributeTypes: ItemAttributeType[];
-  attributeOptions: Record<string, ItemAttributeOption[]>;
-  t: any;
-}> = ({ value = [], onChange, attributeTypes, attributeOptions, t }) => {
-  const [configs, setConfigs] = useState<ItemAttributeConfig[]>(value);
-
-  useEffect(() => {
-    setConfigs(value || []);
-  }, [value]);
-
-  const handleConfigChange = (newConfigs: ItemAttributeConfig[]) => {
-    setConfigs(newConfigs);
-    onChange?.(newConfigs);
-  };
-
-  const addAttributeType = (attributeTypeId: string) => {
-    // 获取该属性类型的所有选项
-    const allOptions = attributeOptions[attributeTypeId] || [];
-    const allOptionIds = allOptions.map(opt => opt.id);
-    
-    const newConfigs = [...configs, {
-      attributeTypeId,
-      isRequired: false,
-      optionOverrides: {},
-      allowedOptions: allOptionIds, // 默认选中所有选项
-      defaultOptionId: undefined, // 默认无默认选项
-      optionOrder: allOptionIds // 按创建顺序排列
-    }];
-    handleConfigChange(newConfigs);
-  };
-
-  const removeAttributeType = (attributeTypeId: string) => {
-    const newConfigs = configs.filter(config => config.attributeTypeId !== attributeTypeId);
-    handleConfigChange(newConfigs);
-  };
-
-  const updateConfig = (attributeTypeId: string, updates: Partial<ItemAttributeConfig>) => {
-    const newConfigs = configs.map(config => 
-      config.attributeTypeId === attributeTypeId 
-        ? { ...config, ...updates }
-        : config
-    );
-    handleConfigChange(newConfigs);
-  };
-
-  const updateOptionOverride = (attributeTypeId: string, optionId: string, priceModifier: number) => {
-    const config = configs.find(c => c.attributeTypeId === attributeTypeId);
-    if (config) {
-      const newOverrides = { ...config.optionOverrides };
-      if (priceModifier === 0) {
-        delete newOverrides[optionId];
-      } else {
-        newOverrides[optionId] = { priceModifier };
-      }
-      updateConfig(attributeTypeId, { optionOverrides: newOverrides });
-    }
-  };
-
-  const availableTypes = attributeTypes.filter(type => 
-    !configs.some(config => config.attributeTypeId === type.id)
-  );
-
-  return (
-    <div>
-      <div style={{ marginBottom: 16 }}>
-        <Typography.Text strong>{t('pages.menuCenter.linkAttributeTypes')}</Typography.Text>
-        {availableTypes.length > 0 ? (
-          <Select
-            style={{ width: '100%', marginTop: 8 }}
-            placeholder={t('pages.menuCenter.selectAttributeTypePlaceholder')}
-            onSelect={(value: string | undefined) => value && addAttributeType(value)}
-            value={undefined}
-            size="large"
-          >
-            {availableTypes.map(type => (
-              <Select.Option key={type.id} value={type.id}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: '16px' }}>🏷️</span>
-                  <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{type.displayName}</span>
-                </div>
-              </Select.Option>
-            ))}
-          </Select>
-        ) : (
-          <div style={{ 
-            marginTop: 8, 
-            padding: '12px', 
-            backgroundColor: '#f5f5f5', 
-            borderRadius: '6px',
-            textAlign: 'center'
-          }}>
-            <Typography.Text type="secondary">
-              {t('pages.menuCenter.allAttributeTypesLinked')}
-            </Typography.Text>
-          </div>
-        )}
-      </div>
-
-      {configs.map(config => {
-        const attributeType = attributeTypes.find(type => type.id === config.attributeTypeId);
-        if (!attributeType) return null;
-
-        return (
-          <Card 
-            key={config.attributeTypeId} 
-            size="small" 
-            style={{ marginBottom: 12, border: '2px solid #1890ff' }}
-            title={
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Typography.Title level={5} style={{ margin: 0, color: '#1890ff' }}>
-                    🏷️ {attributeType.displayName}
-                  </Typography.Title>
-                  <Tag color="blue">{t('pages.menuCenter.attributeType')}</Tag>
-                </div>
-                <Button 
-                  type="text" 
-                  danger 
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  onClick={() => removeAttributeType(config.attributeTypeId)}
-                >
-                  {t('pages.menuCenter.remove')}
-                </Button>
-              </div>
-            }
-          >
-            
-            <Row gutter={16}>
-              <Col span={12}>
-                <Typography.Text>{t('pages.menuCenter.isRequired')}</Typography.Text>
-                <Switch 
-                  checked={config.isRequired}
-                  onChange={(checked) => updateConfig(config.attributeTypeId, { isRequired: checked })}
-                  checkedChildren={t('pages.menuCenter.required')}
-                  unCheckedChildren={t('pages.menuCenter.optional')}
-                />
-              </Col>
-            </Row>
-
-            {/* 选项选择区域 */}
-            <div style={{ marginTop: 12 }}>
-              <Typography.Text strong>{t('pages.menuCenter.optionSelection')}</Typography.Text>
-              <Typography.Text type="secondary" style={{ fontSize: '12px', marginLeft: 8 }}>
-                {t('pages.menuCenter.optionSelectionTip')}
-              </Typography.Text>
-              <div style={{ marginTop: 8 }}>
-                <Select
-                  mode="multiple"
-                  style={{ width: '100%' }}
-                  placeholder={t('pages.menuCenter.selectOptionsPlaceholder')}
-                  value={config.allowedOptions || []}
-                  onChange={(values) => updateConfig(config.attributeTypeId, { allowedOptions: values })}
-                  allowClear
-                >
-                  {(attributeOptions[attributeType.id] || []).map(option => (
-                    <Select.Option key={option.id} value={option.id}>
-                      {option.displayName}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-
-            {/* 选项配置表格 */}
-            <div style={{ marginTop: 16 }}>
-              <Typography.Text strong>{t('pages.menuCenter.optionConfig')}</Typography.Text>
-              <Typography.Text type="secondary" style={{ fontSize: '12px', marginLeft: 8 }}>
-                {t('pages.menuCenter.optionConfigTip')}
-              </Typography.Text>
-                  
-                  <Table
-                    size="small"
-                    style={{ marginTop: 12 }}
-                    dataSource={(() => {
-                      // 获取过滤后的选项
-                      const filteredOptions = (attributeOptions[attributeType.id] || [])
-                        .filter(option => 
-                          !config.allowedOptions || 
-                          config.allowedOptions.length === 0 || 
-                          config.allowedOptions.includes(option.id)
-                        );
-                      
-                      // 根据 optionOrder 进行排序
-                      if (config.optionOrder && config.optionOrder.length > 0) {
-                        const orderMap = new Map(config.optionOrder.map((id, index) => [id, index]));
-                        return filteredOptions
-                          .sort((a, b) => {
-                            const orderA = orderMap.get(a.id) ?? 999;
-                            const orderB = orderMap.get(b.id) ?? 999;
-                            return orderA - orderB;
-                          })
-                          .map((option, index) => ({
-                            ...option,
-                            key: option.id,
-                            sortIndex: index
-                          }));
-                      }
-                      
-                      // 默认按创建顺序
-                      return filteredOptions.map((option, index) => ({
-                        ...option,
-                        key: option.id,
-                        sortIndex: index
-                      }));
-                    })()}
-                    pagination={false}
-                    bordered
-                    scroll={{ x: 750 }}
-                    columns={[
-                      {
-                        title: t('pages.menuCenter.optionName'),
-                        dataIndex: 'displayName',
-                        width: 120,
-                        render: (text: string) => (
-                          <Typography.Text strong>{text}</Typography.Text>
-                        )
-                      },
-                      {
-                        title: t('pages.menuCenter.default'),
-                        key: 'default',
-                        width: 80,
-                        render: (_, record: any) => {
-                          const isAllowed = !config.allowedOptions || config.allowedOptions.length === 0 || config.allowedOptions.includes(record.id);
-                          const isDefault = config.defaultOptionId === record.id;
-                          return (
-                            <Switch
-                              size="small"
-                              checked={isDefault}
-                              disabled={!isAllowed}
-                              onChange={(checked) => {
-                                updateConfig(config.attributeTypeId, { 
-                                  defaultOptionId: checked ? record.id : undefined 
-                                });
-                              }}
-                            />
-                          );
-                        }
-                      },
-                      {
-                        title: (
-                          <div>
-                            <div>{t('pages.menuCenter.sort')}</div>
-                            <div style={{ fontSize: '10px', color: '#999', fontWeight: 'normal' }}>
-                              {t('pages.menuCenter.sortTip')}
-                            </div>
-                          </div>
-                        ),
-                        key: 'sort',
-                        width: 100,
-                        render: (_, _record: any, index: number) => {
-                          const dataSource = (() => {
-                            const filteredOptions = (attributeOptions[attributeType.id] || [])
-                              .filter(option => 
-                                !config.allowedOptions || 
-                                config.allowedOptions.length === 0 || 
-                                config.allowedOptions.includes(option.id)
-                              );
-                            
-                            if (config.optionOrder && config.optionOrder.length > 0) {
-                              const orderMap = new Map(config.optionOrder.map((id, idx) => [id, idx]));
-                              return filteredOptions.sort((a, b) => {
-                                const orderA = orderMap.get(a.id) ?? 999;
-                                const orderB = orderMap.get(b.id) ?? 999;
-                                return orderA - orderB;
-                              });
-                            }
-                            return filteredOptions;
-                          })();
-                          
-                          const moveUp = () => {
-                            if (index === 0) return;
-                            const newOrder = dataSource.map(opt => opt.id);
-                            [newOrder[index], newOrder[index - 1]] = [newOrder[index - 1], newOrder[index]];
-                            updateConfig(config.attributeTypeId, { optionOrder: newOrder });
-                          };
-                          
-                          const moveDown = () => {
-                            if (index === dataSource.length - 1) return;
-                            const newOrder = dataSource.map(opt => opt.id);
-                            [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-                            updateConfig(config.attributeTypeId, { optionOrder: newOrder });
-                          };
-                          
-                          return (
-                            <Space>
-                              <Button
-                                type="text"
-                                size="small"
-                                icon={<ArrowUpOutlined />}
-                                disabled={index === 0}
-                                onClick={moveUp}
-                                title={t('pages.menuCenter.moveUp')}
-                              />
-                              <Button
-                                type="text"
-                                size="small"
-                                icon={<ArrowDownOutlined />}
-                                disabled={index === dataSource.length - 1}
-                                onClick={moveDown}
-                                title={t('pages.menuCenter.moveDown')}
-                              />
-                            </Space>
-                          );
-                        }
-                      },
-                      {
-                        title: t('pages.menuCenter.presetPrice'),
-                        key: 'originalPrice',
-                        width: 100,
-                        render: (_, record: any) => (
-                          <Typography.Text type="secondary">
-                            {formatPrice(record.priceModifier || 0)}
-                          </Typography.Text>
-                        )
-                      },
-                      {
-                        title: t('pages.menuCenter.overridePrice'),
-                        key: 'price',
-                        width: 120,
-                        render: (_, record: any) => {
-                          const isAllowed = !config.allowedOptions || config.allowedOptions.length === 0 || config.allowedOptions.includes(record.id);
-                          const override = config.optionOverrides?.[record.id];
-                          return (
-                            <InputNumber
-                              size="small"
-                              style={{ width: '100%' }}
-                              placeholder={t('pages.menuCenter.setPricePlaceholder')}
-                              value={override?.priceModifier}
-                              onChange={(val) => updateOptionOverride(config.attributeTypeId, record.id, val || 0)}
-                              precision={2}
-                              disabled={!isAllowed}
-                              addonBefore="$"
-                            />
-                          );
-                        }
-                      },
-                      {
-                        title: t('pages.menuCenter.action'),
-                        key: 'action',
-                        width: 60,
-                        render: (_, record: any) => {
-                          const currentAllowed = config.allowedOptions || [];
-                          const isOnlyOption = currentAllowed.length <= 1;
-                          
-                          return (
-                            <Button
-                              type="text"
-                              danger
-                              size="small"
-                              icon={<DeleteOutlined />}
-                              disabled={isOnlyOption}
-                              title={isOnlyOption ? t('pages.menuCenter.minOneOption') : t('pages.menuCenter.removeOption')}
-                              onClick={() => {
-                                const newAllowed = currentAllowed.filter(id => id !== record.id);
-                                const newOrder = (config.optionOrder || []).filter(id => id !== record.id);
-                                let updates: Partial<ItemAttributeConfig> = { 
-                                  allowedOptions: newAllowed,
-                                  optionOrder: newOrder
-                                };
-                                
-                                // 如果删除的是默认选项，则清除默认选项设置
-                                if (config.defaultOptionId === record.id) {
-                                  updates.defaultOptionId = undefined;
-                                }
-                                
-                                // 如果删除的选项有价格覆盖，则移除该覆盖
-                                if (config.optionOverrides?.[record.id]) {
-                                  const newOverrides = { ...config.optionOverrides };
-                                  delete newOverrides[record.id];
-                                  updates.optionOverrides = newOverrides;
-                                }
-                                
-                                updateConfig(config.attributeTypeId, updates);
-                              }}
-                            />
-                          );
-                        }
-                      }
-                    ]}
-                  />
-                  
-                  {/* 空状态提示 */}
-                  {(attributeOptions[attributeType.id] || [])
-                    .filter(option => 
-                      !config.allowedOptions || 
-                      config.allowedOptions.length === 0 || 
-                      config.allowedOptions.includes(option.id)
-                    ).length === 0 && (
-                    <div style={{
-                      textAlign: 'center',
-                      padding: '24px',
-                      backgroundColor: '#fafafa',
-                      borderRadius: '4px',
-                      marginTop: 12
-                    }}>
-                      <Typography.Text type="secondary">
-                        {t('pages.menuCenter.noOptionsSelected')}
-                      </Typography.Text>
-                    </div>
-                  )}
-                  
-                  <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
-                    <Typography.Text type="secondary">
-                      {t('pages.menuCenter.optionConfigDetailTip')}
-                    </Typography.Text>
-                  </div>
-            </div>
-          </Card>
-        );
-      })}
-
-      {configs.length === 0 && (
-        <Typography.Text type="secondary">
-          {t('pages.menuCenter.selectAttributeTypePrompt')}
-        </Typography.Text>
-      )}
-    </div>
-  );
-};
-
-// 商品属性值输入组件
-const ItemAttributeValuesInput: React.FC<{
-  value?: ItemAttributeValue[];
-  onChange?: (value: ItemAttributeValue[]) => void;
-  attributeConfigs: ItemAttributeConfig[];
-  attributeTypes: ItemAttributeType[];
-  attributeOptions: Record<string, ItemAttributeOption[]>;
-  t: any;
-}> = ({ value = [], onChange, attributeConfigs, attributeTypes, attributeOptions, t }) => {
-  const [selectedAttributes, setSelectedAttributes] = useState<ItemAttributeValue[]>(value);
-
-  useEffect(() => {
-    setSelectedAttributes(value || []);
-  }, [value]);
-
-  const handleAttributeChange = (attributeTypeId: string, attributeValue: any) => {
-    const newAttributes = [...selectedAttributes];
-    const existingIndex = newAttributes.findIndex(attr => attr.attributeTypeId === attributeTypeId);
-    
-    if (existingIndex >= 0) {
-      if (attributeValue === undefined || attributeValue === null || attributeValue === '') {
-        // 移除属性
-        newAttributes.splice(existingIndex, 1);
-      } else {
-        // 更新属性值
-        newAttributes[existingIndex] = {
-          attributeTypeId,
-          value: attributeValue
-        };
-      }
-    } else if (attributeValue !== undefined && attributeValue !== null && attributeValue !== '') {
-      // 添加新属性
-      newAttributes.push({
-        attributeTypeId,
-        value: attributeValue
-      });
-    }
-    
-    setSelectedAttributes(newAttributes);
-    onChange?.(newAttributes);
-  };
-
-  const renderAttributeInput = (attributeType: ItemAttributeType) => {
-    const currentValue = selectedAttributes.find(attr => attr.attributeTypeId === attributeType.id)?.value;
-    
-    // 所有属性类型都是select类型
-    const allOptions = attributeOptions[attributeType.id] || [];
-    
-    // 实现选项过滤逻辑
-    const getAvailableOptions = (attributeTypeId: string) => {
-      // 查找对应的属性配置
-      const config = attributeConfigs.find(c => c.attributeTypeId === attributeTypeId);
-      
-      // 如果没有设置 allowedOptions 或为空数组，返回所有选项
-      if (!config?.allowedOptions || config.allowedOptions.length === 0) {
-        return allOptions;
-      }
-      
-      // 只返回允许的选项
-      return allOptions.filter(option => 
-        config.allowedOptions!.includes(option.id)
-      );
-    };
-    
-    const availableOptions = getAvailableOptions(attributeType.id);
-    
-    return (
-      <Select
-        style={{ width: '100%' }}
-        placeholder={`请选择${attributeType.displayName}`}
-        value={currentValue}
-        onChange={(val) => handleAttributeChange(attributeType.id, val)}
-        allowClear
-      >
-        {availableOptions.map(option => (
-          <Select.Option key={option.id} value={option.value}>
-            {option.displayName}
-            {(Number(option.priceModifier) || 0) !== 0 && (
-              <span style={{ color: '#666', fontSize: '12px' }}>
-                {(Number(option.priceModifier) || 0) > 0 ? ' (+' : ' ('}
-                {fromMinorUnit(Math.abs(Number(option.priceModifier) || 0)).toFixed(2)})
-              </span>
-            )}
-          </Select.Option>
-        ))}
-      </Select>
-    );
-  };
-
-  return (
-    <div>
-      {attributeTypes.map(attributeType => (
-        <Row key={attributeType.id} gutter={8} style={{ marginBottom: 12 }}>
-          <Col span={8}>
-            <Typography.Text strong>
-              {attributeType.displayName}
-            </Typography.Text>
-          </Col>
-          <Col span={16}>
-            {renderAttributeInput(attributeType)}
-          </Col>
-        </Row>
-      ))}
-      
-      {attributeTypes.length === 0 && (
-        <Typography.Text type="secondary">
-          {t('pages.menuCenter.noAttributesAvailable')}
-        </Typography.Text>
-      )}
-    </div>
-  );
-};
-
-// 价格计算工具函数
-const calculateItemPrice = (item: Item, selections: Record<string, any>): number => {
-  let total = item.basePrice;
-  
-  if (!item.attributes) return total;
-  
-  item.attributes.forEach(attr => {
-    const selectedOptionId = selections[attr.attributeTypeId];
-    if (selectedOptionId && attr.attributeType) {
-      const option = attr.attributeType.options?.find(o => o.id === selectedOptionId);
-      if (option) {
-        // 检查是否有价格覆盖
-        const override = attr.optionOverrides?.[selectedOptionId];
-        const priceModifier = override?.priceModifier ?? option.priceModifier;
-        total += Number(priceModifier) || 0;
-      }
-    }
-  });
-  
-  return total;
 };
 
 // 获取商品可用的属性选项
@@ -1429,7 +395,19 @@ const flattenCategoryTree = (tree: HierarchicalCategory[]): HierarchicalCategory
 
 const MenuCenter: React.FC = () => {
   const { t } = useTranslation()
-  const { isAuthenticated } = useAuthContext()
+  const { isAuthenticated, organizations } = useAuthContext()
+
+  // 从 localStorage 找当前选中的 org，判断 orgType
+  const currentOrgId = localStorage.getItem('organization_id')
+  const currentOrg = organizations.find(o => o.id === currentOrgId)
+  const isMain = !currentOrg || currentOrg.orgType === 'MAIN'
+
+  // 品牌多语言配置：除默认语言外的所有额外语言
+  const [additionalLocales, setAdditionalLocales] = useState<string[]>([])
+  const [defaultLocale, setDefaultLocale] = useState<string>('zh-CN')
+
+  // 非主店：品牌商品的门店配置（可用性 / 价格覆盖）
+  const [storeConfigs, setStoreConfigs] = useState<Map<string, StoreMenuConfig>>(new Map())
 
   // 自定义加载图标
   const loadingIcon = <LoadingOutlined style={{ fontSize: 24, color: '#1890ff' }} spin />
@@ -1463,6 +441,7 @@ const MenuCenter: React.FC = () => {
   // 模态框状态
   const [categoryModalVisible, setCategoryModalVisible] = useState(false)
   const [itemModalVisible, setItemModalVisible] = useState(false)
+  const [channelModal, setChannelModal] = useState<{ id: string; name: string } | null>(null)
   const [attributeTypeModalVisible, setAttributeTypeModalVisible] = useState(false)
   const [attributeOptionModalVisible, setAttributeOptionModalVisible] = useState(false)
   const [addonModalVisible, setAddonModalVisible] = useState(false)
@@ -1477,9 +456,17 @@ const MenuCenter: React.FC = () => {
   const [editingModifierGroup, setEditingModifierGroup] = useState<ModifierGroup | null>(null)
   const [editingModifierOption, setEditingModifierOption] = useState<ModifierOption | null>(null)
   const [editingCombo, setEditingCombo] = useState<Combo | null>(null)
+  // 套餐增强功能状态
+  const [comboImageUrl, setComboImageUrl] = useState<string | undefined>()
+  // 新建套餐时选择的待上传图片文件（保存套餐成功后自动上传）
+  const [comboImageFile, setComboImageFile] = useState<File | null>(null)
+  const [comboItemGroups, setComboItemGroups] = useState<ComboItemGroup[]>([])
+  const [comboAvailabilityRules, setComboAvailabilityRules] = useState<ComboAvailabilityRules | undefined>()
+  // 套餐类型：fixed=固定套餐，selection=可选套餐（分组模式）
+  const [comboType, setComboType] = useState<'fixed' | 'selection'>('fixed')
   const [selectedAttributeTypeId, setSelectedAttributeTypeId] = useState<string | null>(null)
   const [selectedModifierGroupId, setSelectedModifierGroupId] = useState<string | null>(null)
-  const [modifierGroupTypeFilter, setModifierGroupTypeFilter] = useState<'all' | 'property' | 'addon' | 'custom'>('all')
+  const [modifierGroupTypeFilter] = useState<string>('all')
 
   // 图片上传状态
   const [imageUploading, setImageUploading] = useState(false)
@@ -1487,11 +474,12 @@ const MenuCenter: React.FC = () => {
 
   // 表单
   const [catForm] = Form.useForm<{ name: string; parentId?: string }>()
-  const [itemForm] = Form.useForm<{ 
-    name: string; 
-    description?: string; 
+  const [itemForm] = Form.useForm<{
+    name: string;
+    name_i18n?: Record<string, string>;
+    description?: string;
     categoryId?: string;
-    basePrice: number; 
+    basePrice: number;
     cost?: number;
     isActive?: boolean;
     customFields?: any;
@@ -1529,6 +517,13 @@ const MenuCenter: React.FC = () => {
         loadModifierGroups()
         loadCombos()
         loadAllItems()
+        if (!isMain) loadStoreConfigs()
+        // 加载品牌语言配置以显示译名输入框
+        getBrandLocale().then(cfg => {
+          setDefaultLocale(cfg.default_locale)
+          // 额外语言 = 全部可用语言排除默认语言，每种都显示译名输入框
+          setAdditionalLocales(cfg.available_locales.filter(l => l !== cfg.default_locale))
+        }).catch(() => { /* 静默失败 */ })
       } catch (error) {
         console.error('❌ [MENU CENTER] Error in useEffect:', error)
       }
@@ -1566,6 +561,16 @@ const MenuCenter: React.FC = () => {
   }, [selectedCategoryId])
 
   // 加载分类列表
+  // 加载非主店的门店配置（用于显示品牌商品的本店可用状态）
+  const loadStoreConfigs = async () => {
+    try {
+      const configs = await storeMenuService.getStoreMenuConfigs()
+      setStoreConfigs(new Map(configs.map(c => [c.catalogItemId, c])))
+    } catch {
+      // 配置加载失败不影响主功能
+    }
+  }
+
   const loadCategories = async () => {
     setLoading(prev => ({ ...prev, categories: true }))
     try {
@@ -1581,7 +586,7 @@ const MenuCenter: React.FC = () => {
       // 静默加载分类，不显示成功消息
     } catch (error) {
       console.error('Failed to load categories:', error)
-      message.error('加载分类失败')
+      UI.toast.error('加载分类失败')
       setCategories([]) // 确保出错时也设置为空数组
     } finally {
       setLoading(prev => ({ ...prev, categories: false }))
@@ -1597,7 +602,7 @@ const MenuCenter: React.FC = () => {
       // 静默加载属性类型，不显示成功消息
     } catch (error) {
       console.error('Failed to load attribute types:', error)
-      message.error('加载属性类型失败')
+      UI.toast.error('加载属性类型失败')
       setAttributeTypes([])
     } finally {
       setLoading(prev => ({ ...prev, attributes: false }))
@@ -1614,7 +619,7 @@ const MenuCenter: React.FC = () => {
       }))
     } catch (error) {
       console.error('Failed to load attribute options:', error)
-      message.error('加载属性选项失败')
+      UI.toast.error('加载属性选项失败')
     }
   }
 
@@ -1622,8 +627,7 @@ const MenuCenter: React.FC = () => {
   // Modifier v2.0: 使用 getModifierGroups 代替 getAddons
   const loadAddons = async () => {
     try {
-      // 从 Modifier API 获取 groupType === 'addon' 的修饰符组
-      const modifierGroups = await itemManagementService.getModifierGroups({ groupType: 'addon', isActive: true })
+      const modifierGroups = await itemManagementService.getModifierGroups({ isActive: true })
       // 将 ModifierGroup 适配为 Addon 类型供 UI 使用
       const adaptedAddons = modifierGroups.map(group => ({
         id: group.id,
@@ -1638,7 +642,7 @@ const MenuCenter: React.FC = () => {
       setAddons(adaptedAddons)
     } catch (error) {
       console.error('Failed to load addons:', error)
-      message.error('加载加料失败')
+      UI.toast.error('加载加料失败')
       setAddons([])
     }
   }
@@ -1650,7 +654,6 @@ const MenuCenter: React.FC = () => {
       const itemModifiers = await itemManagementService.getItemModifiers(itemId)
       // 将 ItemModifierGroup 适配为 ItemAddon 类型供 UI 使用
       const adaptedItemAddons = itemModifiers
-        .filter(im => im.group?.groupType === 'addon') // 只获取类型为 'addon' 的修饰符
         .map(im => ({
           id: im.id,
           itemId: im.itemId,
@@ -1673,7 +676,7 @@ const MenuCenter: React.FC = () => {
       }))
     } catch (error) {
       console.error('Failed to load item addons:', error)
-      message.error('加载商品加料失败')
+      UI.toast.error('加载商品加料失败')
     }
   }
 
@@ -1681,14 +684,12 @@ const MenuCenter: React.FC = () => {
   const loadModifierGroups = async () => {
     setLoading(prev => ({ ...prev, modifiers: true }))
     try {
-      // 根据过滤器加载 ModifierGroups
-      const params = modifierGroupTypeFilter !== 'all' ? { groupType: modifierGroupTypeFilter as any } : {}
-      const groups = await itemManagementService.getModifierGroups({ isActive: true, ...params })
+      const groups = await itemManagementService.getModifierGroups({ isActive: true })
       setModifierGroups(groups)
       console.log('✅ Loaded modifier groups:', groups)
     } catch (error) {
       console.error('Failed to load modifier groups:', error)
-      message.error('加载自定义选项组失败')
+      UI.toast.error('加载自定义选项组失败')
       setModifierGroups([])
     } finally {
       setLoading(prev => ({ ...prev, modifiers: false }))
@@ -1707,7 +708,7 @@ const MenuCenter: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to load modifier options:', error)
-      message.error('加载自定义选项失败')
+      UI.toast.error('加载自定义选项失败')
     }
   }
 
@@ -1730,7 +731,7 @@ const MenuCenter: React.FC = () => {
       setCombos(response.data || [])
     } catch (error) {
       console.error('Failed to load combos:', error)
-      message.error('加载组合商品失败')
+      UI.toast.error('加载组合商品失败')
       setCombos([])
     } finally {
       setLoading(prev => ({ ...prev, combos: false }))
@@ -1741,13 +742,22 @@ const MenuCenter: React.FC = () => {
   const handleCreateCombo = () => {
     setEditingCombo(null)
     comboForm.resetFields()
+    setComboImageUrl(undefined)
+    setComboImageFile(null)
+    setComboItemGroups([])
+    setComboAvailabilityRules(undefined)
+    setComboType('fixed')
     setComboModalVisible(true)
   }
 
   // 编辑Combo
   const handleEditCombo = (combo: Combo) => {
     setEditingCombo(combo)
-    
+
+    // 根据 itemGroups 判断套餐类型
+    const type: 'fixed' | 'selection' = (combo.itemGroups && combo.itemGroups.length > 0) ? 'selection' : 'fixed'
+    setComboType(type)
+
     // 转换comboItems为表单需要的格式
     const comboItems: CreateComboItemPayload[] = (combo.comboItems || []).map(item => ({
       itemId: item.itemId,
@@ -1755,20 +765,54 @@ const MenuCenter: React.FC = () => {
       isRequired: item.isRequired,
       sortOrder: item.sortOrder,
       attributeSelections: item.attributeSelections,
-      addonSelections: item.addonSelections
+      addonSelections: item.addonSelections,
+      groupId: item.groupId,
+      additionalPrice: item.additionalPrice || 0
     }))
-    
-    // 将价格从分转换为元（后端存储的是分，表单显示的是元）
+
+    // 将价格从分转换为元
+    let discountValue: number | undefined = undefined
+    if (combo.discount !== undefined && combo.discount !== null) {
+      if (combo.discountType === 'percentage') {
+        discountValue = Number(combo.discount)
+      } else {
+        discountValue = fromMinorUnit(combo.discount)
+      }
+    }
+
     comboForm.setFieldsValue({
       name: combo.name,
       description: combo.description,
       categoryId: combo.categoryId,
       basePrice: fromMinorUnit(combo.basePrice),
-      discount: combo.discount !== undefined && combo.discount !== null ? fromMinorUnit(combo.discount) : undefined,
+      discount: discountValue,
       discountType: combo.discountType,
       isActive: combo.isActive,
       comboItems: comboItems
     })
+
+    // 加载增强功能字段
+    setComboImageUrl(combo.imageUrl)
+    setComboImageFile(null)  // 编辑模式不需要待上传文件
+
+    // 兼容 snake_case 响应（防御性处理）
+    const normalizedGroups = (combo.itemGroups || []).map(group => {
+      if ('selection_type' in group) {
+        return {
+          id: group.id,
+          name: group.name,
+          selectionType: (group as any).selection_type,
+          minSelections: (group as any).min_selections,
+          maxSelections: (group as any).max_selections,
+          sortOrder: (group as any).sort_order
+        } as ComboItemGroup
+      }
+      return group
+    })
+    setComboItemGroups(normalizedGroups)
+
+    setComboAvailabilityRules(combo.availabilityRules || { enabled: false })
+
     setComboModalVisible(true)
   }
 
@@ -1776,18 +820,60 @@ const MenuCenter: React.FC = () => {
   const handleSaveCombo = async (values: CreateComboPayload) => {
     setLoading(prev => ({ ...prev, creating: true }))
     try {
+      // 可选套餐：验证分组配置
+      if (comboType === 'selection') {
+        if (comboItemGroups.length === 0) {
+          UI.toast.error('可选套餐至少需要一个分组');
+          setLoading(prev => ({ ...prev, creating: false }));
+          return;
+        }
+        const hasEmptyGroupName = comboItemGroups.some(g => !g.name || g.name.trim() === '');
+        if (hasEmptyGroupName) {
+          UI.toast.error('所有分组必须有名称');
+          setLoading(prev => ({ ...prev, creating: false }));
+          return;
+        }
+        const comboItemsForValidation = values.comboItems || [];
+        comboItemGroups.forEach(group => {
+          const groupItems = comboItemsForValidation.filter(ci => ci.groupId === group.id);
+          if (groupItems.length === 0) {
+            throw new Error(`分组 "${group.name}" 中没有商品，请添加商品`);
+          }
+        });
+      }
+
+      // 直接使用 camelCase，后端负责所有 snake_case 转换
+      const payload: any = {
+        ...values,
+        comboItems: values.comboItems || [],
+        imageUrl: comboImageUrl,
+        // 可选套餐才发送 itemGroups
+        itemGroups: comboType === 'selection' ? comboItemGroups : undefined,
+        availabilityRules: comboAvailabilityRules?.enabled ? comboAvailabilityRules : undefined
+      }
+
       if (editingCombo) {
-        await itemManagementService.updateCombo(editingCombo.id, values)
-        message.success(t('pages.menuCenter.updateComboSuccess'))
+        await itemManagementService.updateCombo(editingCombo.id, payload)
+        UI.toast.success(t('pages.menuCenter.updateComboSuccess'))
       } else {
-        await itemManagementService.createCombo(values)
-        message.success(t('pages.menuCenter.createComboSuccess'))
+        const newCombo = await itemManagementService.createCombo(payload)
+        // 如果用户在创建时选了图片，保存成功后立即上传（uploadComboImage 会自动更新 combo.imageUrl）
+        if (comboImageFile && newCombo?.id) {
+          try {
+            await itemManagementService.uploadComboImage(newCombo.id, comboImageFile)
+          } catch (imgError) {
+            console.error('Image upload after create failed:', imgError)
+            UI.toast.warning('套餐已保存，但图片上传失败，请在编辑时重新上传')
+          }
+        }
+        setComboImageFile(null)
+        UI.toast.success(t('pages.menuCenter.createComboSuccess'))
       }
       setComboModalVisible(false)
       loadCombos()
     } catch (error) {
       console.error('Failed to save combo:', error)
-      message.error(editingCombo ? t('pages.menuCenter.updateComboFailed') : t('pages.menuCenter.createComboFailed'))
+      UI.toast.error(editingCombo ? t('pages.menuCenter.updateComboFailed') : t('pages.menuCenter.createComboFailed'))
     } finally {
       setLoading(prev => ({ ...prev, creating: false }))
     }
@@ -1797,11 +883,11 @@ const MenuCenter: React.FC = () => {
   const handleDeleteCombo = async (id: string) => {
     try {
       await itemManagementService.deleteCombo(id)
-      message.success(t('pages.menuCenter.deleteComboSuccess'))
+      UI.toast.success(t('pages.menuCenter.deleteComboSuccess'))
       loadCombos()
     } catch (error) {
       console.error('Failed to delete combo:', error)
-      message.error(t('pages.menuCenter.deleteComboFailed'))
+      UI.toast.error(t('pages.menuCenter.deleteComboFailed'))
     }
   }
 
@@ -1862,7 +948,7 @@ const MenuCenter: React.FC = () => {
       // 静默加载商品，不显示加载消息
     } catch (error) {
       console.error('Failed to load items:', error)
-      message.error('加载商品失败')
+      UI.toast.error('加载商品失败')
       setItems([]) // 确保出错时也设置为空数组
     } finally {
       setLoading(prev => ({ ...prev, items: false }))
@@ -1881,6 +967,7 @@ const MenuCenter: React.FC = () => {
     setEditingCategory(category)
     catForm.setFieldsValue({
       name: category.name,
+      name_i18n: (category as any).name_i18n ?? {},
       parentId: category.parentId
     })
     setCategoryModalVisible(true)
@@ -1889,7 +976,7 @@ const MenuCenter: React.FC = () => {
   const handleDeleteCategory = async (categoryId: string) => {
     try {
       await itemManagementService.deleteCategory(categoryId)
-      message.success(t('pages.menuCenter.deleteCategorySuccess'))
+      UI.toast.success(t('pages.menuCenter.deleteCategorySuccess'))
       
       // 如果删除的是当前选中的分类，清空选择
       if (selectedCategoryId === categoryId) {
@@ -1899,7 +986,7 @@ const MenuCenter: React.FC = () => {
       loadCategories()
     } catch (error) {
       console.error('Failed to delete category:', error)
-      message.error(t('pages.menuCenter.deleteCategoryFailed'))
+      UI.toast.error(t('pages.menuCenter.deleteCategoryFailed'))
     }
   }
 
@@ -1907,22 +994,27 @@ const MenuCenter: React.FC = () => {
   const handleCategorySubmit = async (values: any) => {
     setLoading(prev => ({ ...prev, creating: true }))
     try {
+      const name_i18n = values.name_i18n && Object.values(values.name_i18n).some(Boolean)
+        ? values.name_i18n : undefined
+
       if (editingCategory) {
         // 更新分类 - 不传递 tenant_id，由后端从JWT自动提取
         const updatePayload: UpdateCategoryPayload = {
           name: values.name,
-          parentId: values.parentId || undefined
+          parentId: values.parentId || undefined,
+          ...(name_i18n && { name_i18n }) as any,
         }
         await itemManagementService.updateCategory(editingCategory.id, updatePayload)
-        message.success('分类更新成功')
+        UI.toast.success('分类更新成功')
       } else {
         // 创建分类 - 不传递 tenant_id，由后端从JWT自动提取
         const createPayload: CreateCategoryPayload = {
           name: values.name,
-          parentId: values.parentId || undefined // 确保空值转为 undefined
+          parentId: values.parentId || undefined, // 确保空值转为 undefined
+          ...(name_i18n && { name_i18n }) as any,
         }
         const newCategory = await itemManagementService.createCategory(createPayload)
-        message.success('分类创建成功')
+        UI.toast.success('分类创建成功')
         setSelectedCategoryId(newCategory.id)
       }
       
@@ -1930,7 +1022,7 @@ const MenuCenter: React.FC = () => {
       loadCategories()
     } catch (error) {
       console.error('Failed to save category:', error)
-      message.error(editingCategory ? '更新分类失败' : '创建分类失败')
+      UI.toast.error(editingCategory ? '更新分类失败' : '创建分类失败')
     } finally {
       setLoading(prev => ({ ...prev, creating: false }))
     }
@@ -1939,7 +1031,7 @@ const MenuCenter: React.FC = () => {
   // 创建商品
   const handleCreateItem = async () => {
     if (!selectedCategoryId) {
-      message.warning('请先选择一个分类')
+      UI.toast.warning('请先选择一个分类')
       return
     }
     
@@ -1981,10 +1073,10 @@ const MenuCenter: React.FC = () => {
       optionOrder: attr.optionOrder || []
     })) || []
     
-    // 加载商品的修饰符配置（Modifier v2.0）
+    // 加载商品的自定义选项配置（Modifier v2.0）
     let itemModifiersData: ItemModifierConfig[] = []
     try {
-      // 获取商品的修饰符组关联
+      // 获取商品的自定义选项组关联
       const itemModifierGroups = await itemManagementService.getItemModifiers(item.id)
       
       // 转换为表单需要的格式
@@ -2041,16 +1133,21 @@ const MenuCenter: React.FC = () => {
     }
     
     // 将价格从分转换为元（后端存储的是分，表单显示的是元）
+    itemForm.resetFields()
     itemForm.setFieldsValue({
       name: item.name,
+      name_i18n: (item as any).name_i18n ?? {},
       description: item.description,
+      description_i18n: (item as any).description_i18n ?? {},
       categoryId: item.categoryId,
       basePrice: fromMinorUnit(item.basePrice),
       cost: item.cost !== undefined && item.cost !== null ? fromMinorUnit(item.cost) : undefined,
       isActive: item.isActive,
       customFields: item.customFields,
       attributeConfigs: attributeConfigsData,
-      itemModifiers: itemModifiersData
+      itemModifiers: itemModifiersData,
+      scope: item.scope || 'BRAND',
+      visibleStoreIds: item.visible_stores?.map(vs => vs.store_id) || []
     } as any)
     setPreviewImageUrl(item.imageUrl)
     setItemModalVisible(true)
@@ -2060,12 +1157,12 @@ const MenuCenter: React.FC = () => {
   const beforeImageUpload = (file: RcFile): boolean | string => {
     const isValidType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
     if (!isValidType) {
-      message.error('只支持 JPG、PNG、WebP 格式的图片')
+      UI.toast.error('只支持 JPG、PNG、WebP 格式的图片')
       return Upload.LIST_IGNORE
     }
     const isLt5M = file.size / 1024 / 1024 < 5
     if (!isLt5M) {
-      message.error('图片大小不能超过 5MB')
+      UI.toast.error('图片大小不能超过 5MB')
       return Upload.LIST_IGNORE
     }
     return true
@@ -2074,7 +1171,7 @@ const MenuCenter: React.FC = () => {
   // 上传图片
   const handleImageUpload = async (file: RcFile) => {
     if (!editingItem) {
-      message.warning('请先保存商品，然后再上传图片')
+      UI.toast.warning('请先保存商品，然后再上传图片')
       return false
     }
 
@@ -2083,12 +1180,12 @@ const MenuCenter: React.FC = () => {
       const result = await itemManagementService.uploadItemImage(editingItem.id, file)
       setPreviewImageUrl(result.image.url)
       setEditingItem({ ...editingItem, imageUrl: result.image.url })
-      message.success('图片上传成功')
+      UI.toast.success('图片上传成功')
       loadItems() // 刷新列表
       loadAllItems() // 刷新全部商品
     } catch (error: any) {
       console.error('Image upload failed:', error)
-      message.error(error?.response?.data?.error || '图片上传失败')
+      UI.toast.error(error?.response?.data?.error || '图片上传失败')
     } finally {
       setImageUploading(false)
     }
@@ -2110,12 +1207,12 @@ const MenuCenter: React.FC = () => {
           await itemManagementService.deleteItemImage(editingItem.id)
           setPreviewImageUrl(undefined)
           setEditingItem({ ...editingItem, imageUrl: undefined })
-          message.success('图片删除成功')
+          UI.toast.success('图片删除成功')
           loadItems()
           loadAllItems()
         } catch (error: any) {
           console.error('Image delete failed:', error)
-          message.error(error?.response?.data?.error || '图片删除失败')
+          UI.toast.error(error?.response?.data?.error || '图片删除失败')
         }
       }
     })
@@ -2125,11 +1222,11 @@ const MenuCenter: React.FC = () => {
   const handleDeleteItem = async (itemId: string) => {
     try {
       await itemManagementService.deleteItem(itemId)
-      message.success(t('pages.menuCenter.deleteItemSuccess'))
+      UI.toast.success(t('pages.menuCenter.deleteItemSuccess'))
       loadItems()
     } catch (error) {
       console.error('Failed to delete item:', error)
-      message.error(t('pages.menuCenter.deleteItemFailed'))
+      UI.toast.error(t('pages.menuCenter.deleteItemFailed'))
     }
   }
 
@@ -2146,32 +1243,32 @@ const MenuCenter: React.FC = () => {
     try {
       // 验证必要字段
       if (!values.name?.trim()) {
-        message.error('商品名称不能为空')
+        UI.toast.error('商品名称不能为空')
         return
       }
 
       if (typeof values.basePrice !== 'number' || isNaN(values.basePrice)) {
-        message.error('请输入有效的商品售价')
+        UI.toast.error('请输入有效的商品售价')
         return
       }
 
       // 确定使用的分类ID
       const categoryId = values.categoryId || selectedCategoryId
       if (!categoryId) {
-        message.error('请选择商品分类')
+        UI.toast.error('请选择商品分类')
         return
       }
 
       // 验证分类ID是有效的UUID
       if (!isValidUUID(categoryId)) {
-        message.error('分类ID格式无效')
+        UI.toast.error('分类ID格式无效')
         return
       }
 
       // 验证分类是否存在
       const categoryExists = categories.some(cat => cat.id === categoryId)
       if (!categoryExists) {
-        message.error('所选分类不存在，请重新选择')
+        UI.toast.error('所选分类不存在，请重新选择')
         return
       }
 
@@ -2179,14 +1276,14 @@ const MenuCenter: React.FC = () => {
       if (values.cost !== undefined && values.cost !== null && values.cost !== '') {
         const costNumber = Number(values.cost)
         if (isNaN(costNumber) || costNumber < 0) {
-          message.error('成本价格必须是有效的非负数字')
+          UI.toast.error('成本价格必须是有效的非负数字')
           return
         }
       }
 
-      // 注：属性管理已迁移到修饰符系统 (Modifier v2.0)
+      // 注：属性管理已迁移到自定义选项系统 (Modifier v2.0)
       // 属性现在通过以下 API 单独管理:
-      //   - POST /items/{itemId}/modifier-groups (关联修饰符组)
+      //   - POST /items/{itemId}/modifier-groups (关联自定义选项组)
       //   - POST /items/{itemId}/modifier-options (配置选项行为)
 
 //       // 转换attributeConfigs为API期望的attributes格式
@@ -2205,25 +1302,34 @@ const MenuCenter: React.FC = () => {
           name: values.name.trim(),
           description: values.description?.trim(),
           categoryId: categoryId,
-          basePrice: Number(values.basePrice), // 确保是数字类型
-          cost: (values.cost !== undefined && values.cost !== null && values.cost !== '') ? Number(values.cost) : undefined, // 成本可选
-          isActive: Boolean(values.isActive), // 确保是布尔类型
+          basePrice: Number(values.basePrice),
+          cost: (values.cost !== undefined && values.cost !== null && values.cost !== '') ? Number(values.cost) : undefined,
+          isActive: Boolean(values.isActive),
           customFields: values.customFields,
+          ...(values.name_i18n && Object.keys(values.name_i18n).length > 0 && { name_i18n: values.name_i18n }),
+          ...(values.description_i18n && Object.keys(values.description_i18n).length > 0 && { description_i18n: values.description_i18n }),
         }
-        
+
+        // 如果是主店，附带 scope 和 visibleStoreIds 一起更新
+        if (isMain) {
+          const newScope: string = values.scope || 'BRAND'
+          ;(updatePayload as any).scope = newScope
+          ;(updatePayload as any).visibleStoreIds = newScope === 'STORE_EXCLUSIVE' ? (values.visibleStoreIds || []) : []
+        }
+
         await itemManagementService.updateItem(editingItem.id, updatePayload)
-        
-        // 处理修饰符配置（Modifier v2.0）
+
+        // 处理自定义选项配置（Modifier v2.0）
         if (values.itemModifiers && Array.isArray(values.itemModifiers)) {
-          // 1. 先清除现有的修饰符组关联
+          // 1. 先清除现有的自定义选项组关联
           const existingModifiers = await itemManagementService.getItemModifiers(editingItem.id)
           for (const existingModifier of existingModifiers) {
             await itemManagementService.removeModifierGroupFromItem(editingItem.id, existingModifier.modifierGroupId)
           }
           
-          // 2. 添加新的修饰符组关联并配置选项
+          // 2. 添加新的自定义选项组关联并配置选项
           for (const modifierConfig of values.itemModifiers as ItemModifierConfig[]) {
-            // 2.1 关联修饰符组（定义选择规则）
+            // 2.1 关联自定义选项组（定义选择规则）
             const groupPayload: AddModifierGroupToItemPayload = {
               modifierGroupId: modifierConfig.groupId,
               isRequired: modifierConfig.isRequired,
@@ -2250,7 +1356,7 @@ const MenuCenter: React.FC = () => {
               }
             }
             
-            // 2.3 设置商品级修饰符价格（如果有覆盖）
+            // 2.3 设置商品级自定义选项价格（如果有覆盖）
             if (Object.keys(modifierConfig.optionPrices).length > 0) {
               const priceOverrides = Object.entries(modifierConfig.optionPrices).map(([optionId, price]) => ({
                 modifierOptionId: optionId,
@@ -2263,27 +1369,31 @@ const MenuCenter: React.FC = () => {
           }
         }
         
-        message.success('商品更新成功')
+        UI.toast.success('商品更新成功')
       } else {
-        // 创建商品
-        // 注：属性现在通过修饰符系统管理，不在创建时发送
+        // 主店创建商品（BRAND 或 STORE_EXCLUSIVE）
+        const scope = values.scope || 'BRAND'
+        const visibleStoreIds: string[] = scope === 'STORE_EXCLUSIVE' ? (values.visibleStoreIds || []) : []
         const createPayload: CreateItemPayload = {
           name: values.name.trim(),
           description: values.description?.trim(),
           categoryId: categoryId,
-          basePrice: Number(values.basePrice), // 确保是数字类型
-          cost: (values.cost !== undefined && values.cost !== null && values.cost !== '') ? Number(values.cost) : undefined, // 成本可选
-          isActive: values.isActive !== false, // 默认为true，确保是布尔类型
-          customFields: values.customFields
-          // attributes 字段已移除 - 属性现在通过修饰符管理 API 单独处理
-        }
-        
+          basePrice: Number(values.basePrice),
+          cost: (values.cost !== undefined && values.cost !== null && values.cost !== '') ? Number(values.cost) : undefined,
+          isActive: values.isActive !== false,
+          customFields: values.customFields,
+          scope,
+          visibleStoreIds: scope === 'STORE_EXCLUSIVE' ? visibleStoreIds : undefined,
+          ...(values.name_i18n && Object.keys(values.name_i18n).length > 0 && { name_i18n: values.name_i18n }),
+          ...(values.description_i18n && Object.keys(values.description_i18n).length > 0 && { description_i18n: values.description_i18n }),
+        } as any
+
         const createdItem = await itemManagementService.createItem(createPayload)
         
-        // 处理修饰符配置（Modifier v2.0）
+        // 处理自定义选项配置（Modifier v2.0）
         if (values.itemModifiers && Array.isArray(values.itemModifiers) && createdItem.id) {
           for (const modifierConfig of values.itemModifiers as ItemModifierConfig[]) {
-            // 1. 关联修饰符组（定义选择规则）
+            // 1. 关联自定义选项组（定义选择规则）
             const groupPayload: AddModifierGroupToItemPayload = {
               modifierGroupId: modifierConfig.groupId,
               isRequired: modifierConfig.isRequired,
@@ -2310,7 +1420,7 @@ const MenuCenter: React.FC = () => {
               }
             }
             
-            // 3. 设置商品级修饰符价格（如果有覆盖）
+            // 3. 设置商品级自定义选项价格（如果有覆盖）
             if (Object.keys(modifierConfig.optionPrices).length > 0) {
               const priceOverrides = Object.entries(modifierConfig.optionPrices).map(([optionId, price]) => ({
                 modifierOptionId: optionId,
@@ -2323,14 +1433,14 @@ const MenuCenter: React.FC = () => {
           }
         }
         
-        message.success('商品创建成功')
+        UI.toast.success('商品创建成功')
       }
       
       setItemModalVisible(false)
       loadItems()
     } catch (error) {
       console.error('Failed to save item:', error)
-      message.error(editingItem ? '更新商品失败' : '创建商品失败')
+      UI.toast.error(editingItem ? '更新商品失败' : '创建商品失败')
     } finally {
       setLoading(prev => ({ ...prev, creating: false }))
     }
@@ -2366,11 +1476,11 @@ const MenuCenter: React.FC = () => {
   const handleDeleteAttributeType = async (id: string) => {
     try {
       await itemManagementService.deleteAttributeType(id)
-      message.success(t('pages.menuCenter.deleteAttributeTypeSuccess'))
+      UI.toast.success(t('pages.menuCenter.deleteAttributeTypeSuccess'))
       loadAttributeTypes()
     } catch (error) {
       console.error('Failed to delete attribute type:', error)
-      message.error(t('pages.menuCenter.deleteAttributeTypeFailed'))
+      UI.toast.error(t('pages.menuCenter.deleteAttributeTypeFailed'))
     }
   }
 
@@ -2380,7 +1490,7 @@ const MenuCenter: React.FC = () => {
     try {
       // 验证至少有一个选项
       if (!values.options || values.options.length === 0) {
-        message.error(t('pages.menuCenter.atLeastOneOption'))
+        UI.toast.error(t('pages.menuCenter.atLeastOneOption'))
         return
       }
       
@@ -2388,7 +1498,7 @@ const MenuCenter: React.FC = () => {
       const optionValues = values.options.map(opt => opt.value)
       const uniqueValues = new Set(optionValues)
       if (optionValues.length !== uniqueValues.size) {
-        message.error(t('pages.menuCenter.optionValueDuplicate'))
+        UI.toast.error(t('pages.menuCenter.optionValueDuplicate'))
         return
       }
       
@@ -2404,11 +1514,11 @@ const MenuCenter: React.FC = () => {
       if (editingAttributeType) {
         await itemManagementService.updateAttributeType(editingAttributeType.id, attributeTypePayload)
         attributeTypeId = editingAttributeType.id
-        message.success('属性类型更新成功')
+        UI.toast.success('属性类型更新成功')
       } else {
         const createdType = await itemManagementService.createAttributeType(attributeTypePayload)
         attributeTypeId = createdType.id
-        message.success('属性类型创建成功')
+        UI.toast.success('属性类型创建成功')
       }
       
       // 创建或更新选项
@@ -2434,7 +1544,7 @@ const MenuCenter: React.FC = () => {
       await loadAttributeOptions(attributeTypeId)
     } catch (error) {
       console.error('Failed to save attribute type:', error)
-      message.error(editingAttributeType ? t('pages.menuCenter.updateAttributeTypeFailed') : t('pages.menuCenter.createAttributeTypeFailed'))
+      UI.toast.error(editingAttributeType ? t('pages.menuCenter.updateAttributeTypeFailed') : t('pages.menuCenter.createAttributeTypeFailed'))
     } finally {
       setLoading(prev => ({ ...prev, creating: false }))
     }
@@ -2465,18 +1575,18 @@ const MenuCenter: React.FC = () => {
   const handleDeleteAttributeOption = async (optionId: string, typeId: string) => {
     try {
       await itemManagementService.deleteAttributeOption(optionId)
-      message.success(t('pages.menuCenter.deleteAttributeOptionSuccess'))
+      UI.toast.success(t('pages.menuCenter.deleteAttributeOptionSuccess'))
       loadAttributeOptions(typeId)
     } catch (error) {
       console.error('Failed to delete attribute option:', error)
-      message.error(t('pages.menuCenter.deleteAttributeOptionFailed'))
+      UI.toast.error(t('pages.menuCenter.deleteAttributeOptionFailed'))
     }
   }
 
   // 提交属性选项表单
   const handleAttributeOptionSubmit = async (values: CreateItemAttributeOptionPayload) => {
     if (!selectedAttributeTypeId) {
-      message.error(t('pages.menuCenter.selectAttributeTypeFirst'))
+      UI.toast.error(t('pages.menuCenter.selectAttributeTypeFirst'))
       return
     }
 
@@ -2484,16 +1594,16 @@ const MenuCenter: React.FC = () => {
     try {
       if (editingAttributeOption) {
         await itemManagementService.updateAttributeOption(editingAttributeOption.id, values)
-        message.success(t('pages.menuCenter.updateAttributeOptionSuccess'))
+        UI.toast.success(t('pages.menuCenter.updateAttributeOptionSuccess'))
       } else {
         await itemManagementService.createAttributeOption(selectedAttributeTypeId, values)
-        message.success(t('pages.menuCenter.createAttributeOptionSuccess'))
+        UI.toast.success(t('pages.menuCenter.createAttributeOptionSuccess'))
       }
       setAttributeOptionModalVisible(false)
       loadAttributeOptions(selectedAttributeTypeId)
     } catch (error) {
       console.error('Failed to save attribute option:', error)
-      message.error(editingAttributeOption ? t('pages.menuCenter.updateAttributeOptionFailed') : t('pages.menuCenter.createAttributeOptionFailed'))
+      UI.toast.error(editingAttributeOption ? t('pages.menuCenter.updateAttributeOptionFailed') : t('pages.menuCenter.createAttributeOptionFailed'))
     } finally {
       setLoading(prev => ({ ...prev, creating: false }))
     }
@@ -2505,14 +1615,13 @@ const MenuCenter: React.FC = () => {
   // Modifier v2.0: 使用删除 ModifierGroup
   const handleDeleteAddon = async (id: string) => {
     try {
-      // 注意：后端可能没有 deleteModifierGroup 端点，这里需要确认后端实现
-      // 暂时使用旧的 API，如果失败则提示迁移进度
-      await itemManagementService.deleteAddon(id)
-      message.success(t('pages.menuCenter.deleteModifierSuccess'))
+      // Modifier v2.0: 使用 deleteModifierGroup（软删除，设置 is_active=false）
+      await itemManagementService.deleteModifierGroup(id)
+      UI.toast.success(t('pages.menuCenter.deleteModifierSuccess'))
       loadAddons()
     } catch (error) {
       console.error('Failed to delete addon:', error)
-      message.error(t('pages.menuCenter.deleteModifierFailed'))
+      UI.toast.error(t('pages.menuCenter.deleteModifierFailed'))
     }
   }
 
@@ -2522,27 +1631,25 @@ const MenuCenter: React.FC = () => {
     setLoading(prev => ({ ...prev, creating: true }))
     try {
       const payload: CreateModifierGroupPayload = {
-        name: values.description || values.name, // 在 Modifier 中使用 name
-        displayName: values.name, // 在 Modifier 中使用 displayName 作为显示名称
-        groupType: 'addon',
+        name: values.description || values.name,
+        displayName: values.name,
       }
 
       if (editingAddon) {
-        // 更新现有 ModifierGroup - 目前还没有 updateModifierGroup API
-        // 暂时使用旧的 updateAddon API
-        await itemManagementService.updateAddon(editingAddon.id, values)
-        message.success(t('pages.menuCenter.updateModifierSuccess'))
+        // Modifier v2.0: 使用 updateModifierGroup
+        await itemManagementService.updateModifierGroup(editingAddon.id, payload)
+        UI.toast.success(t('pages.menuCenter.updateModifierSuccess'))
       } else {
         // 创建新的 ModifierGroup
         await itemManagementService.createModifierGroup(payload)
-        message.success(t('pages.menuCenter.createModifierSuccess'))
+        UI.toast.success(t('pages.menuCenter.createModifierSuccess'))
       }
       setAddonModalVisible(false)
       setEditingAddon(null)
       loadAddons()
     } catch (error) {
       console.error('Failed to save addon:', error)
-      message.error(editingAddon ? t('pages.menuCenter.updateModifierFailed') : t('pages.menuCenter.createModifierFailed'))
+      UI.toast.error(editingAddon ? t('pages.menuCenter.updateModifierFailed') : t('pages.menuCenter.createModifierFailed'))
     } finally {
       setLoading(prev => ({ ...prev, creating: false }))
     }
@@ -2561,11 +1668,11 @@ const MenuCenter: React.FC = () => {
         maxSelections: payload.maxQuantity || 1
       }
       await itemManagementService.addModifierGroupToItem(itemId, modifierPayload)
-      message.success('添加加料成功')
+      UI.toast.success('添加加料成功')
       loadItemAddons(itemId)
     } catch (error) {
       console.error('Failed to add item addon:', error)
-      message.error('添加加料失败')
+      UI.toast.error('添加加料失败')
     }
   }
 
@@ -2575,11 +1682,11 @@ const MenuCenter: React.FC = () => {
     try {
       // addonId 实际上是 modifierGroupId
       await itemManagementService.removeModifierGroupFromItem(itemId, addonId)
-      message.success('移除加料成功')
+      UI.toast.success('移除加料成功')
       loadItemAddons(itemId)
     } catch (error) {
       console.error('Failed to remove item addon:', error)
-      message.error('移除加料失败')
+      UI.toast.error('移除加料失败')
     }
   }
 
@@ -2590,10 +1697,9 @@ const MenuCenter: React.FC = () => {
 
   // 构建层级分类树
   const categoryTree = useMemo(() => buildCategoryTree(categories), [categories])
-  
+
   // 扁平化的分类列表（用于渲染）
   const flatCategories = useMemo(() => flattenCategoryTree(categoryTree), [categoryTree])
-
 
   // 生成Tree组件数据
   const treeData = useMemo(() => {
@@ -2603,7 +1709,7 @@ const MenuCenter: React.FC = () => {
         title: (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
             <Space style={{ flex: 1 }}>
-              <span style={{ 
+              <span style={{
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
@@ -2611,49 +1717,60 @@ const MenuCenter: React.FC = () => {
                 display: 'inline-block',
                 marginRight: '4px'
               }} />
-              <span style={{ 
+              <span style={{
                 fontWeight: category.level === 0 ? 600 : 400,
                 color: selectedCategoryId === category.id ? '#1890ff' : '#000'
               }}>
                 {category.name}
               </span>
+              {category.isSystem && (
+                <Tag
+                  color="default"
+                  style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px', marginLeft: 2 }}
+                >
+                  系统
+                </Tag>
+              )}
             </Space>
-            <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: 'edit',
-                    label: t('pages.menuCenter.edit'),
-                    icon: <EditOutlined />,
-                    onClick: () => handleEditCategory(category)
-                  },
-                  {
-                    key: 'delete',
-                    label: t('pages.menuCenter.delete'),
-                    icon: <DeleteOutlined />,
-                    danger: true,
-                    onClick: () => {
-                      Modal.confirm({
-                        title: t('pages.menuCenter.deleteCategoryConfirm'),
-                        content: t('pages.menuCenter.deleteCategoryContent', { name: category.name }),
-                        okText: t('pages.menuCenter.delete'),
-                        cancelText: t('pages.menuCenter.cancel'),
-                        onOk: () => handleDeleteCategory(category.id)
-                      })
-                    }
-                  }
-                ]
-              }}
-              trigger={['click']}
-            >
-              <Button 
-                type="text" 
-                size="small" 
-                icon={<MoreOutlined />}
-                onClick={(e) => e.stopPropagation()}
-                style={{ opacity: 0.6 }}
-              />
-            </Dropdown>
+            {isMain && (
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'edit',
+                      label: t('pages.menuCenter.edit'),
+                      icon: <EditOutlined />,
+                      onClick: () => handleEditCategory(category)
+                    },
+                    // 系统分类不显示删除选项
+                    ...(!category.isSystem ? [{
+                      key: 'delete',
+                      label: t('pages.menuCenter.delete'),
+                      icon: <DeleteOutlined />,
+                      danger: true,
+                      onClick: () => {
+                        Modal.confirm({
+                          title: t('pages.menuCenter.deleteCategoryConfirm'),
+                          content: t('pages.menuCenter.deleteCategoryContent', { name: category.name }),
+                          okText: t('pages.menuCenter.delete'),
+                          cancelText: t('pages.menuCenter.cancel'),
+                          onOk: () => handleDeleteCategory(category.id)
+                        })
+                      }
+                    }] : [])
+                  ]
+                }}
+                trigger={['click']}
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<MoreOutlined />}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ opacity: 0.6 }}
+                />
+              </Dropdown>
+            )}
           </div>
         ),
         icon: null, // 不显示文件夹图标
@@ -2686,7 +1803,7 @@ const MenuCenter: React.FC = () => {
     if (isAuthenticated) {
       loadCategories()
       loadAttributeTypes()
-      loadModifierGroups() // 加载修饰符组
+      loadModifierGroups() // 加载自定义选项组
     }
   }, [isAuthenticated])
 
@@ -2708,7 +1825,14 @@ const MenuCenter: React.FC = () => {
 
   return (
     <Space direction="vertical" size={16} style={{ display: 'block' }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>{t('pages.menuCenter.title')}</Typography.Title>
+      <Typography.Title level={4} style={{ margin: 0 }}>
+        {t('pages.menuCenter.title')}
+        {!isMain && (
+          <Tag color="blue" style={{ marginLeft: 8, fontSize: 12 }}>
+            {currentOrg?.orgType === 'FRANCHISE' ? '加盟店' : '分店'}
+          </Tag>
+        )}
+      </Typography.Title>
       <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
         {t('pages.menuCenter.systemDescription')}
       </Typography.Paragraph>
@@ -2734,14 +1858,16 @@ const MenuCenter: React.FC = () => {
             title={
               <Space>
                 {t('pages.menuCenter.categoriesTitle')}
-                <Button 
-                  type="primary" 
-                  size="small" 
-                  icon={<PlusOutlined />}
-                  onClick={handleCreateCategory}
-                >
-                  {t('pages.menuCenter.addCategory')}
-                </Button>
+                {isMain && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<PlusOutlined />}
+                    onClick={handleCreateCategory}
+                  >
+                    {t('pages.menuCenter.addCategory')}
+                  </Button>
+                )}
                 <Button 
                   size="small" 
                   icon={<ReloadOutlined />}
@@ -2792,14 +1918,16 @@ const MenuCenter: React.FC = () => {
                 {t('pages.menuCenter.itemsTitle')}
                 {selectedCategory && (
                   <>
-                    <Button 
-                      type="primary" 
-                      size="small" 
-                      icon={<PlusOutlined />}
-                      onClick={handleCreateItem}
-                    >
-                      {t('pages.menuCenter.addItem')}
-                    </Button>
+                    {isMain && (
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<PlusOutlined />}
+                        onClick={handleCreateItem}
+                      >
+                        {t('pages.menuCenter.addItem')}
+                      </Button>
+                    )}
                     <Button 
                       size="small" 
                       icon={<ReloadOutlined />}
@@ -2825,24 +1953,35 @@ const MenuCenter: React.FC = () => {
 
                 {categoryItems.length === 0 ? (
                     <Empty description={t('pages.menuCenter.emptyItems')}>
-                      <Button type="primary" onClick={handleCreateItem}>
-                        创建第一个商品
-                      </Button>
+                      {isMain && (
+                        <Button type="primary" onClick={handleCreateItem}>
+                          创建第一个商品
+                        </Button>
+                      )}
                     </Empty>
                 ) : (
                   <List
                     dataSource={categoryItems}
                       renderItem={(item) => (
                         <List.Item
-                          actions={[
-                            <Button 
+                          actions={isMain ? [
+                            <Button
                               key="edit"
-                              type="link" 
-                              size="small" 
+                              type="link"
+                              size="small"
                               icon={<EditOutlined />}
                               onClick={() => handleEditItem(item)}
                             >
                               {t('pages.menuCenter.edit')}
+                            </Button>,
+                            <Button
+                              key="channel"
+                              type="link"
+                              size="small"
+                              icon={<BranchesOutlined />}
+                              onClick={() => setChannelModal({ id: item.id, name: item.name })}
+                            >
+                              可售范围
                             </Button>,
                             <Popconfirm
                               key="delete"
@@ -2851,15 +1990,77 @@ const MenuCenter: React.FC = () => {
                               okText={t('pages.menuCenter.delete')}
                               cancelText={t('pages.menuCenter.cancel')}
                             >
-                              <Button 
-                                type="link" 
-                                size="small" 
+                              <Button
+                                type="link"
+                                size="small"
                                 danger
                                 icon={<DeleteOutlined />}
                               >
                                 {t('pages.menuCenter.delete')}
                               </Button>
                             </Popconfirm>
+                          ] : [
+                            <Switch
+                              key="avail"
+                              size="small"
+                              checked={storeConfigs.get(item.id)?.isAvailable ?? true}
+                              checkedChildren="上架"
+                              unCheckedChildren="下架"
+                              onChange={async (val) => {
+                                await storeMenuService.upsertStoreMenuConfig(item.id, { isAvailable: val })
+                                setStoreConfigs(prev => {
+                                  const next = new Map(prev)
+                                  const existing = prev.get(item.id)
+                                  next.set(item.id, { ...(existing ?? { catalogItemId: item.id, priceOverride: null }), isAvailable: val })
+                                  return next
+                                })
+                              }}
+                            />,
+                            <Button
+                              key="price"
+                              type="link"
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => {
+                                const cfg = storeConfigs.get(item.id)
+                                Modal.confirm({
+                                  title: `改价 — ${item.name}`,
+                                  content: (
+                                    <InputNumber
+                                      id="price-override-input"
+                                      defaultValue={cfg?.priceOverride ?? undefined}
+                                      min={0}
+                                      precision={2}
+                                      placeholder={`品牌定价 ${formatPrice(item.basePrice)}，留空恢复默认`}
+                                      style={{ width: '100%', marginTop: 8 }}
+                                    />
+                                  ),
+                                  onOk: async () => {
+                                    const el = document.getElementById('price-override-input') as HTMLInputElement
+                                    const val = el?.value ? Number(el.value) : undefined
+                                    await storeMenuService.upsertStoreMenuConfig(item.id, {
+                                      priceOverride: val,
+                                      isAvailable: storeConfigs.get(item.id)?.isAvailable ?? true,
+                                    })
+                                    await loadStoreConfigs()
+                                    UI.toast.success('价格已更新')
+                                  },
+                                  okText: '保存',
+                                  cancelText: '取消',
+                                })
+                              }}
+                            >
+                              改价
+                            </Button>,
+                            <Button
+                              key="channel"
+                              type="link"
+                              size="small"
+                              icon={<BranchesOutlined />}
+                              onClick={() => setChannelModal({ id: item.id, name: item.name })}
+                            >
+                              可售范围
+                            </Button>
                           ]}
                         >
                           <List.Item.Meta
@@ -2869,6 +2070,9 @@ const MenuCenter: React.FC = () => {
                                 <Tag color={item.isActive ? 'green' : 'red'}>
                                   {item.isActive ? t('pages.menuCenter.active') : t('pages.menuCenter.inactive')}
                                 </Tag>
+                                {item.scope === 'STORE_EXCLUSIVE' && (
+                                  <Tag color="purple">专属</Tag>
+                                )}
                               </Space>
                             }
                             description={
@@ -2882,6 +2086,14 @@ const MenuCenter: React.FC = () => {
                                   <Typography.Text strong>
                                     {t('pages.menuCenter.salePrice')}: {formatPrice(item.basePrice)}
                                   </Typography.Text>
+                                  {!isMain && storeConfigs.get(item.id)?.priceOverride != null && (
+                                    <>
+                                      <Tag color="orange">已改价</Tag>
+                                      <Typography.Text type="warning" strong>
+                                        本店售价: {Number(storeConfigs.get(item.id)!.priceOverride!).toFixed(2)}
+                                      </Typography.Text>
+                                    </>
+                                  )}
                                   {item.cost && (
                                     <Typography.Text type="secondary">
                                       {t('pages.menuCenter.cost')}: {formatPrice(item.cost)}
@@ -3030,6 +2242,12 @@ const MenuCenter: React.FC = () => {
                               title={
                                 <Space>
                                   <Tag color="orange">{t('pages.menuCenter.comboTag')}</Tag>
+                                  {/* 套餐类型标签 */}
+                                  {combo.itemGroups && combo.itemGroups.length > 0 ? (
+                                    <Tag color="purple">可选套餐</Tag>
+                                  ) : (
+                                    <Tag color="cyan">固定套餐</Tag>
+                                  )}
                                   <Typography.Text strong>{combo.name}</Typography.Text>
                                   {!combo.isActive && <Tag color="red">{t('pages.menuCenter.deactivated')}</Tag>}
                                 </Space>
@@ -3041,18 +2259,53 @@ const MenuCenter: React.FC = () => {
                                       <Typography.Text type="secondary">{combo.description}</Typography.Text>
                                     </div>
                                   )}
-                                  {combo.comboItems && combo.comboItems.length > 0 && (
+                                  
+                                  {/* 固定套餐：显示商品列表 */}
+                                  {(!combo.itemGroups || combo.itemGroups.length === 0) && combo.comboItems && combo.comboItems.length > 0 && (
                                     <div style={{ marginTop: 4 }}>
                                       <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
                                         {t('pages.menuCenter.includedItems')}: 
                                       </Typography.Text>
                                       {combo.comboItems.map((comboItem, index) => (
                                         <Tag key={index} color="blue" style={{ margin: '2px' }}>
-                                          {comboItem.item?.name || '未知'} ×{comboItem.quantity}
+                                          {allItems.find(i => i.id === comboItem.itemId)?.name || comboItem.item?.name || '未知'} ×{comboItem.quantity}
                                         </Tag>
                                       ))}
                                     </div>
                                   )}
+                                  
+                                  {/* 可选套餐：显示分组信息 */}
+                                  {combo.itemGroups && combo.itemGroups.length > 0 && (
+                                    <div style={{ marginTop: 4 }}>
+                                      <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
+                                        套餐分组: 
+                                      </Typography.Text>
+                                      <div style={{ marginTop: 4 }}>
+                                        {combo.itemGroups.map((group, index) => {
+                                          const groupItems = (combo.comboItems || []).filter(item => item.groupId === group.id);
+                                          const groupItemCount = groupItems.length;
+                                          const selectionText = group.selectionType === 'single' 
+                                            ? '单选' 
+                                            : `${groupItemCount}选${group.maxSelections || 1}`;
+                                          
+                                          return (
+                                            <div key={index} style={{ marginBottom: 4 }}>
+                                              <Tag color="geekblue" style={{ marginRight: 4 }}>
+                                                {group.name} ({selectionText})
+                                              </Tag>
+                                              {groupItems.map((item, idx) => (
+                                                <Tag key={idx} style={{ margin: '2px', fontSize: '12px' }}>
+                                                  {allItems.find(i => i.id === item.itemId)?.name || '未知'}
+                                                  {item.additionalPrice ? ` +${(item.additionalPrice / 100).toFixed(2)}` : ''}
+                                                </Tag>
+                                              ))}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
                                   <div style={{ marginTop: 8 }}>
                                     <Space size="large">
                                       <span>
@@ -3100,9 +2353,10 @@ const MenuCenter: React.FC = () => {
                     key: 'modifiers',
                     label: '自定义选项组',
                     children: (
-                      <ModifierGroupManager />
+                      <ModifierGroupManager readOnly={!isMain} isMain={isMain} additionalLocales={additionalLocales} />
                     )
-                  }
+                  },
+
                 ]}
               />
             )
@@ -3146,15 +2400,60 @@ const MenuCenter: React.FC = () => {
                       dataIndex: 'name',
                       key: 'name',
                       width: 150,
-                      render: (text: string) => (
-                        <Typography.Text strong>{text}</Typography.Text>
+                      render: (text: string, record: Combo) => (
+                        <Space direction="vertical" size={2}>
+                          <Typography.Text strong>{text}</Typography.Text>
+                          {record.itemGroups && record.itemGroups.length > 0 ? (
+                            <Tag color="purple" style={{ fontSize: '11px' }}>可选套餐</Tag>
+                          ) : (
+                            <Tag color="cyan" style={{ fontSize: '11px' }}>固定套餐</Tag>
+                          )}
+                        </Space>
                       )
                     },
                     {
                       title: t('pages.menuCenter.includedItems'),
                       key: 'items',
-                      width: 250,
+                      width: 300,
                       render: (_, record: Combo) => {
+                        // 可选套餐：显示分组信息
+                        if (record.itemGroups && record.itemGroups.length > 0) {
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {record.itemGroups.map((group, index) => {
+                                const groupItems = (record.comboItems || []).filter(item => item.groupId === group.id);
+                                const groupItemCount = groupItems.length;
+                                const selectionText = group.selectionType === 'single' 
+                                  ? '单选' 
+                                  : `${groupItemCount}选${group.maxSelections || 1}`;
+                                
+                                return (
+                                  <div key={index} style={{ marginBottom: 2 }}>
+                                    <Tag color="geekblue" style={{ fontSize: '11px', marginRight: 4 }}>
+                                      {group.name} ({selectionText})
+                                    </Tag>
+                                    {groupItems.slice(0, 3).map((item, idx) => {
+                                      const itemName = allItems.find(i => i.id === item.itemId)?.name || '未知';
+                                      return (
+                                        <Tag key={idx} style={{ fontSize: '11px', margin: '0 2px' }}>
+                                          {itemName}
+                                          {item.additionalPrice ? ` +${(item.additionalPrice / 100).toFixed(2)}` : ''}
+                                        </Tag>
+                                      );
+                                    })}
+                                    {groupItems.length > 3 && (
+                                      <Typography.Text type="secondary" style={{ fontSize: '11px' }}>
+                                        等{groupItems.length}项
+                                      </Typography.Text>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        }
+                        
+                        // 固定套餐：显示商品列表
                         const items = record.comboItems || []
                         if (items.length === 0) {
                           return <Typography.Text type="secondary">暂无商品</Typography.Text>
@@ -3162,10 +2461,10 @@ const MenuCenter: React.FC = () => {
                         return (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                             {items.map((comboItem, index) => {
-                              const itemName = comboItem.item?.name || '未知商品'
+                              const itemName = allItems.find(i => i.id === comboItem.itemId)?.name || comboItem.item?.name || '未知商品'
                               const quantity = comboItem.quantity || 1
                               return (
-                                <Tag key={index} color="blue" style={{ margin: 0 }}>
+                                <Tag key={index} color="blue" style={{ margin: 0, fontSize: '11px' }}>
                                   {itemName} ×{quantity}
                                 </Tag>
                               )
@@ -3279,7 +2578,17 @@ const MenuCenter: React.FC = () => {
                 />
               </Card>
             )
-          }
+          },
+          {
+            key: 'supplies',
+            label: '耗材管理',
+            children: <SupplyTab />,
+          },
+          ...(isMain ? [{
+            key: 'locale-settings',
+            label: '语言设置',
+            children: <BrandLocaleSettings />,
+          }] : []),
         ]}
       />
 
@@ -3298,11 +2607,20 @@ const MenuCenter: React.FC = () => {
         >
           <Form.Item
             name="name"
-            label={t('pages.menuCenter.categoryName')}
+            label={`${t('pages.menuCenter.categoryName')}（English，默认）`}
             rules={[{ required: true, message: t('pages.menuCenter.categoryNameRequired') }]}
           >
             <Input placeholder={t('pages.menuCenter.categoryNamePlaceholder')} maxLength={50} />
           </Form.Item>
+          {additionalLocales.map(locale => (
+            <Form.Item
+              key={locale}
+              name={['name_i18n', locale]}
+              label={`分类名称（${LOCALE_LABELS[locale] ?? locale}）`}
+            >
+              <Input placeholder={`${LOCALE_LABELS[locale] ?? locale} 译名（可选）`} maxLength={50} />
+            </Form.Item>
+          ))}
 
           <Form.Item
             name="parentId"
@@ -3361,154 +2679,49 @@ const MenuCenter: React.FC = () => {
                 label: t('pages.menuCenter.basicInfo'),
                 children: (
                   <div>
-                    {/* 紧凑的商品基本信息 */}
-                    <Card size="small" title={t('pages.menuCenter.itemBasicInfo')} style={{ marginBottom: 16 }}>
-                      <Row gutter={16}>
-                        <Col span={8}>
-                          <Form.Item
-                            name="name"
-                            label={t('pages.menuCenter.itemNameLabel')}
-                            rules={[
-                              { required: true, message: t('pages.menuCenter.itemNameRequired') },
-                              { max: 255, message: t('pages.menuCenter.itemNameMaxLength') },
-                              { whitespace: true, message: t('pages.menuCenter.itemNameNoWhitespace') }
-                            ]}
-                            style={{ marginBottom: 16 }}
-                          >
-                            <Input placeholder={t('pages.menuCenter.itemNamePlaceholder')} maxLength={100} />
-                          </Form.Item>
-                        </Col>
-                        <Col span={6}>
-                          <Form.Item
-                            name="categoryId"
-                            label={t('pages.menuCenter.itemCategory')}
-                            rules={[
-                              { required: true, message: t('pages.menuCenter.selectCategoryRequired') }
-                            ]}
-                            style={{ marginBottom: 16 }}
-                          >
-                            <Select placeholder={t('pages.menuCenter.selectCategory')} allowClear>
-                              {flatCategories.map(cat => (
-                                <Select.Option key={cat.id} value={cat.id}>
-                                  {cat.level && cat.level > 0 ? (
-                                    <span style={{ color: '#666' }}>
-                                      　└─ {cat.name}
-                                    </span>
-                                  ) : (
-                                    <span style={{ fontWeight: 500 }}>
-                                      {cat.name}
-                                    </span>
-                                  )}
-                                </Select.Option>
-                              ))}
-                            </Select>
-                          </Form.Item>
-                        </Col>
-                        <Col span={4}>
-                          <Form.Item
-                            name="basePrice"
-                            label={t('pages.menuCenter.basePrice')}
-                            rules={[
-                              { required: true, message: t('pages.menuCenter.basePriceRequired') },
-                              { type: 'number', message: t('pages.menuCenter.validNumber') }
-                            ]}
-                            style={{ marginBottom: 16 }}
-                          >
-                            <InputNumber
-                              style={{ width: '100%' }}
-                              placeholder="0.00"
-                              precision={2}
-                              addonBefore="$"
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col span={4}>
-                          <Form.Item
-                            name="cost"
-                            label={t('pages.menuCenter.cost')}
-                            rules={[
-                              { type: 'number', message: t('pages.menuCenter.validNumber') },
-                              { 
-                                validator: (_, value) => {
-                                  if (value !== undefined && value !== null && value !== '' && value < 0) {
-                                    return Promise.reject(new Error(t('pages.menuCenter.costCannotBeNegative')))
-                                  }
-                                  return Promise.resolve()
-                                }
-                              }
-                            ]}
-                            style={{ marginBottom: 16 }}
-                          >
-                            <InputNumber
-                              style={{ width: '100%' }}
-                              placeholder="0.00"
-                              precision={2}
-                              addonBefore="$"
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col span={2}>
-                          <Form.Item
-                            name="isActive"
-                            label={t('pages.menuCenter.status')}
-                            valuePropName="checked"
-                            style={{ marginBottom: 16 }}
-                          >
-                            <Switch size="small" checkedChildren={t('pages.menuCenter.active')} unCheckedChildren={t('pages.menuCenter.inactive')} />
-                          </Form.Item>
-                        </Col>
-                      </Row>
-                      
-                      <Form.Item
-                        name="description"
-                        label={t('pages.menuCenter.itemDescription')}
-                        style={{ marginBottom: editingItem ? 16 : 0 }}
-                      >
-                        <Input.TextArea rows={2} placeholder={t('pages.menuCenter.itemDescriptionPlaceholder')} maxLength={500} />
-                      </Form.Item>
-
-                      {/* 图片上传 - 仅在编辑模式显示 */}
-                      {editingItem ? (
-                        <Form.Item label="商品图片" style={{ marginBottom: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-                            {previewImageUrl ? (
-                              <div style={{ position: 'relative' }}>
-                                <Image
-                                  src={previewImageUrl}
-                                  alt="商品图片"
-                                  width={120}
-                                  height={120}
-                                  style={{ objectFit: 'cover', borderRadius: 8 }}
-                                />
-                                <Button
-                                  type="text"
-                                  danger
-                                  size="small"
-                                  icon={<DeleteOutlined />}
-                                  loading={imageUploading}
-                                  onClick={handleImageDelete}
-                                  style={{
-                                    position: 'absolute',
-                                    top: 4,
-                                    right: 4,
-                                    background: 'rgba(255,255,255,0.9)',
-                                    borderRadius: '50%',
-                                    padding: 4,
-                                    minWidth: 24,
-                                    height: 24,
-                                  }}
-                                />
-                              </div>
-                            ) : (
-                              <Upload
-                                accept=".jpg,.jpeg,.png,.webp"
-                                showUploadList={false}
-                                beforeUpload={beforeImageUpload}
-                                customRequest={({ file }) => handleImageUpload(file as RcFile)}
-                                disabled={imageUploading}
-                              >
-                                <div
-                                  style={{
+                    <Card size="small" style={{ marginBottom: 16 }}>
+                      <Row gutter={24}>
+                        {/* 左栏：图片 */}
+                        <Col flex="140px">
+                          <Form.Item label="图片" style={{ marginBottom: 0 }}>
+                            {editingItem ? (
+                              previewImageUrl ? (
+                                <div style={{ position: 'relative', display: 'inline-block' }}>
+                                  <Image
+                                    src={previewImageUrl}
+                                    alt="商品图片"
+                                    width={120}
+                                    height={120}
+                                    style={{ objectFit: 'cover', borderRadius: 8, display: 'block' }}
+                                  />
+                                  <Button
+                                    type="text"
+                                    danger
+                                    size="small"
+                                    icon={<DeleteOutlined />}
+                                    loading={imageUploading}
+                                    onClick={handleImageDelete}
+                                    style={{
+                                      position: 'absolute',
+                                      top: 4,
+                                      right: 4,
+                                      background: 'rgba(255,255,255,0.9)',
+                                      borderRadius: '50%',
+                                      padding: 4,
+                                      minWidth: 24,
+                                      height: 24,
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <Upload
+                                  accept=".jpg,.jpeg,.png,.webp"
+                                  showUploadList={false}
+                                  beforeUpload={beforeImageUpload}
+                                  customRequest={({ file }) => handleImageUpload(file as RcFile)}
+                                  disabled={imageUploading}
+                                >
+                                  <div style={{
                                     width: 120,
                                     height: 120,
                                     border: '1px dashed #d9d9d9',
@@ -3519,31 +2732,187 @@ const MenuCenter: React.FC = () => {
                                     justifyContent: 'center',
                                     cursor: 'pointer',
                                     background: '#fafafa',
-                                  }}
-                                >
-                                  {imageUploading ? (
-                                    <LoadingOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-                                  ) : (
-                                    <>
-                                      <PictureOutlined style={{ fontSize: 24, color: '#999' }} />
-                                      <span style={{ marginTop: 8, color: '#666', fontSize: 12 }}>上传图片</span>
-                                    </>
-                                  )}
-                                </div>
-                              </Upload>
+                                  }}>
+                                    {imageUploading ? (
+                                      <LoadingOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                                    ) : (
+                                      <>
+                                        <PictureOutlined style={{ fontSize: 24, color: '#999' }} />
+                                        <span style={{ marginTop: 8, color: '#999', fontSize: 12 }}>上传图片</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </Upload>
+                              )
+                            ) : (
+                              <div style={{
+                                width: 120,
+                                height: 120,
+                                border: '1px dashed #d9d9d9',
+                                borderRadius: 8,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: '#fafafa',
+                              }}>
+                                <PictureOutlined style={{ fontSize: 24, color: '#d9d9d9' }} />
+                                <span style={{ marginTop: 8, color: '#bbb', fontSize: 11, textAlign: 'center', padding: '0 8px' }}>保存后可上传</span>
+                              </div>
                             )}
-                            <div style={{ color: '#999', fontSize: 12 }}>
-                              <div>支持 JPG、PNG、WebP 格式</div>
-                              <div>最大 5MB</div>
-                            </div>
-                          </div>
-                        </Form.Item>
-                      ) : (
-                        <div style={{ color: '#999', fontSize: 12, marginTop: 8 }}>
-                          <PictureOutlined style={{ marginRight: 4 }} />
-                          请先保存商品，然后再上传图片
-                        </div>
-                      )}
+                            <div style={{ color: '#bbb', fontSize: 11, marginTop: 6 }}>JPG / PNG / WebP，≤5MB</div>
+                          </Form.Item>
+                        </Col>
+
+                        {/* 中栏：名称 + 描述（所有语言） */}
+                        <Col flex="1" style={{ minWidth: 0 }}>
+                          <Row gutter={12}>
+                            <Col span={12}>
+                              <Form.Item
+                                name="name"
+                                label="名称（English，默认）"
+                                rules={[
+                                  { required: true, message: t('pages.menuCenter.itemNameRequired') },
+                                  { max: 255, message: t('pages.menuCenter.itemNameMaxLength') },
+                                  { whitespace: true, message: t('pages.menuCenter.itemNameNoWhitespace') }
+                                ]}
+                                style={{ marginBottom: 12 }}
+                              >
+                                <Input placeholder={t('pages.menuCenter.itemNamePlaceholder')} maxLength={100} />
+                              </Form.Item>
+                              {additionalLocales.map(locale => (
+                                <Form.Item
+                                  key={locale}
+                                  name={['name_i18n', locale]}
+                                  label={`名称（${LOCALE_LABELS[locale] ?? locale}）`}
+                                  style={{ marginBottom: 12 }}
+                                >
+                                  <Input placeholder={`可选`} maxLength={100} />
+                                </Form.Item>
+                              ))}
+                            </Col>
+                            <Col span={12}>
+                              <Form.Item
+                                name="description"
+                                label="简介（English，默认）"
+                                style={{ marginBottom: 12 }}
+                              >
+                                <Input.TextArea rows={2} placeholder={t('pages.menuCenter.itemDescriptionPlaceholder')} maxLength={500} />
+                              </Form.Item>
+                              {additionalLocales.map(locale => (
+                                <Form.Item
+                                  key={locale}
+                                  name={['description_i18n', locale]}
+                                  label={`简介（${LOCALE_LABELS[locale] ?? locale}）`}
+                                  style={{ marginBottom: 12 }}
+                                >
+                                  <Input.TextArea rows={2} placeholder="可选" maxLength={500} />
+                                </Form.Item>
+                              ))}
+                            </Col>
+                          </Row>
+                        </Col>
+
+                        {/* 右栏：分类、价格、状态 */}
+                        <Col flex="220px">
+                          <Form.Item
+                            name="categoryId"
+                            label={t('pages.menuCenter.itemCategory')}
+                            rules={[{ required: true, message: t('pages.menuCenter.selectCategoryRequired') }]}
+                            style={{ marginBottom: 12 }}
+                          >
+                            <Select placeholder={t('pages.menuCenter.selectCategory')} allowClear>
+                              {flatCategories.map(cat => (
+                                <Select.Option key={cat.id} value={cat.id}>
+                                  {cat.level && cat.level > 0 ? (
+                                    <span style={{ color: '#666' }}>　└─ {cat.name}</span>
+                                  ) : (
+                                    <span style={{ fontWeight: 500 }}>{cat.name}</span>
+                                  )}
+                                </Select.Option>
+                              ))}
+                            </Select>
+                          </Form.Item>
+                          <Row gutter={12}>
+                            <Col span={12}>
+                              <Form.Item
+                                name="basePrice"
+                                label={t('pages.menuCenter.basePrice')}
+                                rules={[
+                                  { required: true, message: t('pages.menuCenter.basePriceRequired') },
+                                  { type: 'number', message: t('pages.menuCenter.validNumber') }
+                                ]}
+                                style={{ marginBottom: 12 }}
+                              >
+                                <InputNumber style={{ width: '100%' }} placeholder="0.00" precision={2} />
+                              </Form.Item>
+                            </Col>
+                            <Col span={12}>
+                              <Form.Item
+                                name="cost"
+                                label={t('pages.menuCenter.cost')}
+                                rules={[
+                                  { type: 'number', message: t('pages.menuCenter.validNumber') },
+                                  {
+                                    validator: (_, value) => {
+                                      if (value !== undefined && value !== null && value !== '' && value < 0) {
+                                        return Promise.reject(new Error(t('pages.menuCenter.costCannotBeNegative')))
+                                      }
+                                      return Promise.resolve()
+                                    }
+                                  }
+                                ]}
+                                style={{ marginBottom: 12 }}
+                              >
+                                <InputNumber style={{ width: '100%' }} placeholder="0.00" precision={2} />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          <Form.Item
+                            name="isActive"
+                            label={t('pages.menuCenter.status')}
+                            valuePropName="checked"
+                            style={{ marginBottom: 12 }}
+                          >
+                            <Switch checkedChildren={t('pages.menuCenter.active')} unCheckedChildren={t('pages.menuCenter.inactive')} />
+                          </Form.Item>
+                          {/* 商品范围（仅主店可配置） */}
+                          {isMain && (
+                            <>
+                              <Form.Item
+                                name="scope"
+                                label="商品范围"
+                                initialValue="BRAND"
+                                style={{ marginBottom: 12 }}
+                              >
+                                <Select>
+                                  <Select.Option value="BRAND">品牌商品（全部门店）</Select.Option>
+                                  <Select.Option value="STORE_EXCLUSIVE">店铺专属</Select.Option>
+                                </Select>
+                              </Form.Item>
+                              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.scope !== cur.scope}>
+                                {({ getFieldValue }) => getFieldValue('scope') === 'STORE_EXCLUSIVE' && (
+                                  <Form.Item
+                                    name="visibleStoreIds"
+                                    label="可见门店"
+                                    rules={[{ required: true, message: '请至少选择一个可见门店', type: 'array', min: 1 }]}
+                                    style={{ marginBottom: 0 }}
+                                  >
+                                    <Select mode="multiple" placeholder="选择可见门店">
+                                      {organizations.map((o: any) => (
+                                        <Select.Option key={o.id} value={o.id}>
+                                          {o.orgName}
+                                          {o.orgType === 'MAIN' ? ' (主店)' : o.orgType === 'FRANCHISE' ? ' (加盟)' : ' (分店)'}
+                                        </Select.Option>
+                                      ))}
+                                    </Select>
+                                  </Form.Item>
+                                )}
+                              </Form.Item>
+                            </>
+                          )}
+                        </Col>
+                      </Row>
                     </Card>
                   </div>
                 )
@@ -3922,7 +3291,6 @@ const MenuCenter: React.FC = () => {
                   placeholder={t('pages.menuCenter.pricePlaceholder')}
                   precision={2}
                   min={0}
-                  addonBefore="$"
                 />
               </Form.Item>
             </Col>
@@ -3940,7 +3308,6 @@ const MenuCenter: React.FC = () => {
                   placeholder={t('pages.menuCenter.costPlaceholder')}
                   precision={2}
                   min={0}
-                  addonBefore="$"
                 />
               </Form.Item>
             </Col>
@@ -4021,7 +3388,10 @@ const MenuCenter: React.FC = () => {
             discount: 0,
             discountType: 'fixed',
             isActive: true,
-            comboItems: []
+            comboItems: [],
+            imageUrl: undefined,
+            itemGroups: [],
+            availabilityRules: undefined
           }}
         >
           <Row gutter={16}>
@@ -4063,13 +3433,26 @@ const MenuCenter: React.FC = () => {
             name="description"
             label="描述"
           >
-            <Input.TextArea 
-              placeholder={t('pages.menuCenter.comboDescriptionPlaceholder')} 
-              rows={3} 
+            <Input.TextArea
+              placeholder={t('pages.menuCenter.comboDescriptionPlaceholder')}
+              rows={3}
               maxLength={500}
               showCount
             />
           </Form.Item>
+
+          {/* 套餐图片上传 */}
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
+              套餐图片
+            </label>
+            <ComboImageUpload
+              comboId={editingCombo?.id}
+              imageUrl={comboImageUrl}
+              onImageChange={setComboImageUrl}
+              onFileSelect={setComboImageFile}
+            />
+          </div>
 
           <Form.Item name="isActive" valuePropName="checked">
             <Space>
@@ -4078,144 +3461,177 @@ const MenuCenter: React.FC = () => {
             </Space>
           </Form.Item>
 
+          {/* 套餐类型选择 */}
+          <Form.Item label="套餐类型">
+            <Radio.Group
+              value={comboType}
+              disabled={!!editingCombo}
+              onChange={(e) => {
+                const newType = e.target.value as 'fixed' | 'selection';
+                setComboType(newType);
+                // 切换类型时清空对应数据，避免数据混用
+                if (newType === 'fixed') {
+                  setComboItemGroups([]);
+                  // 清除 comboItems 中的 groupId
+                  const items = comboForm.getFieldValue('comboItems') || [];
+                  comboForm.setFieldsValue({
+                    comboItems: items.map((i: any) => ({ ...i, groupId: undefined }))
+                  });
+                } else {
+                  // 切到可选套餐时清空固定商品列表，用户从分组重新配置
+                  comboForm.setFieldsValue({ comboItems: [] });
+                }
+              }}
+            >
+              <Radio.Button value="fixed">固定套餐</Radio.Button>
+              <Radio.Button value="selection">可选套餐</Radio.Button>
+            </Radio.Group>
+            <div style={{ color: '#999', fontSize: 12, marginTop: 6 }}>
+              {editingCombo ? (
+                <span style={{ color: '#ff4d4f' }}>
+                  ⚠️ 套餐创建后不能修改类型
+                </span>
+              ) : (
+                <>
+                  {comboType === 'fixed'
+                    ? '包含固定商品，价格由各商品自动汇总'
+                    : '顾客从各分组中自行选择，套餐价格手动设定'}
+                </>
+              )}
+            </div>
+          </Form.Item>
+
           <Divider>{t('pages.menuCenter.comboItemsConfig')}</Divider>
 
-          <Form.Item
-            name="comboItems"
-            label=""
-          >
-            <ComboItemsInput 
-              allItems={allItems} 
-              onPriceChange={(totalPrice) => {
-                comboForm.setFieldsValue({ basePrice: totalPrice });
-              }}
-              t={t}
-            />
-          </Form.Item>
+          {comboType === 'fixed' ? (
+            <>
+              {/* 固定套餐：商品列表 + 自动计算价格 */}
+              <Form.Item name="comboItems" label="">
+                <ComboItemsInput
+                  allItems={allItems}
+                  onPriceChange={(totalPrice) => {
+                    comboForm.setFieldsValue({ basePrice: fromMinorUnit(totalPrice) });
+                  }}
+                  t={t}
+                />
+              </Form.Item>
 
-          <Divider>价格与折扣</Divider>
+              <Divider>套餐定价</Divider>
 
-          <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => 
-            prevValues.basePrice !== currentValues.basePrice || 
-            prevValues.discount !== currentValues.discount ||
-            prevValues.discountType !== currentValues.discountType
-          }>
-            {({ getFieldValue }) => {
-              const basePrice = Number(getFieldValue('basePrice')) || 0;
-              const discount = Number(getFieldValue('discount')) || 0;
-              const discountType = getFieldValue('discountType') || 'fixed';
-              
-              let discountAmount = 0;
-              if (discountType === 'fixed') {
-                discountAmount = discount;
-              } else {
-                discountAmount = basePrice * (discount / 100);
-              }
-              
-              const finalPrice = Math.max(0, basePrice - discountAmount);
-              
-              return (
-                <div>
-                  {/* 商品总价显示 */}
-                  <div style={{
-                    padding: '12px 16px',
-                    backgroundColor: '#f0f9ff',
-                    border: '1px solid #bae6fd',
-                    borderRadius: '6px',
-                    marginBottom: 16
-                  }}>
-                    <Row align="middle">
-                      <Col span={12}>
-                        <Typography.Text type="secondary">商品总价（自动计算）</Typography.Text>
-                      </Col>
-                      <Col span={12} style={{ textAlign: 'right' }}>
-                        <Typography.Text strong style={{ fontSize: '18px', color: '#0369a1' }}>
-                          {formatPrice(basePrice)}
+              <Form.Item noStyle shouldUpdate={(prev, curr) =>
+                prev.basePrice !== curr.basePrice ||
+                prev.discount !== curr.discount ||
+                prev.discountType !== curr.discountType
+              }>
+                {({ getFieldValue }) => {
+                  const basePrice = Number(getFieldValue('basePrice')) || 0;
+                  const discount = Number(getFieldValue('discount')) || 0;
+                  const discountType = getFieldValue('discountType') || 'fixed';
+                  let discountAmount = discountType === 'fixed' ? discount : basePrice * (discount / 100);
+                  const finalPrice = Math.max(0, basePrice - discountAmount);
+
+                  return (
+                    <div>
+                      {/* 商品总价展示 */}
+                      <div style={{ padding: '12px 16px', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6, marginBottom: 16 }}>
+                        <Row align="middle">
+                          <Col span={12}><Typography.Text type="secondary">商品总价（自动计算）</Typography.Text></Col>
+                          <Col span={12} style={{ textAlign: 'right' }}>
+                            <Typography.Text strong style={{ fontSize: 18, color: '#0369a1' }}>${basePrice.toFixed(2)}</Typography.Text>
+                          </Col>
+                        </Row>
+                      </div>
+
+                      {/* 折扣设置（可选） */}
+                      <div style={{ marginBottom: 16 }}>
+                        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+                          折扣设置（可选）
                         </Typography.Text>
-                      </Col>
-                    </Row>
-                  </div>
+                        <Row gutter={16}>
+                          <Col span={12}>
+                            <Form.Item name="discountType" label="折扣类型" style={{ marginBottom: 0 }}>
+                              <Select onChange={() => comboForm.setFieldValue('discount', 0)}>
+                                <Select.Option value="fixed">固定金额</Select.Option>
+                                <Select.Option value="percentage">百分比</Select.Option>
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                          <Col span={12}>
+                            <Form.Item name="discount" label={discountType === 'percentage' ? '折扣 (%)' : '折扣 ($)'} rules={[{ type: 'number', min: 0 }]} style={{ marginBottom: 0 }}>
+                              {discountType === 'percentage' ? (
+                                <InputNumber style={{ width: '100%' }} precision={0} min={0} max={100} placeholder="0" />
+                              ) : (
+                                <InputNumber style={{ width: '100%' }} precision={2} min={0} placeholder="0.00" />
+                              )}
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                      </div>
 
-                  {/* 折扣编辑区域 */}
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <Form.Item
-                        name="discountType"
-                        label="折扣类型"
-                      >
-                        <Select>
-                          <Select.Option value="fixed">固定金额</Select.Option>
-                          <Select.Option value="percentage">百分比</Select.Option>
-                        </Select>
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item
-                        name="discount"
-                        label="折扣"
-                        rules={[
-                          { type: 'number', min: 0, message: '折扣不能为负数' }
-                        ]}
-                      >
-                        {discountType === 'percentage' ? (
-                          <InputNumber
-                            style={{ width: '100%' }}
-                            placeholder="0"
-                            precision={2}
-                            min={0}
-                            max={100}
-                            addonAfter="%"
-                          />
-                        ) : (
-                          <InputNumber
-                            style={{ width: '100%' }}
-                            placeholder="0.00"
-                            precision={2}
-                            min={0}
-                            addonBefore="$"
-                          />
-                        )}
-                      </Form.Item>
-                    </Col>
-                  </Row>
-
-                  {/* 最终售价显示 */}
-                  {basePrice > 0 && (
-                    <div style={{
-                      padding: '16px',
-                      backgroundColor: '#f6ffed',
-                      border: '2px solid #52c41a',
-                      borderRadius: '6px',
-                      marginTop: 8
-                    }}>
-                      <Row align="middle">
-                        <Col span={12}>
-                          <Typography.Text strong style={{ fontSize: '16px' }}>最终售价</Typography.Text>
-                          {discountAmount > 0 && (
-                            <div style={{ fontSize: '12px', color: '#666', marginTop: 4 }}>
-                              原价 {formatPrice(basePrice)} - 折扣 {discountType === 'percentage'
-                                ? `${discount}%`
-                                : formatPrice(discount)}
-                            </div>
-                          )}
-                        </Col>
-                        <Col span={12} style={{ textAlign: 'right' }}>
-                          <Typography.Text strong style={{ fontSize: '24px', color: '#52c41a' }}>
-                            {formatPrice(finalPrice)}
-                          </Typography.Text>
-                        </Col>
-                      </Row>
+                      {/* 最终售价展示 */}
+                      {basePrice > 0 && (
+                        <div style={{ padding: 16, backgroundColor: '#f6ffed', border: '2px solid #52c41a', borderRadius: 6 }}>
+                          <Row align="middle">
+                            <Col span={12}>
+                              <Typography.Text strong style={{ fontSize: 16 }}>最终售价</Typography.Text>
+                              {discountAmount > 0 && (
+                                <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                                  原价 ${basePrice.toFixed(2)} - 折扣 {discountType === 'percentage' ? `${discount}%` : `$${discount.toFixed(2)}`}
+                                </div>
+                              )}
+                            </Col>
+                            <Col span={12} style={{ textAlign: 'right' }}>
+                              <Typography.Text strong style={{ fontSize: 24, color: '#52c41a' }}>${finalPrice.toFixed(2)}</Typography.Text>
+                            </Col>
+                          </Row>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            }}
-          </Form.Item>
+                  );
+                }}
+              </Form.Item>
 
-          {/* 隐藏的basePrice字段,用于存储自动计算的价格 */}
-          <Form.Item name="basePrice" hidden>
-            <InputNumber />
-          </Form.Item>
+              {/* 隐藏字段存储自动计算的价格 */}
+              <Form.Item name="basePrice" hidden><InputNumber /></Form.Item>
+            </>
+          ) : (
+            <>
+              {/* 分组配置：用 shouldUpdate 确保 comboItems 变化时重新渲染 */}
+              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.comboItems !== curr.comboItems}>
+                {({ getFieldValue }) => (
+                  <ComboItemGroupsConfig
+                    groups={comboItemGroups}
+                    onGroupsChange={setComboItemGroups}
+                    comboItems={getFieldValue('comboItems') || []}
+                    onComboItemsChange={(items) => comboForm.setFieldsValue({ comboItems: items })}
+                    allItems={allItems}
+                  />
+                )}
+              </Form.Item>
+              {/* comboItems 隐藏字段（分组配置通过 onComboItemsChange 写入） */}
+              <Form.Item name="comboItems" hidden><Input /></Form.Item>
+
+              <Divider>套餐定价</Divider>
+
+              {/* 可选套餐：只设置基础价格 */}
+              <Form.Item
+                name="basePrice"
+                label="套餐价格"
+                rules={[{ required: true, message: '请填写套餐价格' }, { type: 'number', min: 0 }]}
+              >
+                <InputNumber precision={2} min={0} style={{ width: 200 }} placeholder="0.00" />
+              </Form.Item>
+              <div style={{ color: '#999', fontSize: 12, marginTop: -12, marginBottom: 16 }}>
+                顾客选择分组商品后，各选项的额外费用将在此价格基础上累加
+              </div>
+            </>
+          )}
+
+          {/* 时段限制配置 */}
+          <ComboAvailabilityConfig
+            value={comboAvailabilityRules}
+            onChange={setComboAvailabilityRules}
+          />
 
           <Form.Item style={{ textAlign: 'right', marginBottom: 0, marginTop: 16 }}>
             <Space>
@@ -4229,6 +3645,15 @@ const MenuCenter: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {channelModal && (
+        <ItemChannelConfig
+          open={!!channelModal}
+          itemId={channelModal.id}
+          itemName={channelModal.name}
+          onClose={() => setChannelModal(null)}
+        />
+      )}
     </Space>
   )
 }

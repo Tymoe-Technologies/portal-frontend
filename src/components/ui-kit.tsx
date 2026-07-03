@@ -8,10 +8,11 @@ import { createPortal } from 'react-dom'
 import * as RadixSwitch from '@radix-ui/react-switch'
 import * as Dialog from '@radix-ui/react-dialog'
 import * as AlertDialog from '@radix-ui/react-alert-dialog'
+import * as RadixSelect from '@radix-ui/react-select'
 import clsx from 'clsx'
 import {
   Loader2, Info, AlertTriangle, CheckCircle2, X, ChevronRight,
-  Image as ImageIcon, Trash2,
+  Image as ImageIcon, Trash2, Check, ChevronsUpDown,
 } from 'lucide-react'
 
 // ─── 徽章 ───────────────────────────────────────────────────────────────────────
@@ -404,31 +405,67 @@ export function NumberInput({ value, onChange, min, max, suffix, disabled, class
   )
 }
 
-export function SelectInput({ value, onChange, options, disabled, className }: {
+// 下拉选择（基于 Radix Select，统一 slate 样式；替代原生 <select>）
+// 空值('' / null)用 sentinel 承载，保留“请选择/清空”这类可再次选中的占位项
+const SELECT_EMPTY = '__ui_select_empty__'
+export function SelectInput({ value, onChange, options, disabled, className, placeholder }: {
   value: string | number
   onChange: (v: any) => void
   options: { label: string; value: string | number }[]
   disabled?: boolean
   className?: string
+  placeholder?: string
 }) {
+  const toStr = (v: string | number) => (v === '' || v == null ? SELECT_EMPTY : String(v))
+  const handleChange = (v: string) => {
+    if (v === SELECT_EMPTY) { onChange(''); return }
+    const opt = options.find(o => String(o.value) === v)
+    onChange(opt ? opt.value : v)
+  }
   return (
-    <select
-      value={value}
-      disabled={disabled}
-      onChange={e => {
-        const raw = e.target.value
-        const num = Number(raw)
-        onChange(raw !== '' && !Number.isNaN(num) && String(num) === raw ? num : raw)
-      }}
-      className={clsx(
-        'text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 cursor-pointer',
-        'disabled:bg-slate-50 disabled:text-slate-400',
-        'focus:outline-2 focus:outline-slate-900 focus:outline-offset-0',
-        className,
-      )}
-    >
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    <RadixSelect.Root value={toStr(value)} onValueChange={handleChange} disabled={disabled}>
+      <RadixSelect.Trigger
+        className={clsx(
+          'group inline-flex min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700',
+          'hover:border-slate-300 transition-colors cursor-pointer',
+          'focus:outline-none focus-visible:outline-2 focus-visible:outline-slate-900 data-[state=open]:border-slate-400',
+          'disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed',
+          '[&>span:first-child]:truncate',
+          className,
+        )}
+      >
+        <RadixSelect.Value placeholder={placeholder} />
+        <RadixSelect.Icon>
+          <ChevronsUpDown className="w-4 h-4 text-slate-400 group-hover:text-slate-500 shrink-0" />
+        </RadixSelect.Icon>
+      </RadixSelect.Trigger>
+      <RadixSelect.Portal>
+        <RadixSelect.Content
+          position="popper"
+          sideOffset={6}
+          className="z-[60] min-w-[var(--radix-select-trigger-width)] max-h-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg p-1"
+        >
+          <RadixSelect.Viewport>
+            {options.map(o => (
+              <RadixSelect.Item
+                key={String(o.value)}
+                value={toStr(o.value)}
+                className={clsx(
+                  'relative flex items-center rounded-lg pl-8 pr-3 py-2 text-sm text-slate-700 select-none cursor-pointer outline-none',
+                  'data-[highlighted]:bg-slate-100 data-[highlighted]:text-slate-900',
+                  'data-[state=checked]:font-medium data-[state=checked]:text-slate-900',
+                )}
+              >
+                <RadixSelect.ItemIndicator className="absolute left-2 inline-flex items-center">
+                  <Check className="w-4 h-4 text-slate-900" />
+                </RadixSelect.ItemIndicator>
+                <RadixSelect.ItemText>{o.label}</RadixSelect.ItemText>
+              </RadixSelect.Item>
+            ))}
+          </RadixSelect.Viewport>
+        </RadixSelect.Content>
+      </RadixSelect.Portal>
+    </RadixSelect.Root>
   )
 }
 

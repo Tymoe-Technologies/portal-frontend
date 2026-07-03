@@ -1,34 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import {
-  Button,
-  Card,
-  Table,
-  Space,
-  Typography,
-  Tag,
-  Modal,
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  message,
-  Row,
-  Col,
-  Divider,
-  TreeSelect,
-  Upload,
-  Image
-} from 'antd'
-import type { RcFile } from 'antd/es/upload/interface'
-import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  SearchOutlined,
-  ReloadOutlined,
-  LoadingOutlined,
-  PictureOutlined
-} from '@ant-design/icons'
+import { Plus, Pencil, Trash2, Search, RotateCw, Image as ImageIcon } from 'lucide-react'
 import { useAuthContext } from '../../auth/AuthProvider'
 import {
   itemManagementService,
@@ -36,63 +7,46 @@ import {
   type Category,
   type CreateItemPayload,
   type UpdateItemPayload,
-  type PaginatedResponse
+  type PaginatedResponse,
 } from '../../services/item-management'
 import { formatPrice, fromMinorUnit } from '../../utils/priceConverter'
 import { getCurrencySymbol } from '../../config/currencyConfig'
-
-const { Title, Text } = Typography
-const { Option } = Select
+import {
+  SectionCard, Btn, Table, type Column, Modal, TextInput, Textarea, SelectInput,
+  ImageUpload, ConfirmDialog, FormRow, toast,
+} from '@/components/ui-kit'
 
 interface ItemFormData {
   name: string
-  description?: string
+  description: string
   basePrice: number
-  categoryId?: string
+  categoryId: string
   isActive: boolean
 }
 
-// 图片上传前验证
-const beforeUpload = (file: RcFile): boolean | string => {
-  const isValidType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
-  if (!isValidType) {
-    message.error('只支持 JPG、PNG、WebP 格式的图片')
-    return Upload.LIST_IGNORE
-  }
-  const isLt5M = file.size / 1024 / 1024 < 5
-  if (!isLt5M) {
-    message.error('图片大小不能超过 5MB')
-    return Upload.LIST_IGNORE
-  }
-  return true
-}
+const EMPTY_FORM: ItemFormData = { name: '', description: '', basePrice: 0, categoryId: '', isActive: true }
 
 const ItemManagement: React.FC = () => {
   const { isAuthenticated } = useAuthContext()
-  const [form] = Form.useForm<ItemFormData>()
 
-  // 状态管理
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<Item[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0
-  })
-  
-  // 模态框状态
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 })
+
   const [modalVisible, setModalVisible] = useState(false)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
-  
-  // 搜索状态
   const [searchQuery, setSearchQuery] = useState('')
-
-  // 图片上传状态
-  const [imageUploading, setImageUploading] = useState(false)
   const [previewImageUrl, setPreviewImageUrl] = useState<string | undefined>(undefined)
+  const [imageUploading, setImageUploading] = useState(false)
 
-  // 初始化数据
+  // 表单状态
+  const [form, setForm] = useState<ItemFormData>(EMPTY_FORM)
+  const [nameError, setNameError] = useState('')
+
+  // 确认框（删除图片 / 删除商品）
+  const [confirm, setConfirm] = useState<{ title: string; description: string; onConfirm: () => void } | null>(null)
+
   useEffect(() => {
     if (isAuthenticated) {
       loadItems()
@@ -100,57 +54,45 @@ const ItemManagement: React.FC = () => {
     }
   }, [isAuthenticated, pagination.current, pagination.pageSize])
 
-  // 加载商品列表
   const loadItems = async () => {
     setLoading(true)
     try {
       const response: PaginatedResponse<Item> = await itemManagementService.getItems({
         page: pagination.current,
         limit: pagination.pageSize,
-        search: searchQuery || undefined
+        search: searchQuery || undefined,
       })
-      
       setItems(response.data)
-      setPagination(prev => ({
-        ...prev,
-        total: response.total
-      }))
-      
-      message.success(`加载了 ${response.data.length} 个商品`)
+      setPagination(prev => ({ ...prev, total: response.total }))
     } catch (error) {
       console.error('Failed to load items:', error)
-      message.error('加载商品列表失败')
+      toast.error('加载商品列表失败')
     } finally {
       setLoading(false)
     }
   }
 
-  // 加载分类列表
   const loadCategories = async () => {
     try {
       const categoryList = await itemManagementService.getCategories()
       setCategories(categoryList)
     } catch (error) {
       console.error('Failed to load categories:', error)
-      message.error('加载分类列表失败')
+      toast.error('加载分类列表失败')
     }
   }
 
-  // 搜索商品
   const handleSearch = async () => {
     if (searchQuery.trim()) {
       setLoading(true)
       try {
         const results = await itemManagementService.searchItems(searchQuery)
         setItems(results)
-        setPagination(prev => ({
-          ...prev,
-          total: results.length
-        }))
-        message.success(`找到 ${results.length} 个匹配的商品`)
+        setPagination(prev => ({ ...prev, total: results.length }))
+        toast.success(`找到 ${results.length} 个匹配的商品`)
       } catch (error) {
         console.error('Failed to search items:', error)
-        message.error('搜索商品失败')
+        toast.error('搜索商品失败')
       } finally {
         setLoading(false)
       }
@@ -159,476 +101,267 @@ const ItemManagement: React.FC = () => {
     }
   }
 
-  // 创建商品
+  const setF = <K extends keyof ItemFormData>(k: K, v: ItemFormData[K]) => setForm(prev => ({ ...prev, [k]: v }))
+
   const handleCreate = () => {
     setEditingItem(null)
-    form.resetFields()
-    form.setFieldsValue({ isActive: true })
+    setForm(EMPTY_FORM)
+    setNameError('')
     setPreviewImageUrl(undefined)
     setModalVisible(true)
   }
 
-  // 编辑商品
   const handleEdit = (item: Item) => {
     setEditingItem(item)
-    form.setFieldsValue({
+    setForm({
       name: item.name,
-      description: item.description,
+      description: item.description || '',
       basePrice: fromMinorUnit(item.basePrice), // 分 → 元
-      categoryId: item.categoryId,
-      isActive: item.isActive
+      categoryId: item.categoryId || '',
+      isActive: item.isActive,
     })
+    setNameError('')
     setPreviewImageUrl(item.imageUrl)
     setModalVisible(true)
   }
 
-  // 上传图片
-  const handleImageUpload = async (file: RcFile) => {
+  const handleImageUpload = async (file: File) => {
     if (!editingItem) {
-      message.warning('请先保存商品，然后再上传图片')
-      return false
+      toast.warning('请先保存商品，然后再上传图片')
+      return
     }
-
     setImageUploading(true)
     try {
-      const result = await itemManagementService.uploadItemImage(editingItem.id, file)
+      const result = await itemManagementService.uploadItemImage(editingItem.id, file as any)
       setPreviewImageUrl(result.image.url)
       setEditingItem({ ...editingItem, imageUrl: result.image.url })
-      message.success('图片上传成功')
-      loadItems() // 刷新列表
+      toast.success('图片上传成功')
+      loadItems()
     } catch (error: any) {
       console.error('Image upload failed:', error)
-      message.error(error?.response?.data?.error || '图片上传失败')
+      toast.error(error?.response?.data?.error || '图片上传失败')
     } finally {
       setImageUploading(false)
     }
-    return false // 阻止默认上传行为
   }
 
-  // 删除图片
-  const handleImageDelete = async () => {
+  const handleImageDelete = () => {
     if (!editingItem) return
-
-    Modal.confirm({
+    setConfirm({
       title: '确认删除图片',
-      content: '确定要删除这张商品图片吗？',
-      okText: '删除',
-      okType: 'danger',
-      cancelText: '取消',
-      onOk: async () => {
+      description: '确定要删除这张商品图片吗？',
+      onConfirm: async () => {
         try {
           await itemManagementService.deleteItemImage(editingItem.id)
           setPreviewImageUrl(undefined)
           setEditingItem({ ...editingItem, imageUrl: undefined })
-          message.success('图片删除成功')
-          loadItems() // 刷新列表
+          toast.success('图片删除成功')
+          setConfirm(null)
+          loadItems()
         } catch (error: any) {
-          console.error('Image delete failed:', error)
-          message.error(error?.response?.data?.error || '图片删除失败')
+          toast.error(error?.response?.data?.error || '图片删除失败')
         }
-      }
+      },
     })
   }
 
-  // 删除商品
-  const handleDelete = async (id: string) => {
-    Modal.confirm({
+  const handleDelete = (id: string) => {
+    setConfirm({
       title: '确认删除',
-      content: '确定要删除这个商品吗？此操作不可恢复。',
-      okText: '删除',
-      okType: 'danger',
-      cancelText: '取消',
-      onOk: async () => {
+      description: '确定要删除这个商品吗？此操作不可恢复。',
+      onConfirm: async () => {
         try {
           await itemManagementService.deleteItem(id)
-          message.success('商品删除成功')
+          toast.success('商品删除成功')
+          setConfirm(null)
           loadItems()
         } catch (error) {
-          console.error('Failed to delete item:', error)
-          message.error('删除商品失败')
+          toast.error('删除商品失败')
         }
-      }
+      },
     })
   }
 
-  // 提交表单
-  const handleSubmit = async (values: ItemFormData) => {
+  const handleSubmit = async () => {
+    if (!form.name.trim()) { setNameError('请输入商品名称'); return }
+    setNameError('')
     try {
       if (editingItem) {
-        // 更新商品
         const updatePayload: UpdateItemPayload = {
-          name: values.name,
-          description: values.description,
-          basePrice: values.basePrice,
-          categoryId: values.categoryId || undefined,
-          isActive: values.isActive
+          name: form.name, description: form.description, basePrice: form.basePrice,
+          categoryId: form.categoryId || undefined, isActive: form.isActive,
         }
         await itemManagementService.updateItem(editingItem.id, updatePayload)
-        message.success('商品更新成功')
+        toast.success('商品更新成功')
       } else {
-        // 创建商品
         const createPayload: CreateItemPayload = {
-          name: values.name,
-          description: values.description,
-          basePrice: values.basePrice,
-          categoryId: values.categoryId || '',
-          isActive: values.isActive
+          name: form.name, description: form.description, basePrice: form.basePrice,
+          categoryId: form.categoryId || '', isActive: form.isActive,
         }
         await itemManagementService.createItem(createPayload)
-        message.success('商品创建成功')
+        toast.success('商品创建成功')
       }
-
       setModalVisible(false)
       loadItems()
     } catch (error) {
       console.error('Failed to save item:', error)
-      message.error(editingItem ? '更新商品失败' : '创建商品失败')
+      toast.error(editingItem ? '更新商品失败' : '创建商品失败')
     }
   }
 
-  // 表格列定义
-  const columns = [
+  const columns: Column<Item>[] = [
     {
-      title: '图片',
-      dataIndex: 'imageUrl',
-      key: 'imageUrl',
-      width: 80,
-      render: (imageUrl: string) => imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt="商品图片"
-          width={50}
-          height={50}
-          style={{ objectFit: 'cover', borderRadius: 4 }}
-          fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAfUlEQVR4nO3XsQ2AMAwAQPb/dGbAZSBQJJI7qT3xDwAA/KPVdl/l3DKz12q7r3JuGSIA"
-        />
-      ) : (
-        <div style={{
-          width: 50,
-          height: 50,
-          background: '#f5f5f5',
-          borderRadius: 4,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <PictureOutlined style={{ color: '#bbb', fontSize: 20 }} />
+      key: 'imageUrl', title: '图片', width: 80,
+      render: (r) => r.imageUrl
+        ? <img src={r.imageUrl} alt="商品图片" className="w-[50px] h-[50px] object-cover rounded" />
+        : <div className="w-[50px] h-[50px] bg-slate-100 rounded flex items-center justify-center"><ImageIcon className="w-5 h-5 text-slate-300" /></div>,
+    },
+    { key: 'name', title: '商品名称', width: 200, render: (r) => r.name },
+    { key: 'description', title: '描述', width: 250, render: (r) => <span className="block max-w-[250px] truncate">{r.description}</span> },
+    { key: 'basePrice', title: '价格', width: 120, render: (r) => formatPrice(r.basePrice) },
+    { key: 'category', title: '分类', width: 150, render: (r: any) => r.category?.name || '-' },
+    {
+      key: 'isActive', title: '状态', width: 100,
+      render: (r) => <span className={`inline-flex items-center text-xs px-1.5 py-0.5 rounded ring-1 ${r.isActive ? 'bg-green-50 text-green-600 ring-green-200' : 'bg-red-50 text-red-600 ring-red-200'}`}>{r.isActive ? '活跃' : '停用'}</span>,
+    },
+    { key: 'createdAt', title: '创建时间', width: 180, render: (r: any) => (r.createdAt ? new Date(r.createdAt).toLocaleString() : '-') },
+    {
+      key: 'actions', title: '操作', width: 150,
+      render: (r) => (
+        <div className="flex items-center gap-1">
+          <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEdit(r)}>编辑</Btn>
+          <Btn variant="link" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => handleDelete(r.id)}>删除</Btn>
         </div>
-      )
+      ),
     },
-    {
-      title: '商品名称',
-      dataIndex: 'name',
-      key: 'name',
-      width: 200
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      width: 250,
-      ellipsis: true
-    },
-    {
-      title: '价格',
-      dataIndex: 'basePrice',
-      key: 'basePrice',
-      width: 120,
-      render: (basePrice: number) => formatPrice(basePrice)
-    },
-    {
-      title: '分类',
-      dataIndex: 'category',
-      key: 'category',
-      width: 150,
-      render: (category: Category) => category?.name || '-'
-    },
-    {
-      title: '状态',
-      dataIndex: 'isActive',
-      key: 'isActive',
-      width: 100,
-      render: (isActive: boolean) => (
-        <Tag color={isActive ? 'green' : 'red'}>
-          {isActive ? '活跃' : '停用'}
-        </Tag>
-      )
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (time: string) => time ? new Date(time).toLocaleString() : '-'
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 150,
-      render: (_: any, record: Item) => (
-        <Space>
-          <Button 
-            type="link" 
-            icon={<EditOutlined />} 
-            onClick={() => handleEdit(record)}
-            size="small"
-          >
-            编辑
-          </Button>
-          <Button 
-            type="link" 
-            danger 
-            icon={<DeleteOutlined />} 
-            onClick={() => handleDelete(record.id)}
-            size="small"
-          >
-            删除
-          </Button>
-        </Space>
-      )
-    }
   ]
 
-  // 分类树形数据转换
-  const categoryTreeData = categories.map(cat => ({
-    title: cat.name,
-    value: cat.id,
-    key: cat.id
-  }))
+  const categoryOptions = [{ label: '（无分类）', value: '' }, ...categories.map(cat => ({ label: cat.name, value: cat.id }))]
 
   if (!isAuthenticated) {
-    return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <Text>请先登录以使用商品管理功能</Text>
-      </div>
-    )
+    return <div className="p-6 text-center"><span className="text-slate-600">请先登录以使用商品管理功能</span></div>
   }
 
+  const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.pageSize))
+  const rangeStart = pagination.total === 0 ? 0 : (pagination.current - 1) * pagination.pageSize + 1
+  const rangeEnd = Math.min(pagination.current * pagination.pageSize, pagination.total)
+
   return (
-    <div style={{ padding: 24 }}>
-      <Card>
-        <Title level={2}>商品管理</Title>
-        
+    <div className="p-6">
+      <SectionCard>
+        <h2 className="text-2xl font-semibold text-slate-900 mb-4">商品管理</h2>
+
         {/* 搜索和操作栏 */}
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={8}>
-            <Input.Search
-              placeholder="搜索商品名称..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onSearch={handleSearch}
-              enterButton={<SearchOutlined />}
-              allowClear
-            />
-          </Col>
-          <Col span={16} style={{ textAlign: 'right' }}>
-            <Space>
-              <Button 
-                icon={<ReloadOutlined />} 
-                onClick={loadItems}
-                loading={loading}
-              >
-                刷新
-              </Button>
-              <Button 
-                type="primary" 
-                icon={<PlusOutlined />} 
-                onClick={handleCreate}
-              >
-                添加商品
-              </Button>
-            </Space>
-          </Col>
-        </Row>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex gap-2 max-w-md w-full">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                placeholder="搜索商品名称..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
+                className="w-full text-sm bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
+              />
+            </div>
+            <Btn variant="secondary" onClick={handleSearch}>搜索</Btn>
+          </div>
+          <div className="flex gap-2">
+            <Btn variant="secondary" icon={<RotateCw className="w-3.5 h-3.5" />} loading={loading} onClick={loadItems}>刷新</Btn>
+            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreate}>添加商品</Btn>
+          </div>
+        </div>
 
         {/* 商品表格 */}
-        <Table
-          columns={columns}
-          dataSource={items}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
-            onChange: (page, pageSize) => {
-              setPagination(prev => ({
-                ...prev,
-                current: page,
-                pageSize: pageSize || 10
-              }))
-            }
-          }}
-          scroll={{ x: 1200 }}
-        />
-      </Card>
+        <Table columns={columns} data={items} rowKey={(r) => r.id} loading={loading} />
+
+        {/* 分页 */}
+        <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
+          <span>第 {rangeStart}-{rangeEnd} 条，共 {pagination.total} 条</span>
+          <div className="flex items-center gap-2">
+            <div className="w-28">
+              <SelectInput value={String(pagination.pageSize)} onChange={(v) => setPagination(prev => ({ ...prev, current: 1, pageSize: Number(v) }))}
+                options={[{ label: '10 条/页', value: '10' }, { label: '20 条/页', value: '20' }, { label: '50 条/页', value: '50' }]} />
+            </div>
+            <Btn variant="secondary" size="sm" disabled={pagination.current <= 1} onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}>上一页</Btn>
+            <span>{pagination.current} / {totalPages}</span>
+            <Btn variant="secondary" size="sm" disabled={pagination.current >= totalPages} onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}>下一页</Btn>
+          </div>
+        </div>
+      </SectionCard>
 
       {/* 创建/编辑商品模态框 */}
       <Modal
         title={editingItem ? '编辑商品' : '创建商品'}
         open={modalVisible}
-        onCancel={() => setModalVisible(false)}
-        footer={null}
-        width={600}
+        onOpenChange={(o) => !o && setModalVisible(false)}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Btn variant="secondary" onClick={() => setModalVisible(false)}>取消</Btn>
+            <Btn variant="primary" onClick={handleSubmit}>{editingItem ? '更新' : '创建'}</Btn>
+          </div>
+        }
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-        >
-          <Form.Item
-            name="name"
-            label="商品名称"
-            rules={[{ required: true, message: '请输入商品名称' }]}
-          >
-            <Input placeholder="请输入商品名称" />
-          </Form.Item>
+        <div className="space-y-4">
+          <FormRow label="商品名称">
+            <TextInput className="w-full" value={form.name} onChange={(v) => { setF('name', v); if (nameError) setNameError('') }} placeholder="请输入商品名称" />
+          </FormRow>
+          {nameError && <p className="text-sm text-red-500 -mt-2">{nameError}</p>}
 
-          <Form.Item
-            name="description"
-            label="商品描述"
-          >
-            <Input.TextArea rows={3} placeholder="请输入商品描述" />
-          </Form.Item>
+          <FormRow label="商品描述">
+            <Textarea className="w-full" rows={3} value={form.description} onChange={(v) => setF('description', v)} placeholder="请输入商品描述" />
+          </FormRow>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="basePrice"
-                label="价格"
-                rules={[
-                  { required: true, message: '请输入商品价格' },
-                  { type: 'number', min: 0, message: '价格不能为负数' }
-                ]}
-              >
-                <InputNumber
-                  style={{ width: '100%' }}
+          <div className="grid grid-cols-2 gap-4">
+            <FormRow label="价格">
+              <div className="relative w-full">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{getCurrencySymbol()}</span>
+                <input type="number" min={0} step={0.01} value={form.basePrice}
+                  onChange={(e) => setF('basePrice', Number(e.target.value))}
                   placeholder="0.00"
-                  precision={2}
-                  prefix={getCurrencySymbol()}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="isActive"
-                label="状态"
-                rules={[{ required: true, message: '请选择商品状态' }]}
-                valuePropName="checked"
-              >
-                <Select placeholder="请选择状态">
-                  <Option value={true}>活跃</Option>
-                  <Option value={false}>停用</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
+                  className="w-full text-sm bg-white border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0" />
+              </div>
+            </FormRow>
+            <FormRow label="状态">
+              <div className="w-full"><SelectInput className="w-full" value={form.isActive ? 'true' : 'false'} onChange={(v) => setF('isActive', v === 'true')}
+                options={[{ label: '活跃', value: 'true' }, { label: '停用', value: 'false' }]} /></div>
+            </FormRow>
+          </div>
 
-          <Form.Item
-            name="categoryId"
-            label="商品分类"
-          >
-            <TreeSelect
-              placeholder="请选择分类"
-              allowClear
-              treeData={categoryTreeData}
-              showSearch
-              treeDefaultExpandAll
-            />
-          </Form.Item>
+          <FormRow label="商品分类">
+            <div className="w-full"><SelectInput className="w-full" value={form.categoryId} onChange={(v) => setF('categoryId', String(v))} options={categoryOptions} placeholder="请选择分类" /></div>
+          </FormRow>
 
           {/* 图片上传 - 仅在编辑模式显示 */}
-          {editingItem && (
-            <Form.Item label="商品图片">
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-                {previewImageUrl ? (
-                  <div style={{ position: 'relative' }}>
-                    <Image
-                      src={previewImageUrl}
-                      alt="商品图片"
-                      width={120}
-                      height={120}
-                      style={{ objectFit: 'cover', borderRadius: 8 }}
-                    />
-                    <Button
-                      type="primary"
-                      danger
-                      size="small"
-                      icon={<DeleteOutlined />}
-                      onClick={handleImageDelete}
-                      style={{
-                        position: 'absolute',
-                        top: 4,
-                        right: 4
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <Upload
-                    accept=".jpg,.jpeg,.png,.webp"
-                    showUploadList={false}
-                    beforeUpload={beforeUpload}
-                    customRequest={({ file }) => handleImageUpload(file as RcFile)}
-                    disabled={imageUploading}
-                  >
-                    <div style={{
-                      width: 120,
-                      height: 120,
-                      border: '1px dashed #d9d9d9',
-                      borderRadius: 8,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      background: '#fafafa'
-                    }}>
-                      {imageUploading ? <LoadingOutlined /> : <PlusOutlined />}
-                      <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-                        {imageUploading ? '上传中...' : '上传图片'}
-                      </div>
-                    </div>
-                  </Upload>
-                )}
-                <div style={{ fontSize: 12, color: '#999' }}>
+          {editingItem ? (
+            <FormRow label="商品图片">
+              <div className="flex items-start gap-4">
+                <ImageUpload url={previewImageUrl} loading={imageUploading} size={120} maxMB={5}
+                  onPick={handleImageUpload} onRemove={handleImageDelete} />
+                <div className="text-xs text-slate-400 space-y-0.5">
                   <div>支持 JPG、PNG、WebP 格式</div>
                   <div>图片大小不超过 5MB</div>
                   <div>建议尺寸 800x800 像素</div>
                 </div>
               </div>
-            </Form.Item>
+            </FormRow>
+          ) : (
+            <div className="px-4 py-3 bg-slate-50 rounded-md text-[13px] text-slate-500">💡 提示：保存商品后可以上传图片</div>
           )}
-
-          {!editingItem && (
-            <div style={{
-              padding: '12px 16px',
-              background: '#f6f6f6',
-              borderRadius: 6,
-              marginBottom: 16,
-              fontSize: 13,
-              color: '#666'
-            }}>
-              💡 提示：保存商品后可以上传图片
-            </div>
-          )}
-
-          <Divider />
-
-          <Form.Item style={{ textAlign: 'right', marginBottom: 0 }}>
-            <Space>
-              <Button onClick={() => setModalVisible(false)}>
-                取消
-              </Button>
-              <Button type="primary" htmlType="submit">
-                {editingItem ? '更新' : '创建'}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+        </div>
       </Modal>
+
+      {/* 确认框 */}
+      <ConfirmDialog
+        open={!!confirm}
+        onOpenChange={(o) => !o && setConfirm(null)}
+        title={confirm?.title ?? ''}
+        description={confirm?.description}
+        danger
+        confirmText="删除"
+        onConfirm={() => confirm?.onConfirm()}
+      />
     </div>
   )
 }

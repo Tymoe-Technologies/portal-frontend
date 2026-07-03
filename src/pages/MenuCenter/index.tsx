@@ -454,6 +454,10 @@ const MenuCenter: React.FC = () => {
   const [editingModifierGroup, setEditingModifierGroup] = useState<ModifierGroup | null>(null)
   const [editingModifierOption, setEditingModifierOption] = useState<ModifierOption | null>(null)
   const [editingCombo, setEditingCombo] = useState<Combo | null>(null)
+  // 显示骨架去 antd：删除确认目标
+  const [comboDeleteTarget, setComboDeleteTarget] = useState<Combo | null>(null)
+  const [itemDeleteTarget, setItemDeleteTarget] = useState<Item | null>(null)
+  const [categoryDeleteTarget, setCategoryDeleteTarget] = useState<Category | null>(null)
   // 套餐增强功能状态
   const [comboImageUrl, setComboImageUrl] = useState<string | undefined>()
   // 新建套餐时选择的待上传图片文件（保存套餐成功后自动上传）
@@ -2359,191 +2363,84 @@ const MenuCenter: React.FC = () => {
                   </Space>
                 }
               >
-                <Table
-                  dataSource={combos}
-                  rowKey="id"
-                  loading={{spinning: loading.combos, indicator: loadingIcon}}
-                  pagination={{ pageSize: 10 }}
+                <UI.Table
+                  data={combos}
+                  rowKey={(r: Combo) => r.id}
+                  loading={loading.combos}
                   columns={[
                     {
-                      title: t('pages.menuCenter.comboName'),
-                      dataIndex: 'name',
-                      key: 'name',
-                      width: 150,
-                      render: (text: string, record: Combo) => (
-                        <Space direction="vertical" size={2}>
-                          <Typography.Text strong>{text}</Typography.Text>
-                          {record.itemGroups && record.itemGroups.length > 0 ? (
-                            <Tag color="purple" style={{ fontSize: '11px' }}>可选套餐</Tag>
-                          ) : (
-                            <Tag color="cyan" style={{ fontSize: '11px' }}>固定套餐</Tag>
-                          )}
-                        </Space>
-                      )
+                      key: 'name', title: t('pages.menuCenter.comboName'), width: 150,
+                      render: (record: Combo) => (
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="font-medium text-slate-800">{record.name}</span>
+                          {record.itemGroups && record.itemGroups.length > 0
+                            ? <UI.Badge variant="gold">可选套餐</UI.Badge>
+                            : <UI.Badge variant="blue">固定套餐</UI.Badge>}
+                        </div>
+                      ),
                     },
                     {
-                      title: t('pages.menuCenter.includedItems'),
-                      key: 'items',
-                      width: 300,
-                      render: (_, record: Combo) => {
-                        // 可选套餐：显示分组信息
+                      key: 'items', title: t('pages.menuCenter.includedItems'), width: 300,
+                      render: (record: Combo) => {
                         if (record.itemGroups && record.itemGroups.length > 0) {
                           return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div className="flex flex-col gap-1">
                               {record.itemGroups.map((group, index) => {
-                                const groupItems = (record.comboItems || []).filter(item => item.groupId === group.id);
-                                const groupItemCount = groupItems.length;
-                                const selectionText = group.selectionType === 'single' 
-                                  ? '单选' 
-                                  : `${groupItemCount}选${group.maxSelections || 1}`;
-                                
+                                const groupItems = (record.comboItems || []).filter(item => item.groupId === group.id)
+                                const selectionText = group.selectionType === 'single' ? '单选' : `${groupItems.length}选${group.maxSelections || 1}`
                                 return (
-                                  <div key={index} style={{ marginBottom: 2 }}>
-                                    <Tag color="geekblue" style={{ fontSize: '11px', marginRight: 4 }}>
-                                      {group.name} ({selectionText})
-                                    </Tag>
-                                    {groupItems.slice(0, 3).map((item, idx) => {
-                                      const itemName = allItems.find(i => i.id === item.itemId)?.name || '未知';
-                                      return (
-                                        <Tag key={idx} style={{ fontSize: '11px', margin: '0 2px' }}>
-                                          {itemName}
-                                          {item.additionalPrice ? ` +${(item.additionalPrice / 100).toFixed(2)}` : ''}
-                                        </Tag>
-                                      );
-                                    })}
-                                    {groupItems.length > 3 && (
-                                      <Typography.Text type="secondary" style={{ fontSize: '11px' }}>
-                                        等{groupItems.length}项
-                                      </Typography.Text>
-                                    )}
+                                  <div key={index} className="flex flex-wrap items-center gap-1">
+                                    <UI.Badge variant="blue">{group.name} ({selectionText})</UI.Badge>
+                                    {groupItems.slice(0, 3).map((item, idx) => (
+                                      <UI.Badge key={idx}>{allItems.find(i => i.id === item.itemId)?.name || '未知'}{item.additionalPrice ? ` +${(item.additionalPrice / 100).toFixed(2)}` : ''}</UI.Badge>
+                                    ))}
+                                    {groupItems.length > 3 && <span className="text-xs text-slate-400">等{groupItems.length}项</span>}
                                   </div>
-                                );
+                                )
                               })}
                             </div>
-                          );
+                          )
                         }
-                        
-                        // 固定套餐：显示商品列表
                         const items = record.comboItems || []
-                        if (items.length === 0) {
-                          return <Typography.Text type="secondary">暂无商品</Typography.Text>
-                        }
+                        if (items.length === 0) return <span className="text-slate-400">暂无商品</span>
                         return (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                            {items.map((comboItem, index) => {
-                              const itemName = allItems.find(i => i.id === comboItem.itemId)?.name || comboItem.item?.name || '未知商品'
-                              const quantity = comboItem.quantity || 1
-                              return (
-                                <Tag key={index} color="blue" style={{ margin: 0, fontSize: '11px' }}>
-                                  {itemName} ×{quantity}
-                                </Tag>
-                              )
-                            })}
+                          <div className="flex flex-wrap gap-1">
+                            {items.map((comboItem, index) => (
+                              <UI.Badge key={index} variant="blue">{allItems.find(i => i.id === comboItem.itemId)?.name || comboItem.item?.name || '未知商品'} ×{comboItem.quantity || 1}</UI.Badge>
+                            ))}
                           </div>
                         )
-                      }
+                      },
+                    },
+                    { key: 'category', title: '分类', width: 100, render: (r: Combo) => (r as any).category?.name || '-' },
+                    { key: 'basePrice', title: '原价', width: 100, render: (r: Combo) => <span className="text-slate-700">{formatPrice(r.basePrice)}</span> },
+                    {
+                      key: 'discount', title: '折扣', width: 100,
+                      render: (r: Combo) => {
+                        const discount = Number(r.discount) || 0
+                        if (discount === 0) return <span className="text-slate-400">无</span>
+                        return <span className="text-red-600">{r.discountType === 'percentage' ? `-${discount}%` : `-${formatPrice(discount)}`}</span>
+                      },
                     },
                     {
-                      title: '分类',
-                      dataIndex: 'category',
-                      key: 'category',
-                      width: 100,
-                      render: (category: Category) => category?.name || '-'
+                      key: 'finalPrice', title: '售价', width: 100,
+                      render: (r: Combo) => {
+                        const basePrice = Number(r.basePrice) || 0
+                        const discount = Number(r.discount) || 0
+                        const discountAmount = r.discountType === 'percentage' ? basePrice * (discount / 100) : discount
+                        return <span className="font-semibold text-emerald-600">{formatPrice(Math.max(0, basePrice - discountAmount))}</span>
+                      },
                     },
+                    { key: 'isActive', title: t('pages.menuCenter.status'), render: (r: Combo) => <UI.Badge variant={r.isActive ? 'green' : 'red'}>{r.isActive ? t('pages.menuCenter.activated') : t('pages.menuCenter.deactivated')}</UI.Badge> },
                     {
-                      title: '原价',
-                      dataIndex: 'basePrice',
-                      key: 'basePrice',
-                      width: 100,
-                      render: (price: any) => {
-                        return (
-                          <Typography.Text style={{ fontSize: '14px' }}>
-                            {formatPrice(price)}
-                          </Typography.Text>
-                        )
-                      }
+                      key: 'actions', title: t('pages.menuCenter.action'),
+                      render: (record: Combo) => (
+                        <div className="flex items-center gap-1">
+                          <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditCombo(record)}>{t('pages.menuCenter.edit')}</UI.Btn>
+                          <button title={t('pages.menuCenter.delete')} onClick={() => setComboDeleteTarget(record)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      ),
                     },
-                    {
-                      title: '折扣',
-                      key: 'discount',
-                      width: 100,
-                      render: (_, record: Combo) => {
-                        const discount = Number(record.discount) || 0
-                        if (discount === 0) return <Typography.Text type="secondary">无</Typography.Text>
-                        return (
-                          <Typography.Text type="danger">
-                            {record.discountType === 'percentage'
-                              ? `-${discount}%`
-                              : `-${formatPrice(discount)}`}
-                          </Typography.Text>
-                        )
-                      }
-                    },
-                    {
-                      title: '售价',
-                      key: 'finalPrice',
-                      width: 100,
-                      render: (_, record: Combo) => {
-                        const basePrice = Number(record.basePrice) || 0
-                        const discount = Number(record.discount) || 0
-                        let discountAmount = 0
-
-                        if (record.discountType === 'percentage') {
-                          discountAmount = basePrice * (discount / 100)
-                        } else {
-                          discountAmount = discount
-                        }
-
-                        const finalPrice = Math.max(0, basePrice - discountAmount)
-
-                        return (
-                          <Typography.Text strong style={{ color: '#52c41a', fontSize: '15px' }}>
-                            {formatPrice(finalPrice)}
-                          </Typography.Text>
-                        )
-                      }
-                    },
-                    {
-                      title: t('pages.menuCenter.status'),
-                      dataIndex: 'isActive',
-                      key: 'isActive',
-                      render: (isActive: boolean) => (
-                        <Tag color={isActive ? 'green' : 'red'}>
-                          {isActive ? t('pages.menuCenter.activated') : t('pages.menuCenter.deactivated')}
-                        </Tag>
-                      )
-                    },
-                    {
-                      title: t('pages.menuCenter.action'),
-                      key: 'actions',
-                      render: (_, record: Combo) => (
-                        <Space>
-                          <Button
-                            type="link"
-                            size="small"
-                            icon={<EditOutlined />}
-                            onClick={() => handleEditCombo(record)}
-                          >
-                            {t('pages.menuCenter.edit')}
-                          </Button>
-                          <Popconfirm
-                            title={t('pages.menuCenter.deleteComboConfirm')}
-                            onConfirm={() => handleDeleteCombo(record.id)}
-                            okText={t('pages.menuCenter.confirm')}
-                            cancelText={t('pages.menuCenter.cancel')}
-                          >
-                            <Button
-                              type="link"
-                              size="small"
-                              danger
-                              icon={<DeleteOutlined />}
-                            >
-                              {t('pages.menuCenter.delete')}
-                            </Button>
-                          </Popconfirm>
-                        </Space>
-                      )
-                    }
                   ]}
                 />
               </Card>
@@ -3033,6 +2930,33 @@ const MenuCenter: React.FC = () => {
           onClose={() => setChannelModal(null)}
         />
       )}
+
+      {/* 删除确认（套餐/商品/分类，供列表与树复用） */}
+      <UI.ConfirmDialog
+        open={!!comboDeleteTarget}
+        onOpenChange={(v) => !v && setComboDeleteTarget(null)}
+        title={t('pages.menuCenter.deleteComboConfirm')}
+        confirmText={t('pages.menuCenter.delete')}
+        danger
+        onConfirm={() => { if (comboDeleteTarget) { handleDeleteCombo(comboDeleteTarget.id); setComboDeleteTarget(null) } }}
+      />
+      <UI.ConfirmDialog
+        open={!!itemDeleteTarget}
+        onOpenChange={(v) => !v && setItemDeleteTarget(null)}
+        title={t('pages.menuCenter.deleteItemConfirm')}
+        confirmText={t('pages.menuCenter.delete')}
+        danger
+        onConfirm={() => { if (itemDeleteTarget) { handleDeleteItem(itemDeleteTarget.id); setItemDeleteTarget(null) } }}
+      />
+      <UI.ConfirmDialog
+        open={!!categoryDeleteTarget}
+        onOpenChange={(v) => !v && setCategoryDeleteTarget(null)}
+        title={t('pages.menuCenter.deleteCategoryConfirm')}
+        description={categoryDeleteTarget ? t('pages.menuCenter.deleteCategoryContent', { name: categoryDeleteTarget.name }) : undefined}
+        confirmText={t('pages.menuCenter.delete')}
+        danger
+        onConfirm={() => { if (categoryDeleteTarget) { handleDeleteCategory(categoryDeleteTarget.id); setCategoryDeleteTarget(null) } }}
+      />
     </Space>
   )
 }

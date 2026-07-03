@@ -102,6 +102,28 @@ export function Switch({ checked, onCheckedChange, disabled }: {
   )
 }
 
+// ─── 复选框（原生 + slate 强调色） ───────────────────────────────────────────────
+
+export function Checkbox({ checked, onCheckedChange, label, disabled }: {
+  checked: boolean
+  onCheckedChange: (v: boolean) => void
+  label?: React.ReactNode
+  disabled?: boolean
+}) {
+  return (
+    <label className={clsx('inline-flex items-center gap-2 text-sm text-slate-700 select-none', disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer')}>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={e => onCheckedChange(e.target.checked)}
+        className="w-4 h-4 accent-slate-900 cursor-pointer"
+      />
+      {label}
+    </label>
+  )
+}
+
 // ─── 提示框 ─────────────────────────────────────────────────────────────────────
 
 export function AlertBox({ type = 'info', title, description, action }: {

@@ -1,16 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Card, Row, Col, Statistic, List, Progress, Tag, Spin, message } from 'antd'
-import {
-  CalendarOutlined,
-  CheckCircleOutlined,
-  DashboardOutlined,
-  AppstoreOutlined,
-  ClockCircleOutlined,
-} from '@ant-design/icons'
+import { Calendar, CheckCircle2, Gauge, LayoutGrid, Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { bookingsApi, resourcesApi } from '@/services/booking'
 import type { Booking, BookableResource } from '@/types/booking'
-import { BOOKING_STATUS_COLORS } from '@/types/booking'
+import { SectionCard, StatCard, ProgressBar, Spinner, toast } from '@/components/ui-kit'
+import BookingPageLayout from './BookingPageLayout'
+import { StatusBadge } from './bookingUi'
 
 export default function BookingDashboard() {
   const { t } = useTranslation()
@@ -25,14 +20,11 @@ export default function BookingDashboard() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [b, r] = await Promise.all([
-        bookingsApi.list(),
-        resourcesApi.list(),
-      ])
+      const [b, r] = await Promise.all([bookingsApi.list(), resourcesApi.list()])
       setBookings(b)
       setResources(r)
     } catch (err) {
-      message.error(t('common.error'))
+      toast.error(t('common.error'))
     } finally {
       setLoading(false)
     }
@@ -46,132 +38,82 @@ export default function BookingDashboard() {
     ? Math.round((activeResources.length / resources.length) * 100)
     : 0
 
+  const utilItems = [
+    { label: t('pages.booking.dashboard.tables'), value: 85 },
+    { label: t('pages.booking.dashboard.rooms'), value: 60 },
+    { label: t('pages.booking.dashboard.chairs'), value: 92 },
+    { label: t('pages.booking.dashboard.staff'), value: 70 },
+    { label: t('pages.booking.dashboard.timeSlots'), value: 45 },
+  ]
+
   return (
-    <Spin spinning={loading}>
-      <div>
-        <h2 style={{ marginBottom: 24, fontSize: 20, fontWeight: 600 }}>
-          {t('pages.booking.dashboard.title')}
-        </h2>
+    <BookingPageLayout>
+      {loading ? (
+        <div className="py-16 text-center"><Spinner className="w-8 h-8 mx-auto text-slate-400" /></div>
+      ) : (
+        <div>
+          <h2 className="mb-6 text-xl font-semibold text-slate-800">{t('pages.booking.dashboard.title')}</h2>
 
-        {/* Stats Cards */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-          <Col xs={24} sm={12} xl={6}>
-            <Card>
-              <Statistic
-                title={t('pages.booking.dashboard.todayBookings')}
-                value={todayBookings.length}
-                prefix={<CalendarOutlined />}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} xl={6}>
-            <Card>
-              <Statistic
-                title={t('pages.booking.dashboard.confirmed')}
-                value={confirmedCount}
-                suffix={`/ ${todayBookings.length}`}
-                prefix={<CheckCircleOutlined />}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} xl={6}>
-            <Card>
-              <Statistic
-                title={t('pages.booking.dashboard.utilization')}
-                value={utilizationRate}
-                suffix="%"
-                prefix={<DashboardOutlined />}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} xl={6}>
-            <Card>
-              <Statistic
-                title={t('pages.booking.dashboard.activeResources')}
-                value={activeResources.length}
-                suffix={`/ ${resources.length}`}
-                prefix={<AppstoreOutlined />}
-              />
-            </Card>
-          </Col>
-        </Row>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            <StatCard title={t('pages.booking.dashboard.todayBookings')} value={todayBookings.length} icon={<Calendar className="w-5 h-5" />} />
+            <StatCard title={t('pages.booking.dashboard.confirmed')} value={`${confirmedCount} / ${todayBookings.length}`} icon={<CheckCircle2 className="w-5 h-5" />} />
+            <StatCard title={t('pages.booking.dashboard.utilization')} value={`${utilizationRate}%`} icon={<Gauge className="w-5 h-5" />} />
+            <StatCard title={t('pages.booking.dashboard.activeResources')} value={`${activeResources.length} / ${resources.length}`} icon={<LayoutGrid className="w-5 h-5" />} />
+          </div>
 
-        <Row gutter={[16, 16]}>
-          {/* Today's Schedule */}
-          <Col xs={24} xl={16}>
-            <Card
-              title={t('pages.booking.dashboard.todaySchedule')}
-              extra={
-                <Tag>{t('pages.booking.dashboard.bookingsCount', { count: todayBookings.length })}</Tag>
-              }
-            >
-              <List
-                dataSource={todayBookings.slice(0, 8)}
-                locale={{ emptyText: t('pages.booking.bookings.noBookings') }}
-                renderItem={(booking) => (
-                  <List.Item>
-                    <List.Item.Meta
-                      avatar={
-                        <div style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 8,
-                          background: '#f5f5f5',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                          <ClockCircleOutlined style={{ fontSize: 16, color: '#999' }} />
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            {/* Today's Schedule */}
+            <div className="xl:col-span-2">
+              <SectionCard
+                title={t('pages.booking.dashboard.todaySchedule')}
+                action={<span className="text-xs px-2 py-0.5 rounded ring-1 bg-slate-100 text-slate-600 ring-slate-200">{t('pages.booking.dashboard.bookingsCount', { count: todayBookings.length })}</span>}
+              >
+                {todayBookings.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-6 text-center">{t('pages.booking.bookings.noBookings')}</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {todayBookings.slice(0, 8).map((booking) => (
+                      <li key={booking.id} className="flex items-center gap-3 py-3">
+                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                          <Clock className="w-4 h-4 text-slate-400" />
                         </div>
-                      }
-                      title={
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span>{booking.customerName}</span>
-                          <Tag color={BOOKING_STATUS_COLORS[booking.status]}>
-                            {t(`pages.booking.status.${booking.status}`)}
-                          </Tag>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-800 font-medium">{booking.customerName}</span>
+                            <StatusBadge status={booking.status}>{t(`pages.booking.status.${booking.status}`)}</StatusBadge>
+                          </div>
+                          <div className="text-sm text-slate-500 truncate">
+                            {`${booking.primaryResource?.name ?? ''} · ${booking.startTime}–${booking.endTime}`}
+                          </div>
                         </div>
-                      }
-                      description={`${booking.resourceName} · ${booking.startTime}–${booking.endTime}`}
-                    />
-                    <span style={{ fontFamily: 'monospace', color: '#999', fontSize: 13 }}>
-                      {booking.startTime}
-                    </span>
-                  </List.Item>
+                        <span className="font-mono text-slate-400 text-[13px]">{booking.startTime}</span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
-              />
-            </Card>
-          </Col>
+              </SectionCard>
+            </div>
 
-          {/* Resource Utilization */}
-          <Col xs={24} xl={8}>
-            <Card title={t('pages.booking.dashboard.resourceUtilization')}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {[
-                  { label: t('pages.booking.dashboard.tables'), value: 85 },
-                  { label: t('pages.booking.dashboard.rooms'), value: 60 },
-                  { label: t('pages.booking.dashboard.chairs'), value: 92 },
-                  { label: t('pages.booking.dashboard.staff'), value: 70 },
-                  { label: t('pages.booking.dashboard.timeSlots'), value: 45 },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 13 }}>{item.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 500 }}>{item.value}%</span>
+            {/* Resource Utilization */}
+            <div>
+              <SectionCard title={t('pages.booking.dashboard.resourceUtilization')}>
+                <div className="flex flex-col gap-4">
+                  {utilItems.map((item) => (
+                    <div key={item.label}>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-[13px] text-slate-600">{item.label}</span>
+                        <span className="text-[13px] font-medium text-slate-700">{item.value}%</span>
+                      </div>
+                      <ProgressBar percent={item.value} />
                     </div>
-                    <Progress
-                      percent={item.value}
-                      showInfo={false}
-                      strokeColor="#1677ff"
-                      size="small"
-                    />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </Col>
-        </Row>
-      </div>
-    </Spin>
+                  ))}
+                </div>
+              </SectionCard>
+            </div>
+          </div>
+        </div>
+      )}
+    </BookingPageLayout>
   )
 }

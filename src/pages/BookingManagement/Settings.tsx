@@ -1,253 +1,151 @@
 import { useEffect, useState } from 'react'
-import {
-  Card, Form, TimePicker, InputNumber, Switch, Button, Space, message, Spin, Typography,
-} from 'antd'
-import {
-  ClockCircleOutlined, CalendarOutlined, SettingOutlined,
-  SaveOutlined, UndoOutlined, DollarOutlined,
-} from '@ant-design/icons'
+import { Calendar, Save, Undo2, DollarSign } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import dayjs from 'dayjs'
 import { settingsApi } from '@/services/booking'
 import type { BookingSettings } from '@/types/booking'
+import { SectionCard, Btn, Switch, NumberInput, Spinner, toast } from '@/components/ui-kit'
+import BookingPageLayout from './BookingPageLayout'
 
-const { Text } = Typography
+interface FormState {
+  advanceBookingDays: number
+  minAdvanceHours: number
+  requireCustomerPhone: boolean
+  requireCustomerEmail: boolean
+  depositEnabled: boolean
+  depositAmount: number
+}
+
+const EMPTY: FormState = {
+  advanceBookingDays: 30, minAdvanceHours: 0,
+  requireCustomerPhone: false, requireCustomerEmail: false,
+  depositEnabled: false, depositAmount: 0,
+}
 
 export default function BookingSettingsPage() {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState<BookingSettings | null>(null)
-  const [form] = Form.useForm()
+  const [form, setForm] = useState<FormState>(EMPTY)
 
   useEffect(() => {
     loadSettings()
   }, [])
+
+  const toState = (data: BookingSettings): FormState => ({
+    advanceBookingDays: data?.advanceBookingDays ?? 30,
+    minAdvanceHours: data?.minAdvanceHours ?? 0,
+    requireCustomerPhone: data?.requireCustomerPhone ?? false,
+    requireCustomerEmail: data?.requireCustomerEmail ?? false,
+    depositEnabled: data?.depositEnabled ?? false,
+    depositAmount: data?.depositAmount != null ? data.depositAmount / 100 : 0,
+  })
 
   const loadSettings = async () => {
     setLoading(true)
     try {
       const data = await settingsApi.get()
       setSettings(data)
-      form.setFieldsValue({
-        openTime: data.openTime ? dayjs(data.openTime, 'HH:mm') : null,
-        closeTime: data.closeTime ? dayjs(data.closeTime, 'HH:mm') : null,
-        slotDurationMinutes: data.slotDurationMinutes,
-        advanceBookingDays: data.advanceBookingDays,
-        maxPartySize: data.maxPartySize,
-        requireStaffSelection: data.requireStaffSelection,
-        allowWalkIn: data.allowWalkIn,
-        autoConfirm: data.autoConfirm,
-        allowAutoAssignment: data.allowAutoAssignment,
-        depositRequired: data.depositRequired,
-        depositAmount: data.depositAmount,
-      })
+      if (data) setForm(toState(data))
     } catch {
-      message.error(t('common.error'))
+      toast.error(t('common.error'))
     } finally {
       setLoading(false)
     }
   }
 
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm(prev => ({ ...prev, [k]: v }))
+
   const handleSave = async () => {
     try {
-      const values = await form.validateFields()
       setSaving(true)
       const payload: Partial<BookingSettings> = {
-        openTime: values.openTime?.format('HH:mm'),
-        closeTime: values.closeTime?.format('HH:mm'),
-        slotDurationMinutes: values.slotDurationMinutes,
-        advanceBookingDays: values.advanceBookingDays,
-        maxPartySize: values.maxPartySize,
-        requireStaffSelection: values.requireStaffSelection,
-        allowWalkIn: values.allowWalkIn,
-        autoConfirm: values.autoConfirm,
-        allowAutoAssignment: values.allowAutoAssignment,
-        depositRequired: values.depositRequired,
-        depositAmount: values.depositAmount,
+        advanceBookingDays: form.advanceBookingDays,
+        minAdvanceHours: form.minAdvanceHours,
+        requireCustomerPhone: form.requireCustomerPhone,
+        requireCustomerEmail: form.requireCustomerEmail,
+        depositEnabled: form.depositEnabled,
+        depositAmount: form.depositAmount != null ? Math.round(form.depositAmount * 100) : undefined,
       }
       await settingsApi.update(payload)
-      message.success(t('common.saveSuccess'))
+      toast.success(t('common.saveSuccess'))
     } catch {
-      message.error(t('common.saveFailed'))
+      toast.error(t('common.saveFailed'))
     } finally {
       setSaving(false)
     }
   }
 
   const handleReset = () => {
-    if (settings) {
-      form.setFieldsValue({
-        openTime: settings.openTime ? dayjs(settings.openTime, 'HH:mm') : null,
-        closeTime: settings.closeTime ? dayjs(settings.closeTime, 'HH:mm') : null,
-        slotDurationMinutes: settings.slotDurationMinutes,
-        advanceBookingDays: settings.advanceBookingDays,
-        maxPartySize: settings.maxPartySize,
-        requireStaffSelection: settings.requireStaffSelection,
-        allowWalkIn: settings.allowWalkIn,
-        autoConfirm: settings.autoConfirm,
-        allowAutoAssignment: settings.allowAutoAssignment,
-        depositRequired: settings.depositRequired,
-        depositAmount: settings.depositAmount,
-      })
-    }
+    if (settings) setForm(toState(settings))
   }
 
   return (
-    <Spin spinning={loading}>
-      <div style={{ maxWidth: 640 }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
-              {t('pages.booking.settings.title')}
-            </h2>
-            {settings && (
-              <Text type="secondary" style={{ fontSize: 13 }}>
-                {t('pages.booking.settings.description', { name: settings.businessName })}
-              </Text>
-            )}
+    <BookingPageLayout>
+      {loading ? (
+        <div className="py-16 text-center"><Spinner className="w-8 h-8 mx-auto text-slate-400" /></div>
+      ) : (
+        <div className="max-w-xl">
+          {/* 页头 */}
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="m-0 text-xl font-semibold text-slate-800">{t('pages.booking.settings.title')}</h2>
+              {settings && <p className="text-[13px] text-slate-400 mt-0.5">各资源类型的专属设置在对应管理页面中配置</p>}
+            </div>
+            <div className="flex gap-2">
+              <Btn variant="secondary" icon={<Undo2 className="w-3.5 h-3.5" />} onClick={handleReset}>{t('common.reset')}</Btn>
+              <Btn variant="primary" icon={<Save className="w-3.5 h-3.5" />} onClick={handleSave} loading={saving}>{t('common.save')}</Btn>
+            </div>
           </div>
-          <Space>
-            <Button icon={<UndoOutlined />} onClick={handleReset}>
-              {t('common.reset')}
-            </Button>
-            <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
-              {t('common.save')}
-            </Button>
-          </Space>
+
+          {/* 预约规则 */}
+          <div className="mb-4">
+            <SectionCard title={<span className="inline-flex items-center gap-2"><Calendar className="w-4 h-4" />{t('pages.booking.settings.bookingRules')}</span>}>
+              <div className="flex gap-4 mb-2">
+                <div className="flex-1">
+                  <div className="text-sm text-slate-600 mb-1.5">最多提前预约（天）</div>
+                  <NumberInput className="w-full" value={form.advanceBookingDays} onChange={(v) => set('advanceBookingDays', v)} min={1} max={90} />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm text-slate-600 mb-1.5">最少提前时间（小时）</div>
+                  <NumberInput className="w-full" value={form.minAdvanceHours} onChange={(v) => set('minAdvanceHours', v)} min={0} max={72} />
+                </div>
+              </div>
+              <SettingToggle label="要求客户手机号" description="创建预约时必须填写手机号"
+                checked={form.requireCustomerPhone} onChange={(v) => set('requireCustomerPhone', v)} />
+              <SettingToggle label="要求客户邮箱" description="创建预约时必须填写邮箱"
+                checked={form.requireCustomerEmail} onChange={(v) => set('requireCustomerEmail', v)} />
+            </SectionCard>
+          </div>
+
+          {/* 押金配置 */}
+          <SectionCard title={<span className="inline-flex items-center gap-2"><DollarSign className="w-4 h-4" />{t('pages.booking.settings.depositConfig')}</span>}>
+            <SettingToggle label={t('pages.booking.settings.depositEnabled')} description={t('pages.booking.settings.depositEnabledDesc')}
+              checked={form.depositEnabled} onChange={(v) => set('depositEnabled', v)} />
+            <div className="pt-3">
+              <div className="text-sm text-slate-600 mb-1.5">{t('pages.booking.settings.depositAmount')}</div>
+              <NumberInput value={form.depositAmount} onChange={(v) => set('depositAmount', v)} min={0} suffix="元" />
+            </div>
+          </SectionCard>
         </div>
-
-        <Form form={form} layout="vertical">
-          {/* Business Hours */}
-          <Card
-            size="small"
-            title={
-              <Space>
-                <ClockCircleOutlined />
-                {t('pages.booking.settings.businessHours')}
-              </Space>
-            }
-            style={{ marginBottom: 16 }}
-          >
-            <div style={{ display: 'flex', gap: 16 }}>
-              <Form.Item label={t('pages.booking.settings.openingTime')} name="openTime" style={{ flex: 1 }}>
-                <TimePicker format="HH:mm" style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item label={t('pages.booking.settings.closingTime')} name="closeTime" style={{ flex: 1 }}>
-                <TimePicker format="HH:mm" style={{ width: '100%' }} />
-              </Form.Item>
-            </div>
-            <Form.Item label={t('pages.booking.settings.slotDuration')} name="slotDurationMinutes">
-              <InputNumber min={5} max={240} step={5} style={{ width: 200 }} />
-            </Form.Item>
-          </Card>
-
-          {/* Booking Rules */}
-          <Card
-            size="small"
-            title={
-              <Space>
-                <CalendarOutlined />
-                {t('pages.booking.settings.bookingRules')}
-              </Space>
-            }
-            style={{ marginBottom: 16 }}
-          >
-            <div style={{ display: 'flex', gap: 16 }}>
-              <Form.Item label={t('pages.booking.settings.advanceBookingDays')} name="advanceBookingDays" style={{ flex: 1 }}>
-                <InputNumber min={1} max={90} style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item label={t('pages.booking.settings.maxPartySize')} name="maxPartySize" style={{ flex: 1 }}>
-                <InputNumber min={1} max={100} style={{ width: '100%' }} />
-              </Form.Item>
-            </div>
-          </Card>
-
-          {/* Features */}
-          <Card
-            size="small"
-            title={
-              <Space>
-                <SettingOutlined />
-                {t('pages.booking.settings.features')}
-              </Space>
-            }
-            style={{ marginBottom: 16 }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              <SettingToggle
-                name="requireStaffSelection"
-                label={t('pages.booking.settings.requireStaff')}
-                description={t('pages.booking.settings.requireStaffDesc')}
-              />
-              <SettingToggle
-                name="allowWalkIn"
-                label={t('pages.booking.settings.allowWalkIn')}
-                description={t('pages.booking.settings.allowWalkInDesc')}
-              />
-              <SettingToggle
-                name="allowAutoAssignment"
-                label={t('pages.booking.settings.autoAssign')}
-                description={t('pages.booking.settings.autoAssignDesc')}
-              />
-              <SettingToggle
-                name="autoConfirm"
-                label={t('pages.booking.settings.autoConfirm')}
-                description={t('pages.booking.settings.autoConfirmDesc')}
-              />
-            </div>
-          </Card>
-
-          {/* Deposit Configuration */}
-          <Card
-            size="small"
-            title={
-              <Space>
-                <DollarOutlined />
-                {t('pages.booking.settings.depositConfig')}
-              </Space>
-            }
-          >
-            <SettingToggle
-              name="depositRequired"
-              label={t('pages.booking.settings.depositRequired')}
-              description={t('pages.booking.settings.depositRequiredDesc')}
-            />
-            <Form.Item label={t('pages.booking.settings.depositAmount')} name="depositAmount">
-              <InputNumber min={0} step={1} prefix="$" style={{ width: 200 }} />
-            </Form.Item>
-          </Card>
-        </Form>
-      </div>
-    </Spin>
+      )}
+    </BookingPageLayout>
   )
 }
 
-function SettingToggle({
-  name,
-  label,
-  description,
-}: {
-  name: string
+function SettingToggle({ label, description, checked, onChange }: {
   label: string
   description: string
+  checked: boolean
+  onChange: (v: boolean) => void
 }) {
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '12px 0',
-      borderBottom: '1px solid #f0f0f0',
-    }}>
+    <div className="flex justify-between items-center py-3 border-b border-slate-100 last:border-b-0">
       <div>
-        <div style={{ fontSize: 14, fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{description}</div>
+        <div className="text-sm font-medium text-slate-700">{label}</div>
+        <div className="text-xs text-slate-400 mt-0.5">{description}</div>
       </div>
-      <Form.Item name={name} valuePropName="checked" noStyle>
-        <Switch />
-      </Form.Item>
+      <Switch checked={checked} onCheckedChange={onChange} />
     </div>
   )
 }

@@ -1,15 +1,17 @@
-// ─── 设置类页面共享 UI 组件（slate 手写风格，与 OnlineOrderConfig 一致） ─────────
+// ─── 全站共享设计组件 kit（slate 手写风格，逐步替换 antd 的唯一来源） ─────────────
 //
-// 统一订单与配送等设置页面的视觉语言：白底卡片 + slate 配色 + rounded-xl。
-// 底层仅依赖 Radix(Switch/Dialog)+ Tailwind,不引入 antd。
+// 统一视觉语言：白底卡片 + slate 配色 + rounded-xl。
+// 底层仅依赖 Radix(Switch/Dialog/AlertDialog)+ Tailwind,不引入 antd。
 
 import React from 'react'
+import { createPortal } from 'react-dom'
 import * as RadixSwitch from '@radix-ui/react-switch'
 import * as Dialog from '@radix-ui/react-dialog'
 import * as AlertDialog from '@radix-ui/react-alert-dialog'
 import clsx from 'clsx'
 import {
   Loader2, Info, AlertTriangle, CheckCircle2, X, ChevronRight,
+  Image as ImageIcon, Trash2,
 } from 'lucide-react'
 
 // ─── 徽章 ───────────────────────────────────────────────────────────────────────
@@ -123,6 +125,113 @@ export function AlertBox({ type = 'info', title, description, action }: {
         {description && <div className={clsx('text-sm mt-0.5', styles.sub)}>{description}</div>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
+    </div>
+  )
+}
+
+// ─── 全局 Toast（单例，替代 antd message；无需 Provider，只需挂一次 ToastHost） ──
+
+type ToastType = 'success' | 'error' | 'warning' | 'info'
+interface ToastItem { id: number; type: ToastType; msg: React.ReactNode }
+
+let toastList: ToastItem[] = []
+let toastListeners: Array<(l: ToastItem[]) => void> = []
+let toastSeq = 0
+const emitToasts = () => toastListeners.forEach(l => l([...toastList]))
+function pushToast(type: ToastType, msg: React.ReactNode) {
+  const id = ++toastSeq
+  toastList = [...toastList, { id, type, msg }]
+  emitToasts()
+  setTimeout(() => { toastList = toastList.filter(t => t.id !== id); emitToasts() }, type === 'error' ? 5000 : 3000)
+}
+
+/** 全局提示：toast.success('已保存') 等，任意位置可调用 */
+export const toast = {
+  success: (m: React.ReactNode) => pushToast('success', m),
+  error: (m: React.ReactNode) => pushToast('error', m),
+  warning: (m: React.ReactNode) => pushToast('warning', m),
+  info: (m: React.ReactNode) => pushToast('info', m),
+}
+
+/** 挂在应用根部一次即可（如 BaseLayout） */
+export function ToastHost() {
+  const [list, setList] = React.useState<ToastItem[]>([])
+  React.useEffect(() => {
+    toastListeners.push(setList)
+    return () => { toastListeners = toastListeners.filter(l => l !== setList) }
+  }, [])
+
+  const styles: Record<ToastType, { wrap: string; icon: React.ReactNode }> = {
+    success: { wrap: 'border-emerald-200 text-emerald-800', icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" /> },
+    error:   { wrap: 'border-red-200 text-red-800',         icon: <AlertTriangle className="w-4 h-4 text-red-500" /> },
+    warning: { wrap: 'border-amber-200 text-amber-800',     icon: <AlertTriangle className="w-4 h-4 text-amber-500" /> },
+    info:    { wrap: 'border-blue-200 text-blue-800',       icon: <Info className="w-4 h-4 text-blue-500" /> },
+  }
+
+  return createPortal(
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none">
+      {list.map(t => (
+        <div key={t.id} className={clsx('pointer-events-auto flex items-center gap-2 rounded-lg border bg-white px-3.5 py-2 text-sm font-medium shadow-lg', styles[t.type].wrap)}>
+          {styles[t.type].icon}
+          <span>{t.msg}</span>
+        </div>
+      ))}
+    </div>,
+    document.body,
+  )
+}
+
+// ─── 图片上传（单图，点击选择 + 预览 + 删除；替代 antd Upload/Image） ─────────────
+
+export function ImageUpload({ url, loading, onPick, onRemove, accept = '.jpg,.jpeg,.png,.webp', maxMB = 5, size = 120, hint }: {
+  url?: string
+  loading?: boolean
+  onPick: (file: File) => void
+  onRemove: () => void
+  accept?: string
+  maxMB?: number
+  size?: number
+  hint?: string
+}) {
+  const inputRef = React.useRef<HTMLInputElement>(null)
+  const validate = (file: File): boolean => {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { toast.error('只支持 JPG、PNG、WebP 格式的图片'); return false }
+    if (file.size / 1024 / 1024 >= maxMB) { toast.error(`图片大小不能超过 ${maxMB}MB`); return false }
+    return true
+  }
+  return (
+    <div>
+      {url ? (
+        <div className="relative rounded-md overflow-hidden border border-slate-200" style={{ width: size, height: size }}>
+          <img src={url} alt="" className="object-cover" style={{ width: size, height: size }} />
+          <button
+            onClick={onRemove}
+            disabled={loading}
+            className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-md bg-white/80 text-red-500 hover:bg-white transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={loading}
+          className="flex flex-col items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-slate-400 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
+          style={{ width: size, height: size }}
+        >
+          {loading
+            ? <Loader2 className="w-6 h-6 animate-spin" />
+            : <><ImageIcon className="w-6 h-6 mb-1.5" /><span className="text-xs text-slate-500">上传图片</span></>}
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f && validate(f)) onPick(f); e.target.value = '' }}
+      />
+      {hint && <p className="text-xs text-slate-400 mt-2">{hint}</p>}
     </div>
   )
 }

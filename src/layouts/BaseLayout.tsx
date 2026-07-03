@@ -16,6 +16,7 @@ import {
   Smartphone, Trash2, Sparkles, PanelLeftClose, PanelLeftOpen,
   Check, ChevronsUpDown,
 } from 'lucide-react'
+import { ToastHost } from '../components/ui-kit'
 
 // ─── 侧边栏导航项类型 ──────────────────────────────────────────────────────────
 
@@ -347,6 +348,8 @@ const BaseLayout: React.FC = () => {
 
   return (
     <Tooltip.Provider>
+      {/* 全局 Toast 宿主（kit toast() 的渲染出口，全站挂一次） */}
+      <ToastHost />
       <div className="flex min-h-screen bg-slate-50">
 
         {/* ── 侧边栏 ──────────────────────────────────────────── */}

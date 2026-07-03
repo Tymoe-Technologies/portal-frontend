@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Card, Button, Spin, Row, Col, Form, Modal, Space, DatePicker, Tag, Radio } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { LoadingOutlined, PoweroffOutlined } from '@ant-design/icons'
+import { Power } from 'lucide-react'
 import { uberStoreStatusService, StoreInfo, StoreStatus } from '@/services/uberStoreStatus'
 import dayjs from 'dayjs'
+import { SectionCard, Btn, Spinner, Modal, AlertBox } from '@/components/ui-kit'
 
 interface StoreManagementProps {
   merchantId: string
@@ -18,47 +18,60 @@ interface DetailedStoreStatus {
   offlineReasonMetadata?: string
 }
 
+// 单选组（替代 antd Radio.Group）
+function RadioGroup({ value, onChange, options }: {
+  value: number | null
+  onChange: (v: number) => void
+  options: { label: string; value: number }[]
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {options.map(opt => (
+        <label key={opt.value} className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+          <input type="radio" checked={value === opt.value} onChange={() => onChange(opt.value)} className="w-4 h-4 accent-slate-900" />
+          {opt.label}
+        </label>
+      ))}
+    </div>
+  )
+}
+
 /**
  * 店铺管理组件
  * 展示店铺基本信息和管理店铺状态
  */
-const StoreManagement: React.FC<StoreManagementProps> = ({ merchantId, storeId, storeName }) => {
-  const { t } = useTranslation()
-  const [busyModeForm] = Form.useForm()
-  const [pauseOrdersForm] = Form.useForm()
+const StoreManagement: React.FC<StoreManagementProps> = ({ merchantId, storeId }) => {
+  useTranslation()
 
-  // 店铺状态
   const [loading, setLoading] = useState(false)
-  const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null)
-  const [storeStatus, setStoreStatus] = useState<StoreStatus | null>(null)
+  const [, setStoreInfo] = useState<StoreInfo | null>(null)
+  const [, setStoreStatus] = useState<StoreStatus | null>(null)
   const [detailedStatus, setDetailedStatus] = useState<DetailedStoreStatus | null>(null)
 
   // 暂停接单
   const [showPauseModal, setShowPauseModal] = useState(false)
   const [pauseLoading, setPauseLoading] = useState(false)
+  const [pauseMinutes, setPauseMinutes] = useState<number | null>(null)
 
   // 忙碌模式
   const [showBusyModeModal, setShowBusyModeModal] = useState(false)
   const [busyModeLoading, setBusyModeLoading] = useState(false)
+  const [busyModeDuration, setBusyModeDuration] = useState<number | null>(null)
+  const [delayDuration, setDelayDuration] = useState<number | null>(null)
 
   // 消息
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [modalError, setModalError] = useState('')
 
-  /**
-   * 加载店铺信息和状态
-   */
   useEffect(() => {
     const loadStoreData = async () => {
       try {
         setLoading(true)
         const info = await uberStoreStatusService.getStoreInfo(merchantId, storeId)
         setStoreInfo(info)
-
         const status = await uberStoreStatusService.getStoreStatus(merchantId, storeId)
         setStoreStatus(status)
-
-        // 获取详细状态
         const detailedSt = await uberStoreStatusService.getStoreStatusDetailed(merchantId, storeId)
         setDetailedStatus(detailedSt)
       } catch (error: any) {
@@ -67,38 +80,20 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ merchantId, storeId, 
         setLoading(false)
       }
     }
-
-    if (merchantId && storeId) {
-      loadStoreData()
-    }
+    if (merchantId && storeId) loadStoreData()
   }, [merchantId, storeId])
 
-  /**
-   * 暂停接单
-   */
   const handlePauseOrders = async () => {
+    if (!pauseMinutes) { setModalError('请选择暂停时间'); return }
+    setModalError('')
     try {
       setPauseLoading(true)
-      const formValues = await pauseOrdersForm.validateFields()
-
-      // 计算暂停时间：当前时间 + 选择的分钟数
-      const pauseUntil = dayjs().add(formValues.pauseMinutes, 'minute')
-
-      await uberStoreStatusService.pauseOrders(
-        merchantId,
-        storeId,
-        pauseUntil.toISOString()
-      )
-
-      setSuccessMessage(`✅ 接单已暂停 ${formValues.pauseMinutes} 分钟`)
+      const pauseUntil = dayjs().add(pauseMinutes, 'minute')
+      await uberStoreStatusService.pauseOrders(merchantId, storeId, pauseUntil.toISOString())
+      setSuccessMessage(`✅ 接单已暂停 ${pauseMinutes} 分钟`)
       setShowPauseModal(false)
-      pauseOrdersForm.resetFields()
-
-      // 重新加载状态
-      const newDetailedStatus = await uberStoreStatusService.getStoreStatusDetailed(
-        merchantId,
-        storeId
-      )
+      setPauseMinutes(null)
+      const newDetailedStatus = await uberStoreStatusService.getStoreStatusDetailed(merchantId, storeId)
       setDetailedStatus(newDetailedStatus)
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error: any) {
@@ -108,20 +103,12 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ merchantId, storeId, 
     }
   }
 
-  /**
-   * 恢复接单
-   */
   const handleResumeOrders = async () => {
     try {
       setLoading(true)
       await uberStoreStatusService.resumeOrders(merchantId, storeId)
       setSuccessMessage('✅ 接单已恢复')
-
-      // 重新加载状态
-      const newDetailedStatus = await uberStoreStatusService.getStoreStatusDetailed(
-        merchantId,
-        storeId
-      )
+      const newDetailedStatus = await uberStoreStatusService.getStoreStatusDetailed(merchantId, storeId)
       setDetailedStatus(newDetailedStatus)
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error: any) {
@@ -131,27 +118,18 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ merchantId, storeId, 
     }
   }
 
-  /**
-   * 设置忙碌模式
-   */
   const handleSetBusyMode = async () => {
+    if (!busyModeDuration) { setModalError('请选择忙碌模式持续时间'); return }
+    if (!delayDuration) { setModalError('请选择额外准备时间'); return }
+    setModalError('')
     try {
       setBusyModeLoading(true)
-      const formValues = await busyModeForm.validateFields()
-
-      // 计算忙碌模式的截止时间
-      const delayUntil = dayjs().add(formValues.busyModeDuration, 'minute')
-
-      await uberStoreStatusService.setBusyMode(
-        merchantId,
-        storeId,
-        delayUntil.toISOString(),
-        formValues.delayDuration
-      )
-
-      setSuccessMessage(`✅ 已设置 ${formValues.busyModeDuration} 分钟的高需求模式，额外准备时间 ${formValues.delayDuration} 秒`)
+      const delayUntil = dayjs().add(busyModeDuration, 'minute')
+      await uberStoreStatusService.setBusyMode(merchantId, storeId, delayUntil.toISOString(), delayDuration)
+      setSuccessMessage(`✅ 已设置 ${busyModeDuration} 分钟的高需求模式，额外准备时间 ${delayDuration} 秒`)
       setShowBusyModeModal(false)
-      busyModeForm.resetFields()
+      setBusyModeDuration(null)
+      setDelayDuration(null)
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error: any) {
       setErrorMessage(error.message || '设置忙碌模式失败')
@@ -160,9 +138,6 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ merchantId, storeId, 
     }
   }
 
-  /**
-   * 清除忙碌模式
-   */
   const handleClearBusyMode = async () => {
     try {
       setLoading(true)
@@ -177,208 +152,106 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ merchantId, storeId, 
   }
 
   if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '50px' }}>
-        <Spin
-          indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />}
-          tip="加载店铺信息..."
-        />
-      </div>
-    )
+    return <div className="text-center py-12"><Spinner className="w-10 h-10 mx-auto text-slate-400" /></div>
   }
 
-  return (
-    <div className="store-management">
-      {/* 成功消息 */}
-      {successMessage && (
-        <div style={{ marginBottom: '20px' }}>
-          <Card style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f' }}>
-            {successMessage}
-          </Card>
-        </div>
-      )}
+  const online = detailedStatus?.status === 'ONLINE'
 
-      {/* 错误消息 */}
-      {errorMessage && (
-        <div style={{ marginBottom: '20px' }}>
-          <Card style={{ backgroundColor: '#fff2f0', borderColor: '#ffccc7' }}>
-            {errorMessage}
-          </Card>
-        </div>
-      )}
+  return (
+    <div className="store-management space-y-5">
+      {successMessage && <AlertBox type="success" description={successMessage} />}
+      {errorMessage && <AlertBox type="error" description={errorMessage} />}
 
       {/* 店铺状态管理 */}
-      <Card
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <PoweroffOutlined style={{ color: '#1890ff', fontSize: '20px' }} />
-            <span>店铺状态管理</span>
+      <SectionCard title={<span className="inline-flex items-center gap-2.5"><Power className="w-5 h-5 text-blue-500" />店铺状态管理</span>}>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <label className="text-slate-600">当前状态</label>
+            <span className={`inline-flex items-center text-xs px-1.5 py-0.5 rounded ring-1 ${online ? 'bg-green-50 text-green-600 ring-green-200' : 'bg-red-50 text-red-600 ring-red-200'}`}>
+              {online ? '在线' : '离线'}
+            </span>
           </div>
-        }
-        variant="filled"
-        style={{ marginBottom: '20px' }}
-      >
-        <Row gutter={[16, 16]}>
-          <Col span={24}>
-            <div className="status-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label>当前状态</label>
-              <Tag color={detailedStatus?.status === 'ONLINE' ? 'green' : 'red'}>
-                {detailedStatus?.status === 'ONLINE' ? '在线' : '离线'}
-              </Tag>
-            </div>
-          </Col>
 
           {detailedStatus?.isOfflineUntil && (
-            <Col span={24}>
-              <div className="status-item">
-                <label>离线直到</label>
-                <span>{detailedStatus.isOfflineUntil}</span>
-              </div>
-            </Col>
+            <div className="flex justify-between"><label className="text-slate-600">离线直到</label><span className="text-slate-700">{detailedStatus.isOfflineUntil}</span></div>
           )}
-
           {detailedStatus?.offlineReason && (
-            <Col span={24}>
-              <div className="status-item">
-                <label>离线原因</label>
-                <span>{detailedStatus.offlineReason}</span>
-              </div>
-            </Col>
+            <div className="flex justify-between"><label className="text-slate-600">离线原因</label><span className="text-slate-700">{detailedStatus.offlineReason}</span></div>
           )}
 
-          <Col span={24}>
-            <Space wrap>
-              <Button
-                onClick={() => setShowPauseModal(true)}
-                loading={pauseLoading}
-              >
-                暂停接单
-              </Button>
+          <div className="flex flex-wrap gap-2">
+            <Btn variant="secondary" loading={pauseLoading} onClick={() => { setModalError(''); setShowPauseModal(true) }}>暂停接单</Btn>
+            {detailedStatus?.status === 'OFFLINE' && detailedStatus?.isOfflineUntil && (
+              <Btn variant="secondary" loading={loading} onClick={handleResumeOrders}>恢复接单</Btn>
+            )}
+            <Btn variant="secondary" loading={busyModeLoading} onClick={() => { setModalError(''); setShowBusyModeModal(true) }}>忙碌模式</Btn>
+            <Btn variant="secondary" loading={loading} onClick={handleClearBusyMode}>清除忙碌</Btn>
+          </div>
 
-              {detailedStatus?.status === 'OFFLINE' && detailedStatus?.isOfflineUntil && (
-                <Button
-                  onClick={handleResumeOrders}
-                  loading={loading}
-                >
-                  恢复接单
-                </Button>
-              )}
-
-              <Button
-                onClick={() => setShowBusyModeModal(true)}
-                loading={busyModeLoading}
-              >
-                忙碌模式
-              </Button>
-
-              <Button
-                onClick={handleClearBusyMode}
-                loading={loading}
-              >
-                清除忙碌
-              </Button>
-            </Space>
-          </Col>
-
-          <Col span={24}>
-            <p style={{ color: '#999', fontSize: '12px', marginBottom: 0 }}>
-              <strong>暂停接单：</strong>指定时间内暂停接收订单。<br/>
-              <strong>恢复接单：</strong>从暂停状态恢复。<br/>
-              <strong>忙碌模式：</strong>临时增加订单准备时间。<br/>
-              <strong>清除忙碌：</strong>恢复默认准备时间。
-            </p>
-          </Col>
-        </Row>
-      </Card>
+          <p className="text-xs text-slate-400 mb-0">
+            <strong>暂停接单：</strong>指定时间内暂停接收订单。<br />
+            <strong>恢复接单：</strong>从暂停状态恢复。<br />
+            <strong>忙碌模式：</strong>临时增加订单准备时间。<br />
+            <strong>清除忙碌：</strong>恢复默认准备时间。
+          </p>
+        </div>
+      </SectionCard>
 
       {/* 暂停接单模态框 */}
       <Modal
         title="暂停接单"
         open={showPauseModal}
-        onCancel={() => {
-          setShowPauseModal(false)
-          pauseOrdersForm.resetFields()
-        }}
-        onOk={handlePauseOrders}
-        loading={pauseLoading}
+        onOpenChange={(o) => { if (!o) { setShowPauseModal(false); setPauseMinutes(null) } }}
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Btn variant="secondary" onClick={() => { setShowPauseModal(false); setPauseMinutes(null) }}>取消</Btn>
+            <Btn variant="primary" loading={pauseLoading} onClick={handlePauseOrders}>确定</Btn>
+          </div>
+        }
       >
-        <Form form={pauseOrdersForm} layout="vertical">
-          <Form.Item
-            label="选择暂停时长"
-            name="pauseMinutes"
-            rules={[
-              { required: true, message: '请选择暂停时间' },
-            ]}
-          >
-            <Radio.Group style={{ width: '100%' }}>
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Radio value={10}>10分钟</Radio>
-                <Radio value={15}>15分钟</Radio>
-                <Radio value={20}>20分钟</Radio>
-                <Radio value={25}>25分钟</Radio>
-                <Radio value={1440} style={{ marginTop: '10px' }}>今天不再接单</Radio>
-              </Space>
-            </Radio.Group>
-          </Form.Item>
-          <p style={{ color: '#999', fontSize: '12px', marginTop: '15px' }}>
-            选择暂停时间后，店铺将停止接收新订单，直到指定时间后恢复。
-          </p>
-        </Form>
+        <div>
+          <div className="text-sm text-slate-600 mb-2">选择暂停时长</div>
+          <RadioGroup value={pauseMinutes} onChange={setPauseMinutes} options={[
+            { label: '10分钟', value: 10 }, { label: '15分钟', value: 15 }, { label: '20分钟', value: 20 },
+            { label: '25分钟', value: 25 }, { label: '今天不再接单', value: 1440 },
+          ]} />
+          {modalError && <p className="text-sm text-red-500 mt-2">{modalError}</p>}
+          <p className="text-xs text-slate-400 mt-4">选择暂停时间后，店铺将停止接收新订单，直到指定时间后恢复。</p>
+        </div>
       </Modal>
 
       {/* 忙碌模式模态框 */}
       <Modal
         title="设置忙碌模式"
         open={showBusyModeModal}
-        onCancel={() => {
-          setShowBusyModeModal(false)
-          busyModeForm.resetFields()
-        }}
-        onOk={handleSetBusyMode}
-        loading={busyModeLoading}
+        onOpenChange={(o) => { if (!o) { setShowBusyModeModal(false); setBusyModeDuration(null); setDelayDuration(null) } }}
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Btn variant="secondary" onClick={() => { setShowBusyModeModal(false); setBusyModeDuration(null); setDelayDuration(null) }}>取消</Btn>
+            <Btn variant="primary" loading={busyModeLoading} onClick={handleSetBusyMode}>确定</Btn>
+          </div>
+        }
       >
-        <Form form={busyModeForm} layout="vertical">
-          <Form.Item
-            label="忙碌模式持续时间"
-            name="busyModeDuration"
-            rules={[
-              { required: true, message: '请选择忙碌模式持续时间' },
-            ]}
-          >
-            <Radio.Group style={{ width: '100%' }}>
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Radio value={15}>15分钟</Radio>
-                <Radio value={30}>30分钟</Radio>
-                <Radio value={45}>45分钟</Radio>
-                <Radio value={60}>60分钟</Radio>
-              </Space>
-            </Radio.Group>
-          </Form.Item>
-
-          <Form.Item
-            label="额外准备时间"
-            name="delayDuration"
-            rules={[
-              { required: true, message: '请选择额外准备时间' },
-            ]}
-          >
-            <Radio.Group style={{ width: '100%' }}>
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Radio value={300}>5分钟（300秒）</Radio>
-                <Radio value={600}>10分钟（600秒）</Radio>
-                <Radio value={900}>15分钟（900秒）</Radio>
-                <Radio value={1200}>20分钟（1200秒）</Radio>
-                <Radio value={1800}>30分钟（1800秒）</Radio>
-              </Space>
-            </Radio.Group>
-          </Form.Item>
-
-          <p style={{ color: '#999', fontSize: '12px' }}>
-            选择高需求模式的持续时间和额外准备时间。在此期间内每个新订单都会增加指定的准备时间。
-          </p>
-        </Form>
+        <div className="space-y-4">
+          <div>
+            <div className="text-sm text-slate-600 mb-2">忙碌模式持续时间</div>
+            <RadioGroup value={busyModeDuration} onChange={setBusyModeDuration} options={[
+              { label: '15分钟', value: 15 }, { label: '30分钟', value: 30 }, { label: '45分钟', value: 45 }, { label: '60分钟', value: 60 },
+            ]} />
+          </div>
+          <div>
+            <div className="text-sm text-slate-600 mb-2">额外准备时间</div>
+            <RadioGroup value={delayDuration} onChange={setDelayDuration} options={[
+              { label: '5分钟（300秒）', value: 300 }, { label: '10分钟（600秒）', value: 600 }, { label: '15分钟（900秒）', value: 900 },
+              { label: '20分钟（1200秒）', value: 1200 }, { label: '30分钟（1800秒）', value: 1800 },
+            ]} />
+          </div>
+          {modalError && <p className="text-sm text-red-500">{modalError}</p>}
+          <p className="text-xs text-slate-400">选择高需求模式的持续时间和额外准备时间。在此期间内每个新订单都会增加指定的准备时间。</p>
+        </div>
       </Modal>
-
     </div>
   )
 }

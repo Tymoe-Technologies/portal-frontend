@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -9,3 +11,31 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, 
 .nav a { color: inherit; text-decoration: none; margin-right: 12px; }
 .nav a.active { text-decoration: underline; }
 .layout-content { padding: 16px; }
+
+/* ─── 侧边栏：折叠分组展开/收起动画 ─────────────────────────── */
+@keyframes collapsible-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-collapsible-content-height); opacity: 1; }
+}
+@keyframes collapsible-up {
+  from { height: var(--radix-collapsible-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+@theme {
+  --animate-collapsible-down: collapsible-down 0.2s ease-out;
+  --animate-collapsible-up: collapsible-up 0.18s ease-in;
+}
+
+/* ─── 侧边栏：纤细滚动条 ──────────────────────────────────── */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.sidebar-scroll:hover { scrollbar-color: rgb(203 213 225) transparent; }
+.sidebar-scroll::-webkit-scrollbar { width: 6px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+}
+.sidebar-scroll:hover::-webkit-scrollbar-thumb { background: rgb(203 213 225); }

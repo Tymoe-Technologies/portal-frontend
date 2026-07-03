@@ -1,7 +1,6 @@
 import React from 'react'
-import { useRouteError, isRouteErrorResponse } from 'react-router-dom'
-import { Result, Button } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom'
+import { Btn } from '@/components/ui-kit'
 
 interface RouteError {
   status?: number
@@ -44,83 +43,35 @@ const ErrorPage: React.FC = () => {
         errorSubtitle = `错误代码: ${error.status}`
     }
 
-    if (error.data?.message) {
-      errorDetails = error.data.message
-    }
+    if (error.data?.message) errorDetails = error.data.message
   } else if (error instanceof Error) {
     errorDetails = error.message
   }
 
-  const handleGoBack = () => {
-    navigate(-1)
-  }
-
-  const handleGoHome = () => {
-    navigate('/')
-  }
-
-  const handleReload = () => {
-    window.location.reload()
-  }
+  const handleGoBack = () => navigate(-1)
+  const handleGoHome = () => navigate('/')
+  const handleReload = () => window.location.reload()
 
   return (
-    <div style={{ padding: '50px 20px', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Result
-        status={errorStatus === 404 ? '404' : errorStatus === 403 ? '403' : errorStatus === 401 ? '401' : '500'}
-        title={errorTitle}
-        subTitle={
-          <>
-            <p>{errorSubtitle}</p>
-            {errorDetails && process.env.NODE_ENV === 'development' && (
-              <details
-                style={{
-                  marginTop: '20px',
-                  padding: '10px',
-                  backgroundColor: '#f5f5f5',
-                  borderRadius: '4px',
-                  textAlign: 'left',
-                }}
-              >
-                <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>
-                  错误详情（仅开发环境显示）
-                </summary>
-                <pre
-                  style={{
-                    marginTop: '10px',
-                    fontSize: '12px',
-                    whiteSpace: 'pre-wrap',
-                    wordWrap: 'break-word',
-                    maxHeight: '200px',
-                    overflow: 'auto',
-                  }}
-                >
-                  {errorDetails}
-                </pre>
-              </details>
-            )}
-          </>
-        }
-        extra={[
-          <Button
-            key="back"
-            onClick={handleGoBack}
-            style={{ marginRight: '10px' }}
-          >
-            返回上一页
-          </Button>,
-          <Button
-            key="home"
-            type="primary"
-            onClick={handleGoHome}
-            style={{ marginRight: '10px' }}
-          >
-            返回首页
-          </Button>,
-          <Button key="reload" onClick={handleReload}>
-            刷新页面
-          </Button>,
-        ]}
-      />
+    <div className="min-h-screen flex items-center justify-center px-5 py-12">
+      <div className="text-center max-w-lg">
+        <div className="text-7xl font-bold text-slate-300 mb-4">{errorStatus}</div>
+        <h1 className="text-xl font-semibold text-slate-800 mb-2">{errorTitle}</h1>
+        <p className="text-slate-500">{errorSubtitle}</p>
+
+        {errorDetails && process.env.NODE_ENV === 'development' && (
+          <details className="mt-5 p-3 bg-slate-50 rounded-md text-left">
+            <summary className="cursor-pointer font-bold text-slate-700">错误详情（仅开发环境显示）</summary>
+            <pre className="mt-2.5 text-xs whitespace-pre-wrap break-words max-h-52 overflow-auto text-slate-600">{errorDetails}</pre>
+          </details>
+        )}
+
+        <div className="flex items-center justify-center gap-2.5 mt-6">
+          <Btn variant="secondary" onClick={handleGoBack}>返回上一页</Btn>
+          <Btn variant="primary" onClick={handleGoHome}>返回首页</Btn>
+          <Btn variant="secondary" onClick={handleReload}>刷新页面</Btn>
+        </div>
+      </div>
     </div>
   )
 }

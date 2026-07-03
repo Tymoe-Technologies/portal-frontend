@@ -1,13 +1,13 @@
 import React from 'react'
-import { Card, Typography } from 'antd'
 import { useTranslation } from 'react-i18next'
+import { SectionCard } from '@/components/ui-kit'
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation()
   return (
-    <Card title={t('pages.dashboard.title')} bordered={false}>
-      <Typography.Paragraph type="secondary">{t('pages.dashboard.desc')}</Typography.Paragraph>
-    </Card>
+    <SectionCard title={t('pages.dashboard.title')}>
+      <p className="text-sm text-slate-500">{t('pages.dashboard.desc')}</p>
+    </SectionCard>
   )
 }
 

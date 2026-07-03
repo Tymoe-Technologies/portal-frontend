@@ -7,7 +7,6 @@ import * as Tooltip from '@radix-ui/react-tooltip'
 import * as Select from '@radix-ui/react-select'
 import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '../auth/AuthProvider'
-import { message } from 'antd'
 import clsx from 'clsx'
 import {
   LayoutDashboard, Package, ListOrdered, ShoppingCart, Store, Users,
@@ -16,7 +15,7 @@ import {
   Smartphone, Trash2, Sparkles, PanelLeftClose, PanelLeftOpen,
   Check, ChevronsUpDown,
 } from 'lucide-react'
-import { ToastHost } from '../components/ui-kit'
+import { ToastHost, toast } from '../components/ui-kit'
 
 // ─── 侧边栏导航项类型 ──────────────────────────────────────────────────────────
 
@@ -228,9 +227,9 @@ const BaseLayout: React.FC = () => {
       ])
       const financeData = financeRes?.ok ? await financeRes.json().catch(() => ({})) : { error: `HTTP ${financeRes?.status}` }
       const orderData = orderRes?.ok ? await orderRes.json().catch(() => ({})) : { error: `HTTP ${orderRes?.status}` }
-      message.success(`已清除 — Finance: ${JSON.stringify(financeData.deleted ?? financeData)} | Order: ${JSON.stringify(orderData.deleted ?? orderData)}`)
+      toast.success(`已清除 — Finance: ${JSON.stringify(financeData.deleted ?? financeData)} | Order: ${JSON.stringify(orderData.deleted ?? orderData)}`)
     } catch (err: any) {
-      message.error(err.message || '清除失败')
+      toast.error(err.message || '清除失败')
     } finally {
       setClearingData(false)
       setClearDialogOpen(false)

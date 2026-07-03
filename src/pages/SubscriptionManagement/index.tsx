@@ -1,8 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import {
-  Button, Spin, Typography, Alert, Result, message,
-} from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import { RotateCw, Info, AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   subscriptionApi,
@@ -10,10 +7,28 @@ import {
   type CatalogPlan,
   type CatalogModule,
 } from '@/services/subscription'
+import { Btn, AlertBox, Spinner, toast } from '@/components/ui-kit'
 import PlanCatalog from './PlanCatalog'
 import SubscriptionDashboard from './SubscriptionDashboard'
 
-const { Text } = Typography
+// 结果态视图（替代 antd Result）
+function StatusResult({ status, title, subTitle, extra }: {
+  status: 'info' | 'warning'
+  title: string
+  subTitle: string
+  extra?: React.ReactNode
+}) {
+  const Icon = status === 'warning' ? AlertTriangle : Info
+  const color = status === 'warning' ? 'text-amber-500' : 'text-blue-500'
+  return (
+    <div className="text-center py-12">
+      <Icon className={`w-12 h-12 mx-auto mb-4 ${color}`} />
+      <h3 className="text-lg font-semibold text-slate-800 mb-1">{title}</h3>
+      <p className="text-slate-500 mb-5">{subTitle}</p>
+      {extra}
+    </div>
+  )
+}
 
 export default function SubscriptionManagement() {
   const { t } = useTranslation()
@@ -61,25 +76,24 @@ export default function SubscriptionManagement() {
       window.history.replaceState({}, '', window.location.pathname)
     }
     if (status === 'success') {
-      message.success(t('pages.subscription.paymentSuccess'))
+      toast.success(t('pages.subscription.paymentSuccess'))
       // 轮询等待 webhook 处理完成后订阅状态更新，最多重试 6 次（约 12 秒）
       let attempts = 0
       const poll = setInterval(async () => {
         attempts++
         try {
           const query = await subscriptionApi.getSubscriptionQuery(orgId)
-          // 状态变为活跃时停止轮询并更新页面
           if (query.subscription.status === 'active' || query.subscription.status === 'trialing') {
             clearInterval(poll)
             setQueryResult(query)
           }
         } catch {
-          // 轮询失败静默处理，不影响页面
+          // 轮询失败静默处理
         }
         if (attempts >= 6) clearInterval(poll)
       }, 2000)
     } else if (status === 'canceled') {
-      message.warning(t('pages.subscription.paymentCanceled'))
+      toast.warning(t('pages.subscription.paymentCanceled'))
     }
   }, [t, orgId])
 
@@ -94,7 +108,7 @@ export default function SubscriptionManagement() {
       const result = await subscriptionApi.createPortal(orgId)
       window.location.href = result.portalUrl
     } catch {
-      message.error(t('pages.subscription.portalError'))
+      toast.error(t('pages.subscription.portalError'))
     } finally {
       setPortalLoading(false)
     }
@@ -116,7 +130,6 @@ export default function SubscriptionManagement() {
 
   const enrichedModules = useMemo(() => {
     if (!queryResult) return []
-    // 找到当前 plan 包含的模块 key 集合
     const plan = catalogPlans.find((p) => p.key === queryResult.subscription.planKey)
     const planIncludedKeys = new Set(plan?.includedModules.map((m) => m.moduleKey) || [])
 
@@ -136,29 +149,21 @@ export default function SubscriptionManagement() {
 
   const subscriptionStatus = queryResult?.subscription.status || 'none'
 
-  // 渲染内容区
   const renderContent = () => {
     if (loading) {
-      return <Spin style={{ display: 'block', textAlign: 'center', padding: 48 }} />
+      return <div className="text-center py-12"><Spinner className="w-8 h-8 mx-auto text-slate-400" /></div>
     }
 
     if (error) {
       return (
-        <Alert
+        <AlertBox
           type="error"
-          showIcon
-          message={t('pages.subscription.loadError')}
-          action={
-            <Button size="small" onClick={loadData}>
-              {t('common.refresh')}
-            </Button>
-          }
-          style={{ marginBottom: 16 }}
+          description={t('pages.subscription.loadError')}
+          action={<Btn variant="secondary" size="sm" onClick={loadData}>{t('common.refresh')}</Btn>}
         />
       )
     }
 
-    // canceled 状态下用户点了 resubscribe → 显示 PlanCatalog
     if (showCatalog || subscriptionStatus === 'none') {
       return <PlanCatalog orgId={orgId} plans={catalogPlans} modules={catalogModules} />
     }
@@ -177,13 +182,8 @@ export default function SubscriptionManagement() {
 
     if (subscriptionStatus === 'past_due') {
       return (
-        <>
-          <Alert
-            type="error"
-            showIcon
-            message={t('pages.subscription.pastDueWarning')}
-            style={{ marginBottom: 16 }}
-          />
+        <div className="space-y-4">
+          <AlertBox type="error" description={t('pages.subscription.pastDueWarning')} />
           <SubscriptionDashboard
             queryResult={queryResult!}
             enrichedPlan={enrichedPlan}
@@ -191,75 +191,54 @@ export default function SubscriptionManagement() {
             onManageBilling={handlePortal}
             portalLoading={portalLoading}
           />
-        </>
+        </div>
       )
     }
 
     if (subscriptionStatus === 'canceled') {
       return (
-        <Result
+        <StatusResult
           status="info"
           title={t('pages.subscription.canceledTitle')}
           subTitle={t('pages.subscription.canceledDesc')}
-          extra={
-            <Button type="primary" onClick={() => setShowCatalog(true)}>
-              {t('pages.subscription.resubscribe')}
-            </Button>
-          }
+          extra={<Btn variant="primary" onClick={() => setShowCatalog(true)}>{t('pages.subscription.resubscribe')}</Btn>}
         />
       )
     }
 
-    // unpaid / incomplete
     if (subscriptionStatus === 'unpaid') {
       return (
-        <Result
+        <StatusResult
           status="warning"
           title={t('pages.subscription.needsActionUnpaidTitle')}
           subTitle={t('pages.subscription.needsActionUnpaidDesc')}
-          extra={
-            <Button type="primary" onClick={handlePortal} loading={portalLoading}>
-              {t('pages.subscription.updatePayment')}
-            </Button>
-          }
+          extra={<Btn variant="primary" loading={portalLoading} onClick={handlePortal}>{t('pages.subscription.updatePayment')}</Btn>}
         />
       )
     }
 
     if (subscriptionStatus === 'incomplete') {
       return (
-        <Result
+        <StatusResult
           status="warning"
           title={t('pages.subscription.needsActionIncompleteTitle')}
           subTitle={t('pages.subscription.needsActionIncompleteDesc')}
-          extra={
-            <Button type="primary" onClick={handlePortal} loading={portalLoading}>
-              {t('pages.subscription.manageBilling')}
-            </Button>
-          }
+          extra={<Btn variant="primary" loading={portalLoading} onClick={handlePortal}>{t('pages.subscription.manageBilling')}</Btn>}
         />
       )
     }
 
-    // 兜底：未知状态
     return <PlanCatalog orgId={orgId} plans={catalogPlans} modules={catalogModules} />
   }
 
   return (
-    <div style={{ maxWidth: 960 }}>
-      {/* 页面标题 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+    <div className="max-w-4xl">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
-            {t('pages.subscription.title')}
-          </h2>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            {t('pages.subscription.description')}
-          </Text>
+          <h2 className="m-0 text-xl font-semibold text-slate-800">{t('pages.subscription.title')}</h2>
+          <p className="text-[13px] text-slate-500">{t('pages.subscription.description')}</p>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={loadData}>
-          {t('common.refresh')}
-        </Button>
+        <Btn variant="secondary" icon={<RotateCw className="w-3.5 h-3.5" />} onClick={loadData}>{t('common.refresh')}</Btn>
       </div>
 
       {renderContent()}

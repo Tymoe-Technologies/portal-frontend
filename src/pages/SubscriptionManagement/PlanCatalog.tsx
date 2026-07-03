@@ -1,16 +1,12 @@
 import { useState, useMemo } from 'react'
-import {
-  Row, Col, Card, Button, Tag, Typography, Checkbox, message,
-} from 'antd'
-import { CheckCircleFilled } from '@ant-design/icons'
+import { CheckCircle2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   subscriptionApi,
   type CatalogPlan,
   type CatalogModule,
 } from '@/services/subscription'
-
-const { Text, Title } = Typography
+import { Btn, Checkbox, toast } from '@/components/ui-kit'
 
 interface PlanCatalogProps {
   orgId: string
@@ -22,42 +18,34 @@ export default function PlanCatalog({ orgId, plans, modules }: PlanCatalogProps)
   const { t } = useTranslation()
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [selectedPlanKey, setSelectedPlanKey] = useState<string | null>(
-    // 若只有 1 个计划，默认选中
     plans.length === 1 ? plans[0].key : null,
   )
   const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([])
 
-  // 选中计划已包含的模块 key 集合
   const includedModuleKeys = useMemo(() => {
     const plan = plans.find((p) => p.key === selectedPlanKey)
     if (!plan) return new Set<string>()
     return new Set(plan.includedModules.map((m) => m.moduleKey))
   }, [plans, selectedPlanKey])
 
-  // 额外可选模块 = 所有模块 - 选中计划已包含的模块
   const extraModules = useMemo(() => {
     return modules.filter((m) => !includedModuleKeys.has(m.key))
   }, [modules, includedModuleKeys])
 
-  // 选择计划时清除之前选的额外模块
   const handleSelectPlan = (planKey: string) => {
     setSelectedPlanKey(planKey)
     setSelectedModuleKeys([])
   }
 
-  // 切换额外模块选择
   const handleToggleModule = (moduleKey: string) => {
     setSelectedModuleKeys((prev) =>
-      prev.includes(moduleKey)
-        ? prev.filter((k) => k !== moduleKey)
-        : [...prev, moduleKey],
+      prev.includes(moduleKey) ? prev.filter((k) => k !== moduleKey) : [...prev, moduleKey],
     )
   }
 
-  // 前往结账
   const handleCheckout = async () => {
     if (!selectedPlanKey) {
-      message.warning(t('pages.subscription.selectPlanFirst'))
+      toast.warning(t('pages.subscription.selectPlanFirst'))
       return
     }
     setCheckoutLoading(true)
@@ -69,7 +57,7 @@ export default function PlanCatalog({ orgId, plans, modules }: PlanCatalogProps)
       })
       window.location.href = result.checkoutUrl
     } catch {
-      message.error(t('pages.subscription.checkoutError'))
+      toast.error(t('pages.subscription.checkoutError'))
     } finally {
       setCheckoutLoading(false)
     }
@@ -78,127 +66,93 @@ export default function PlanCatalog({ orgId, plans, modules }: PlanCatalogProps)
   return (
     <div>
       {/* 计划卡片 */}
-      <Title level={5} style={{ marginBottom: 16 }}>
-        {t('pages.subscription.choosePlan')}
-      </Title>
-      <Row gutter={[16, 16]}>
+      <h5 className="text-base font-semibold text-slate-800 mb-4">{t('pages.subscription.choosePlan')}</h5>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {plans.map((plan) => {
           const isSelected = selectedPlanKey === plan.key
           return (
-            <Col key={plan.key} xs={24} sm={12} lg={8}>
-              <Card
-                hoverable
-                onClick={() => handleSelectPlan(plan.key)}
-                style={{
-                  borderColor: isSelected ? '#1890ff' : undefined,
-                  borderWidth: isSelected ? 2 : 1,
-                  cursor: 'pointer',
-                }}
-              >
-                <Title level={4} style={{ marginBottom: 4 }}>{plan.name}</Title>
-                {plan.description && (
-                  <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                    {plan.description}
-                  </Text>
+            <div
+              key={plan.key}
+              onClick={() => handleSelectPlan(plan.key)}
+              className={`bg-white rounded-xl p-5 cursor-pointer transition-all hover:shadow-md ${
+                isSelected ? 'border-2 border-blue-500' : 'border border-slate-200'
+              }`}
+            >
+              <h4 className="text-lg font-semibold text-slate-900 mb-1">{plan.name}</h4>
+              {plan.description && <p className="text-sm text-slate-500 mb-3">{plan.description}</p>}
+
+              {/* 价格 */}
+              <div className="mb-3">
+                <span className="font-semibold text-2xl text-slate-900">${plan.monthlyPrice}</span>
+                <span className="text-slate-500"> / {t('pages.subscription.month')}</span>
+              </div>
+
+              {/* 试用期 */}
+              {plan.trialDurationDays > 0 && (
+                <span className="inline-block mb-3 text-xs px-1.5 py-0.5 rounded ring-1 bg-blue-50 text-blue-600 ring-blue-200">
+                  {t('pages.subscription.trialDays', { days: plan.trialDurationDays })}
+                </span>
+              )}
+
+              {/* 包含的模块 */}
+              <div>
+                <span className="text-xs text-slate-500">{t('pages.subscription.includedModules')}</span>
+                {plan.includedModules.length > 0 ? (
+                  <ul className="list-none pl-0 mt-1 mb-0">
+                    {plan.includedModules.map((im) => {
+                      const mod = modules.find((m) => m.key === im.moduleKey)
+                      return (
+                        <li key={im.moduleKey} className="mb-0.5 flex items-center">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mr-1.5 shrink-0" />
+                          <span className="text-[13px] text-slate-700">{mod?.name || im.moduleKey}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-[13px] text-slate-400 mt-1">{t('pages.subscription.noIncludedModules')}</p>
                 )}
-
-                {/* 价格 */}
-                <div style={{ marginBottom: 12 }}>
-                  <Text strong style={{ fontSize: 24 }}>
-                    ${plan.monthlyPrice}
-                  </Text>
-                  <Text type="secondary"> / {t('pages.subscription.month')}</Text>
-                </div>
-
-                {/* 试用期 */}
-                {plan.trialDurationDays > 0 && (
-                  <Tag color="blue" style={{ marginBottom: 12 }}>
-                    {t('pages.subscription.trialDays', { days: plan.trialDurationDays })}
-                  </Tag>
-                )}
-
-                {/* 包含的模块 */}
-                <div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    {t('pages.subscription.includedModules')}
-                  </Text>
-                  {plan.includedModules.length > 0 ? (
-                    <ul style={{ paddingLeft: 0, listStyle: 'none', marginTop: 4, marginBottom: 0 }}>
-                      {plan.includedModules.map((im) => {
-                        const mod = modules.find((m) => m.key === im.moduleKey)
-                        return (
-                          <li key={im.moduleKey} style={{ marginBottom: 2 }}>
-                            <CheckCircleFilled style={{ color: '#52c41a', marginRight: 6 }} />
-                            <Text style={{ fontSize: 13 }}>{mod?.name || im.moduleKey}</Text>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  ) : (
-                    <Text type="secondary" style={{ display: 'block', fontSize: 13, marginTop: 4 }}>
-                      {t('pages.subscription.noIncludedModules')}
-                    </Text>
-                  )}
-                </div>
-              </Card>
-            </Col>
+              </div>
+            </div>
           )
         })}
-      </Row>
+      </div>
 
       {/* 额外可选模块 */}
       {selectedPlanKey && extraModules.length > 0 && (
-        <div style={{ marginTop: 32 }}>
-          <Title level={5} style={{ marginBottom: 16 }}>
-            {t('pages.subscription.additionalModules')}
-          </Title>
-          <Row gutter={[16, 16]}>
+        <div className="mt-8">
+          <h5 className="text-base font-semibold text-slate-800 mb-4">{t('pages.subscription.additionalModules')}</h5>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {extraModules.map((mod) => {
               const isChecked = selectedModuleKeys.includes(mod.key)
               return (
-                <Col key={mod.key} xs={24} sm={12} lg={8}>
-                  <Card
-                    size="small"
-                    hoverable
-                    onClick={() => handleToggleModule(mod.key)}
-                    style={{
-                      borderColor: isChecked ? '#1890ff' : undefined,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <Checkbox checked={isChecked} style={{ marginTop: 2 }} />
-                      <div>
-                        <Text strong>{mod.name}</Text>
-                        {mod.description && (
-                          <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
-                            {mod.description}
-                          </Text>
-                        )}
-                        <Text style={{ fontSize: 13 }}>
-                          ${mod.monthlyPrice} / {t('pages.subscription.month')}
-                        </Text>
-                      </div>
+                <div
+                  key={mod.key}
+                  onClick={() => handleToggleModule(mod.key)}
+                  className={`bg-white rounded-xl p-4 cursor-pointer transition-all hover:shadow-md ${
+                    isChecked ? 'border-2 border-blue-500' : 'border border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="mt-0.5" onClick={(e) => e.stopPropagation()}><Checkbox checked={isChecked} onCheckedChange={() => handleToggleModule(mod.key)} /></div>
+                    <div>
+                      <span className="font-semibold text-slate-800">{mod.name}</span>
+                      {mod.description && <span className="block text-xs text-slate-500">{mod.description}</span>}
+                      <span className="text-[13px] text-slate-700">${mod.monthlyPrice} / {t('pages.subscription.month')}</span>
                     </div>
-                  </Card>
-                </Col>
+                  </div>
+                </div>
               )
             })}
-          </Row>
+          </div>
         </div>
       )}
 
       {/* 结账按钮 */}
-      <div style={{ textAlign: 'center', marginTop: 32 }}>
-        <Button
-          type="primary"
-          size="large"
-          disabled={!selectedPlanKey}
-          loading={checkoutLoading}
-          onClick={handleCheckout}
-        >
+      <div className="text-center mt-8">
+        <Btn variant="primary" disabled={!selectedPlanKey} loading={checkoutLoading} onClick={handleCheckout}>
           {t('pages.subscription.proceedToCheckout')}
-        </Button>
+        </Btn>
       </div>
     </div>
   )

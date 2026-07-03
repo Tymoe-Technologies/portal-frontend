@@ -1,21 +1,16 @@
-import { Card, Space, Tag, Typography, Button, Divider } from 'antd'
-import {
-  CheckCircleOutlined, CreditCardOutlined, AppstoreOutlined,
-  CheckCircleFilled,
-} from '@ant-design/icons'
+import { CheckCircle2, CreditCard, LayoutGrid } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SubscriptionQueryResult } from '@/services/subscription'
+import { SectionCard, Btn } from '@/components/ui-kit'
 
-const { Text } = Typography
-
-// 订阅状态 → Tag 颜色映射
-const statusColorMap: Record<string, string> = {
-  active: 'green',
-  trialing: 'blue',
-  past_due: 'red',
-  canceled: 'default',
-  unpaid: 'orange',
-  incomplete: 'gold',
+// 订阅状态 → 徽章配色（gold/incomplete 归 amber，canceled 归 slate；严禁紫色）
+const STATUS_BADGE: Record<string, string> = {
+  active: 'bg-green-50 text-green-600 ring-green-200',
+  trialing: 'bg-blue-50 text-blue-600 ring-blue-200',
+  past_due: 'bg-red-50 text-red-600 ring-red-200',
+  canceled: 'bg-slate-100 text-slate-600 ring-slate-200',
+  unpaid: 'bg-amber-50 text-amber-600 ring-amber-200',
+  incomplete: 'bg-amber-50 text-amber-600 ring-amber-200',
 }
 
 interface EnrichedPlan {
@@ -51,65 +46,50 @@ export default function SubscriptionDashboard({
   const { t } = useTranslation()
   const { subscription } = queryResult
 
-  // 计算 billing period 剩余天数
   const daysUntilRenewal = subscription.currentPeriodEnd
     ? Math.max(0, Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null
 
-  // 计算试用期剩余天数
   const trialDaysLeft = subscription.trialEndsAt
     ? Math.max(0, Math.ceil((new Date(subscription.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null
 
-  // 格式化日期
   const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString()
 
-  // 计算月费合计（仅额外购买模块）
   const addonModules = enrichedModules.filter((m) => !m.isIncludedInPlan)
   const planPrice = enrichedPlan ? parseFloat(enrichedPlan.monthlyPrice) : 0
   const addonTotal = addonModules.reduce((sum, m) => sum + parseFloat(m.monthlyPrice), 0)
   const monthlyTotal = planPrice + addonTotal
 
+  const badgeCls = STATUS_BADGE[subscription.status] || 'bg-slate-100 text-slate-600 ring-slate-200'
+
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+    <div className="space-y-4">
       {/* Card 1 — 当前计划 */}
-      <Card
-        size="small"
-        title={
-          <Space>
-            <CheckCircleOutlined />
-            {t('pages.subscription.currentPlan')}
-          </Space>
-        }
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+      <SectionCard title={<span className="inline-flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{t('pages.subscription.currentPlan')}</span>}>
+        <div className="flex justify-between items-start flex-wrap gap-3">
           <div>
-            <div style={{ marginBottom: 8 }}>
-              <Text strong style={{ fontSize: 18 }}>
-                {enrichedPlan?.name || subscription.planName || subscription.planKey || '—'}
-              </Text>
-              <Tag
-                color={statusColorMap[subscription.status] || 'default'}
-                style={{ marginLeft: 8 }}
-              >
+            <div className="mb-2">
+              <span className="font-semibold text-lg text-slate-800">{enrichedPlan?.name || subscription.planName || subscription.planKey || '—'}</span>
+              <span className={`ml-2 inline-flex items-center text-xs px-1.5 py-0.5 rounded ring-1 ${badgeCls}`}>
                 {t(`pages.subscription.statusLabel.${subscription.status}` as const) || subscription.status}
-              </Tag>
+              </span>
             </div>
 
             {enrichedPlan && (
-              <div style={{ marginBottom: 8 }}>
-                <Text type="secondary">{t('pages.subscription.price')}: </Text>
-                <Text strong>${enrichedPlan.monthlyPrice}</Text>
-                <Text type="secondary"> / {t('pages.subscription.month')}</Text>
+              <div className="mb-2 text-sm">
+                <span className="text-slate-500">{t('pages.subscription.price')}: </span>
+                <span className="font-semibold text-slate-800">${enrichedPlan.monthlyPrice}</span>
+                <span className="text-slate-500"> / {t('pages.subscription.month')}</span>
               </div>
             )}
 
             {subscription.currentPeriodEnd && (
-              <div style={{ marginBottom: 4 }}>
-                <Text type="secondary">{t('pages.subscription.billingPeriodEnd')}: </Text>
-                <Text>{formatDate(subscription.currentPeriodEnd)}</Text>
+              <div className="mb-1 text-sm">
+                <span className="text-slate-500">{t('pages.subscription.billingPeriodEnd')}: </span>
+                <span className="text-slate-700">{formatDate(subscription.currentPeriodEnd)}</span>
                 {daysUntilRenewal !== null && (
-                  <Text type="secondary"> ({daysUntilRenewal} {t('pages.subscription.daysRemaining')})</Text>
+                  <span className="text-slate-500"> ({daysUntilRenewal} {t('pages.subscription.daysRemaining')})</span>
                 )}
               </div>
             )}
@@ -117,97 +97,62 @@ export default function SubscriptionDashboard({
 
           {/* 试用期倒计时 */}
           {subscription.status === 'trialing' && trialDaysLeft !== null && subscription.trialEndsAt && (
-            <Card
-              size="small"
-              style={{ background: '#e6f7ff', border: '1px solid #91d5ff', minWidth: 180 }}
-            >
-              <div style={{ textAlign: 'center' }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {t('pages.subscription.trialRemaining')}
-                </Text>
-                <div>
-                  <Text strong style={{ fontSize: 28, color: '#1890ff' }}>
-                    {trialDaysLeft}
-                  </Text>
-                  <Text style={{ color: '#1890ff' }}> {t('pages.subscription.days')}</Text>
-                </div>
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  {t('pages.subscription.trialEndsOn', { date: formatDate(subscription.trialEndsAt) })}
-                </Text>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg min-w-[180px] p-3 text-center">
+              <div className="text-xs text-slate-500">{t('pages.subscription.trialRemaining')}</div>
+              <div>
+                <span className="font-semibold text-[28px] text-blue-600">{trialDaysLeft}</span>
+                <span className="text-blue-600"> {t('pages.subscription.days')}</span>
               </div>
-            </Card>
+              <div className="text-[11px] text-slate-500">{t('pages.subscription.trialEndsOn', { date: formatDate(subscription.trialEndsAt) })}</div>
+            </div>
           )}
         </div>
-      </Card>
+      </SectionCard>
 
       {/* Card 2 — 模块 */}
       {enrichedModules.length > 0 && (
-        <Card
-          size="small"
-          title={
-            <Space>
-              <AppstoreOutlined />
-              {t('pages.subscription.modules')}
-            </Space>
-          }
-        >
+        <SectionCard title={<span className="inline-flex items-center gap-2"><LayoutGrid className="w-4 h-4" />{t('pages.subscription.modules')}</span>}>
           {/* Plan 自带模块 */}
           {enrichedModules.filter((m) => m.isIncludedInPlan).length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              {enrichedModules
-                .filter((m) => m.isIncludedInPlan)
-                .map((mod) => (
-                  <div key={mod.key} style={{ display: 'flex', alignItems: 'center', padding: '6px 0' }}>
-                    <CheckCircleFilled style={{ color: '#52c41a', marginRight: 8 }} />
-                    <Text>{mod.name}</Text>
-                    <Tag color="green" style={{ marginLeft: 8 }}>{t('pages.subscription.included')}</Tag>
-                  </div>
-                ))}
+            <div className="mb-3">
+              {enrichedModules.filter((m) => m.isIncludedInPlan).map((mod) => (
+                <div key={mod.key} className="flex items-center py-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-green-500 mr-2" />
+                  <span className="text-slate-700">{mod.name}</span>
+                  <span className="ml-2 text-xs px-1.5 py-0.5 rounded ring-1 bg-green-50 text-green-600 ring-green-200">{t('pages.subscription.included')}</span>
+                </div>
+              ))}
             </div>
           )}
 
           {/* 额外购买模块 */}
           {addonModules.length > 0 && (
             <>
-              {enrichedModules.some((m) => m.isIncludedInPlan) && <Divider style={{ margin: '8px 0' }} />}
-              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-                {t('pages.subscription.addonModules')}
-              </Text>
+              {enrichedModules.some((m) => m.isIncludedInPlan) && <div className="border-t border-slate-100 my-2" />}
+              <span className="text-xs text-slate-500 block mb-2">{t('pages.subscription.addonModules')}</span>
               {addonModules.map((mod) => (
-                <div key={mod.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
-                  <Text>{mod.name}</Text>
-                  <Text type="secondary">${mod.monthlyPrice} / {t('pages.subscription.month')}</Text>
+                <div key={mod.key} className="flex items-center justify-between py-1.5">
+                  <span className="text-slate-700">{mod.name}</span>
+                  <span className="text-slate-500 text-sm">${mod.monthlyPrice} / {t('pages.subscription.month')}</span>
                 </div>
               ))}
             </>
           )}
 
           {/* 月费合计 */}
-          <Divider style={{ margin: '8px 0' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text strong>{t('pages.subscription.monthlyTotal')}</Text>
-            <Text strong style={{ fontSize: 16 }}>${monthlyTotal.toFixed(2)} / {t('pages.subscription.month')}</Text>
+          <div className="border-t border-slate-100 my-2" />
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-slate-800">{t('pages.subscription.monthlyTotal')}</span>
+            <span className="font-semibold text-base text-slate-800">${monthlyTotal.toFixed(2)} / {t('pages.subscription.month')}</span>
           </div>
-        </Card>
+        </SectionCard>
       )}
 
       {/* Card 3 — 账单管理 */}
-      <Card
-        size="small"
-        title={
-          <Space>
-            <CreditCardOutlined />
-            {t('pages.subscription.billing')}
-          </Space>
-        }
-      >
-        <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-          {t('pages.subscription.billingDesc')}
-        </Text>
-        <Button onClick={onManageBilling} loading={portalLoading}>
-          {t('pages.subscription.manageBilling')}
-        </Button>
-      </Card>
-    </Space>
+      <SectionCard title={<span className="inline-flex items-center gap-2"><CreditCard className="w-4 h-4" />{t('pages.subscription.billing')}</span>}>
+        <p className="text-sm text-slate-500 mb-4">{t('pages.subscription.billingDesc')}</p>
+        <Btn variant="secondary" loading={portalLoading} onClick={onManageBilling}>{t('pages.subscription.manageBilling')}</Btn>
+      </SectionCard>
+    </div>
   )
 }

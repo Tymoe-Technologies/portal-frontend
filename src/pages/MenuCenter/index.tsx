@@ -1678,86 +1678,32 @@ const MenuCenter: React.FC = () => {
   // 扁平化的分类列表（用于渲染）
   const flatCategories = useMemo(() => flattenCategoryTree(categoryTree), [categoryTree])
 
-  // 生成Tree组件数据
-  const treeData = useMemo(() => {
-    const convertToTreeData = (categories: HierarchicalCategory[]): any[] => {
-      return categories.map(category => ({
-        key: category.id,
-        title: (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-            <Space style={{ flex: 1 }}>
-              <span style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                backgroundColor: category.level === 0 ? '#1890ff' : '#52c41a',
-                display: 'inline-block',
-                marginRight: '4px'
-              }} />
-              <span style={{
-                fontWeight: category.level === 0 ? 600 : 400,
-                color: selectedCategoryId === category.id ? '#1890ff' : '#000'
-              }}>
-                {category.name}
-              </span>
-              {category.isSystem && (
-                <Tag
-                  color="default"
-                  style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px', marginLeft: 2 }}
-                >
-                  系统
-                </Tag>
+  // 分类树递归渲染（去 antd Tree）
+  const renderCategoryNodes = (nodes: HierarchicalCategory[], depth = 0): React.ReactNode =>
+    nodes.map(category => (
+      <div key={category.id}>
+        <div
+          onClick={() => setSelectedCategoryId(category.id)}
+          style={{ paddingLeft: 8 + depth * 16 }}
+          className={`group flex items-center justify-between gap-2 rounded-md pr-2 py-1.5 cursor-pointer text-sm transition-colors ${selectedCategoryId === category.id ? 'bg-slate-100 text-slate-900 font-medium' : 'text-slate-700 hover:bg-slate-50'}`}
+        >
+          <span className="flex items-center gap-1.5 min-w-0">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${category.level === 0 ? 'bg-slate-900' : 'bg-slate-400'}`} />
+            <span className="truncate">{category.name}</span>
+            {category.isSystem && <UI.Badge>系统</UI.Badge>}
+          </span>
+          {isMain && (
+            <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+              <button title={t('pages.menuCenter.edit')} onClick={() => handleEditCategory(category)} className="p-1 rounded text-slate-400 hover:bg-slate-200 hover:text-slate-600 cursor-pointer"><Pencil className="w-3.5 h-3.5" /></button>
+              {!category.isSystem && (
+                <button title={t('pages.menuCenter.delete')} onClick={() => setCategoryDeleteTarget(category)} className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
               )}
-            </Space>
-            {isMain && (
-              <Dropdown
-                menu={{
-                  items: [
-                    {
-                      key: 'edit',
-                      label: t('pages.menuCenter.edit'),
-                      icon: <EditOutlined />,
-                      onClick: () => handleEditCategory(category)
-                    },
-                    // 系统分类不显示删除选项
-                    ...(!category.isSystem ? [{
-                      key: 'delete',
-                      label: t('pages.menuCenter.delete'),
-                      icon: <DeleteOutlined />,
-                      danger: true,
-                      onClick: () => {
-                        Modal.confirm({
-                          title: t('pages.menuCenter.deleteCategoryConfirm'),
-                          content: t('pages.menuCenter.deleteCategoryContent', { name: category.name }),
-                          okText: t('pages.menuCenter.delete'),
-                          cancelText: t('pages.menuCenter.cancel'),
-                          onOk: () => handleDeleteCategory(category.id)
-                        })
-                      }
-                    }] : [])
-                  ]
-                }}
-                trigger={['click']}
-              >
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<MoreOutlined />}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ opacity: 0.6 }}
-                />
-              </Dropdown>
-            )}
-          </div>
-        ),
-        icon: null, // 不显示文件夹图标
-        children: category.children && category.children.length > 0 ? convertToTreeData(category.children) : undefined,
-        selectable: true
-      }))
-    }
-    
-    return convertToTreeData(categoryTree)
-  }, [categoryTree, selectedCategoryId])
+            </span>
+          )}
+        </div>
+        {category.children && category.children.length > 0 && renderCategoryNodes(category.children, depth + 1)}
+      </div>
+    ))
 
   const categoryItems = useMemo(
     () => {
@@ -1867,24 +1813,7 @@ const MenuCenter: React.FC = () => {
                   </Button>
                 </Empty>
               ) : (
-                <Tree
-                  treeData={treeData}
-                  selectedKeys={selectedCategoryId ? [selectedCategoryId] : []}
-                  defaultExpandAll
-                  showIcon={false}
-                  showLine={false}
-                  switcherIcon={() => null} // 隐藏默认的switcher
-                  onSelect={(selectedKeys) => {
-                    if (selectedKeys.length > 0) {
-                      setSelectedCategoryId(selectedKeys[0] as string)
-                    }
-                  }}
-                  style={{
-                    background: 'transparent',
-                    fontSize: '14px'
-                  }}
-                  className="category-tree"
-                />
+                <div className="space-y-0.5">{renderCategoryNodes(categoryTree)}</div>
               )}
             </Spin>
           </Card>

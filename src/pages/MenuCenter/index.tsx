@@ -480,6 +480,9 @@ const MenuCenter: React.FC = () => {
   const [catNameI18n, setCatNameI18n] = useState<Record<string, string>>({})
   const [catParentId, setCatParentId] = useState<string | undefined>(undefined)
   const [catErr, setCatErr] = useState('')
+  // 顶层/嵌套 Tabs（去 antd Tabs）
+  const [topTab, setTopTab] = useState<'products' | 'combos' | 'supplies' | 'locale-settings'>('products')
+  const [productsTab, setProductsTab] = useState<'items' | 'modifiers'>('items')
   // 商品表单（受控，去 antd Form；提交时组装 values 传给 handleItemSubmit）
   const [itemModalTab, setItemModalTab] = useState<'basic' | 'modifiers'>('basic')
   const [itName, setItName] = useState('')
@@ -1798,33 +1801,36 @@ const MenuCenter: React.FC = () => {
   }
 
   return (
-    <Space direction="vertical" size={16} style={{ display: 'block' }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
-        {t('pages.menuCenter.title')}
-        {!isMain && (
-          <Tag color="blue" style={{ marginLeft: 8, fontSize: 12 }}>
-            {currentOrg?.orgType === 'FRANCHISE' ? '加盟店' : '分店'}
-          </Tag>
-        )}
-      </Typography.Title>
-      <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
-        {t('pages.menuCenter.systemDescription')}
-      </Typography.Paragraph>
+    <div className="max-w-6xl mx-auto px-6 py-6">
+      <UI.PageHeader
+        title={<span className="inline-flex items-center gap-2">{t('pages.menuCenter.title')}{!isMain && <UI.Badge variant="blue">{currentOrg?.orgType === 'FRANCHISE' ? '加盟店' : '分店'}</UI.Badge>}</span>}
+        description={t('pages.menuCenter.systemDescription')}
+      />
 
-      <Tabs
-        defaultActiveKey="products"
+      <UI.Tabs
+        value={topTab}
+        onChange={(k) => setTopTab(k as any)}
         items={[
-          {
-            key: 'products',
-            label: t('pages.menuCenter.menuManagement'),
-            children: (
-              <Tabs
-                defaultActiveKey="items"
-                items={[
-                  {
-                    key: 'items',
-                    label: t('pages.menuCenter.itemList'),
-                    children: (
+          { key: 'products', label: t('pages.menuCenter.menuManagement') },
+          { key: 'combos', label: t('pages.menuCenter.comboManagement') },
+          { key: 'supplies', label: '耗材管理' },
+          ...(isMain ? [{ key: 'locale-settings', label: '语言设置' }] : []),
+        ]}
+      />
+
+      <div className="mt-4">
+      {topTab === 'products' && (
+        <>
+          <UI.Tabs
+            value={productsTab}
+            onChange={(k) => setProductsTab(k as any)}
+            items={[
+              { key: 'items', label: t('pages.menuCenter.itemList') },
+              { key: 'modifiers', label: '自定义选项组' },
+            ]}
+          />
+          <div className="mt-4">
+          {productsTab === 'items' && (
               <Row gutter={16}>
         <Col xs={24} md={10} lg={8}>
           <Card 
@@ -2321,26 +2327,16 @@ const MenuCenter: React.FC = () => {
           </Card>
         </Col>
               </Row>
-                    )
-                  },
-                  {
-                    key: 'modifiers',
-                    label: '自定义选项组',
-                    children: (
-                      <ModifierGroupManager readOnly={!isMain} isMain={isMain} additionalLocales={additionalLocales} />
-                    )
-                  },
-
-                ]}
-              />
-            )
-          },
-          {
-            key: 'combos',
-            label: t('pages.menuCenter.comboManagement'),
-            children: (
-              <Card 
-                size="small" 
+          )}
+          {productsTab === 'modifiers' && (
+            <ModifierGroupManager readOnly={!isMain} isMain={isMain} additionalLocales={additionalLocales} />
+          )}
+          </div>
+        </>
+      )}
+      {topTab === 'combos' && (
+              <Card
+                size="small"
                 title={
                   <Space>
                     {t('pages.menuCenter.comboList')}
@@ -2444,20 +2440,10 @@ const MenuCenter: React.FC = () => {
                   ]}
                 />
               </Card>
-            )
-          },
-          {
-            key: 'supplies',
-            label: '耗材管理',
-            children: <SupplyTab />,
-          },
-          ...(isMain ? [{
-            key: 'locale-settings',
-            label: '语言设置',
-            children: <BrandLocaleSettings />,
-          }] : []),
-        ]}
-      />
+      )}
+      {topTab === 'supplies' && <SupplyTab />}
+      {topTab === 'locale-settings' && isMain && <BrandLocaleSettings />}
+      </div>
 
       {/* 分类创建/编辑模态框 */}
       <UI.Modal
@@ -2957,7 +2943,7 @@ const MenuCenter: React.FC = () => {
         danger
         onConfirm={() => { if (categoryDeleteTarget) { handleDeleteCategory(categoryDeleteTarget.id); setCategoryDeleteTarget(null) } }}
       />
-    </Space>
+    </div>
   )
 }
 

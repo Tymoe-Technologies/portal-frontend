@@ -490,8 +490,16 @@ const MenuCenter: React.FC = () => {
     attributeConfigs?: ItemAttributeConfig[];
     itemAddons?: ItemAddon[];
   }>()
-  const [attributeTypeForm] = Form.useForm<CreateItemAttributeTypePayload & { options: ItemAttributeOption[] }>()
-  const [attributeOptionForm] = Form.useForm<CreateItemAttributeOptionPayload>()
+  // 属性类型表单（受控，含动态选项列表）
+  const [atName, setAtName] = useState('')
+  const [atDisplayName, setAtDisplayName] = useState('')
+  const [atOptions, setAtOptions] = useState<Array<{ id: string; value: string; displayName: string; priceModifier: number }>>([])
+  const [atErr, setAtErr] = useState<{ name?: string; displayName?: string }>({})
+  // 属性选项表单（受控）
+  const [aoValue, setAoValue] = useState('')
+  const [aoDisplayName, setAoDisplayName] = useState('')
+  const [aoPriceModifier, setAoPriceModifier] = useState<number>(0)
+  const [aoErr, setAoErr] = useState<{ value?: string; displayName?: string }>({})
   const [modifierGroupForm] = Form.useForm<CreateModifierGroupPayload & { options: ModifierOption[] }>()
   const [modifierOptionForm] = Form.useForm<CreateModifierOptionPayload>()
   const [comboForm] = Form.useForm<CreateComboPayload>()
@@ -1453,24 +1461,20 @@ const MenuCenter: React.FC = () => {
   // 创建属性类型
   const handleCreateAttributeType = () => {
     setEditingAttributeType(null)
-    attributeTypeForm.resetFields()
+    setAtName(''); setAtDisplayName(''); setAtOptions([]); setAtErr({})
     setAttributeTypeModalVisible(true)
   }
 
   // 编辑属性类型
   const handleEditAttributeType = async (attributeType: ItemAttributeType) => {
     setEditingAttributeType(attributeType)
-    
     // 加载属性选项
     await loadAttributeOptions(attributeType.id)
     const options = attributeOptions[attributeType.id] || []
-    
-    attributeTypeForm.setFieldsValue({
-      name: attributeType.name,
-      displayName: attributeType.displayName,
-      inputType: attributeType.inputType,
-      options: options
-    })
+    setAtName(attributeType.name)
+    setAtDisplayName(attributeType.displayName)
+    setAtOptions(options.map(o => ({ id: o.id, value: o.value, displayName: o.displayName, priceModifier: o.priceModifier || 0 })))
+    setAtErr({})
     setAttributeTypeModalVisible(true)
   }
 
@@ -1487,32 +1491,38 @@ const MenuCenter: React.FC = () => {
   }
 
   // 提交属性类型表单
-  const handleAttributeTypeSubmit = async (values: CreateItemAttributeTypePayload & { options: ItemAttributeOption[] }) => {
+  const handleAttributeTypeSubmit = async () => {
+    const err: { name?: string; displayName?: string } = {}
+    if (!atName.trim()) err.name = t('pages.menuCenter.attributeTypeNameRequired')
+    if (!atDisplayName.trim()) err.displayName = t('pages.menuCenter.displayNameRequired')
+    setAtErr(err)
+    if (Object.keys(err).length) return
+
     setLoading(prev => ({ ...prev, creating: true }))
     try {
       // 验证至少有一个选项
-      if (!values.options || values.options.length === 0) {
+      if (!atOptions || atOptions.length === 0) {
         UI.toast.error(t('pages.menuCenter.atLeastOneOption'))
         return
       }
-      
+
       // 验证选项值唯一性
-      const optionValues = values.options.map(opt => opt.value)
+      const optionValues = atOptions.map(opt => opt.value)
       const uniqueValues = new Set(optionValues)
       if (optionValues.length !== uniqueValues.size) {
         UI.toast.error(t('pages.menuCenter.optionValueDuplicate'))
         return
       }
-      
+
       // 创建属性类型
       const attributeTypePayload = {
-        name: values.name,
-        displayName: values.displayName,
-        inputType: values.inputType
+        name: atName,
+        displayName: atDisplayName,
+        inputType: 'select',
       }
-      
+
       let attributeTypeId: string
-      
+
       if (editingAttributeType) {
         await itemManagementService.updateAttributeType(editingAttributeType.id, attributeTypePayload)
         attributeTypeId = editingAttributeType.id
@@ -1522,9 +1532,9 @@ const MenuCenter: React.FC = () => {
         attributeTypeId = createdType.id
         UI.toast.success('属性类型创建成功')
       }
-      
+
       // 创建或更新选项
-      for (const option of values.options) {
+      for (const option of atOptions) {
         const optionPayload = {
           value: option.value,
           displayName: option.displayName,
@@ -1556,8 +1566,7 @@ const MenuCenter: React.FC = () => {
   const handleCreateAttributeOption = (typeId: string) => {
     setSelectedAttributeTypeId(typeId)
     setEditingAttributeOption(null)
-    attributeOptionForm.resetFields()
-    attributeOptionForm.setFieldsValue({ priceModifier: 0 })
+    setAoValue(''); setAoDisplayName(''); setAoPriceModifier(0); setAoErr({})
     setAttributeOptionModalVisible(true)
   }
 
@@ -1565,11 +1574,10 @@ const MenuCenter: React.FC = () => {
   const handleEditAttributeOption = (option: ItemAttributeOption, typeId: string) => {
     setSelectedAttributeTypeId(typeId)
     setEditingAttributeOption(option)
-    attributeOptionForm.setFieldsValue({
-      value: option.value,
-      displayName: option.displayName,
-      priceModifier: option.priceModifier || 0
-    })
+    setAoValue(option.value)
+    setAoDisplayName(option.displayName)
+    setAoPriceModifier(option.priceModifier || 0)
+    setAoErr({})
     setAttributeOptionModalVisible(true)
   }
 
@@ -1586,14 +1594,20 @@ const MenuCenter: React.FC = () => {
   }
 
   // 提交属性选项表单
-  const handleAttributeOptionSubmit = async (values: CreateItemAttributeOptionPayload) => {
+  const handleAttributeOptionSubmit = async () => {
     if (!selectedAttributeTypeId) {
       UI.toast.error(t('pages.menuCenter.selectAttributeTypeFirst'))
       return
     }
+    const err: { value?: string; displayName?: string } = {}
+    if (!aoValue.trim()) err.value = t('pages.menuCenter.optionValueRequired')
+    if (!aoDisplayName.trim()) err.displayName = t('pages.menuCenter.displayNameRequired')
+    setAoErr(err)
+    if (Object.keys(err).length) return
 
     setLoading(prev => ({ ...prev, creating: true }))
     try {
+      const values = { value: aoValue.trim(), displayName: aoDisplayName, priceModifier: Number.isNaN(aoPriceModifier) ? 0 : aoPriceModifier } as CreateItemAttributeOptionPayload
       if (editingAttributeOption) {
         await itemManagementService.updateAttributeOption(editingAttributeOption.id, values)
         UI.toast.success(t('pages.menuCenter.updateAttributeOptionSuccess'))
@@ -2936,281 +2950,124 @@ const MenuCenter: React.FC = () => {
       </Modal>
 
       {/* 属性类型创建/编辑模态框 */}
-      <Modal
-        title={editingAttributeType ? t('pages.menuCenter.editAttributeType') : t('pages.menuCenter.createAttributeType')}
+      <UI.Modal
         open={attributeTypeModalVisible}
-        onCancel={() => setAttributeTypeModalVisible(false)}
-        footer={null}
-        width={600}
+        onOpenChange={(v) => !v && setAttributeTypeModalVisible(false)}
+        title={editingAttributeType ? t('pages.menuCenter.editAttributeType') : t('pages.menuCenter.createAttributeType')}
+        size="lg"
+        footer={
+          <>
+            <UI.Btn variant="secondary" onClick={() => setAttributeTypeModalVisible(false)}>{t('pages.menuCenter.cancel')}</UI.Btn>
+            <UI.Btn variant="primary" loading={loading.creating} onClick={handleAttributeTypeSubmit}>
+              {editingAttributeType ? t('pages.menuCenter.update') : t('pages.menuCenter.create')}
+            </UI.Btn>
+          </>
+        }
       >
-        <Form
-          form={attributeTypeForm}
-          layout="vertical"
-          onFinish={handleAttributeTypeSubmit}
-        >
-          <Form.Item
-            name="name"
-            label={t('pages.menuCenter.attributeTypeName')}
-            rules={[
-              { required: true, message: t('pages.menuCenter.attributeTypeNameRequired') },
-              { whitespace: true, message: t('pages.menuCenter.attributeTypeNameNoWhitespace') }
-            ]}
-          >
-            <Input placeholder={t('pages.menuCenter.attributeTypeNamePlaceholder')} maxLength={255} />
-          </Form.Item>
+        <div className="space-y-4">
+          <UI.Field label={t('pages.menuCenter.attributeTypeName')} required error={atErr.name}>
+            <UI.TextInput value={atName} onChange={setAtName} placeholder={t('pages.menuCenter.attributeTypeNamePlaceholder')} maxLength={255} />
+          </UI.Field>
 
-          <Form.Item
-            name="displayName"
-            label={t('pages.menuCenter.displayName')}
-            rules={[
-              { required: true, message: t('pages.menuCenter.displayNameRequired') }
-            ]}
-          >
-            <Input placeholder={t('pages.menuCenter.displayNamePlaceholder')} maxLength={255} />
-          </Form.Item>
+          <UI.Field label={t('pages.menuCenter.displayName')} required error={atErr.displayName}>
+            <UI.TextInput value={atDisplayName} onChange={setAtDisplayName} placeholder={t('pages.menuCenter.displayNamePlaceholder')} maxLength={255} />
+          </UI.Field>
 
-          <Form.Item
-            name="inputType"
-            initialValue="select"
-            hidden
-          >
-            <Input value="select" />
-          </Form.Item>
-
-          <Divider>{t('pages.menuCenter.optionSettings')}</Divider>
-          
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Typography.Text strong>{t('pages.menuCenter.optionList')}</Typography.Text>
-              <Button 
-                type="dashed" 
-                size="small"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  const currentOptions = attributeTypeForm.getFieldValue('options') || [];
-                  const newOptions = [...currentOptions, {
-                    id: `temp_${Date.now()}`,
-                    value: '',
-                    displayName: '',
-                    priceModifier: 0
-                  }];
-                  attributeTypeForm.setFieldValue('options', newOptions);
-                }}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">{t('pages.menuCenter.optionList')}</span>
+              </div>
+              <UI.Btn
+                variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />}
+                onClick={() => setAtOptions(prev => [...prev, { id: `temp_${Date.now()}`, value: '', displayName: '', priceModifier: 0 }])}
               >
                 {t('pages.menuCenter.addOption')}
-              </Button>
+              </UI.Btn>
             </div>
-            
-            <Form.Item name="options" initialValue={[]}>
-              <Form.List name="options">
-                {(fields, { remove }) => (
-                  <div>
-                    {fields.map(({ key, name, ...restField }) => (
-                      <Card key={key} size="small" style={{ marginBottom: 8 }}>
-                        <Row gutter={8} align="middle">
-                          <Col span={6}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'value']}
-                              label={t('pages.menuCenter.optionValue')}
-                              rules={[
-                                { required: true, message: t('pages.menuCenter.optionValueRequired') },
-                                { whitespace: true, message: t('pages.menuCenter.optionValueNoWhitespace') }
-                              ]}
-                              style={{ marginBottom: 0 }}
-                            >
-                              <Input placeholder={t('pages.menuCenter.optionValuePlaceholder')} size="small" />
-                            </Form.Item>
-                          </Col>
-                          <Col span={6}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'displayName']}
-                              label={t('pages.menuCenter.displayName')}
-                              rules={[
-                                { required: true, message: t('pages.menuCenter.displayNameRequired') }
-                              ]}
-                              style={{ marginBottom: 0 }}
-                            >
-                              <Input placeholder={t('pages.menuCenter.displayNameOptionPlaceholder')} size="small" />
-                            </Form.Item>
-                          </Col>
-                          <Col span={5}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'priceModifier']}
-                              label={t('pages.menuCenter.priceModifier')}
-                              initialValue={0}
-                              style={{ marginBottom: 0 }}
-                            >
-                              <InputNumber 
-                                placeholder="0.00" 
-                                precision={2}
-                                size="small"
-                                style={{ width: '100%' }}
-                              />
-                            </Form.Item>
-                          </Col>
-                          <Col span={4}>
-                            <div style={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              height: '100%', 
-                              paddingTop: '24px',
-                              color: '#666',
-                              fontSize: '12px'
-                            }}>
-                              {t('pages.menuCenter.sortByCreateOrder')}
-                            </div>
-                          </Col>
-                          <Col span={3}>
-                            <Button 
-                              type="text" 
-                              danger 
-                              size="small"
-                              icon={<DeleteOutlined />}
-                              onClick={() => remove(name)}
-                              style={{ marginTop: 24 }}
-                            />
-                          </Col>
-                        </Row>
-                      </Card>
-                    ))}
-                    
-                    {fields.length === 0 && (
-                      <div style={{ 
-                        textAlign: 'center', 
-                        padding: '20px', 
-                        backgroundColor: '#fafafa', 
-                        borderRadius: '6px',
-                        border: '1px dashed #d9d9d9'
-                      }}>
-                        <Typography.Text type="secondary">
-                          {t('pages.menuCenter.noOptionsYet')}
-                        </Typography.Text>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Form.List>
-            </Form.Item>
-          </div>
 
-          <Form.Item style={{ textAlign: 'right', marginBottom: 0 }}>
-            <Space>
-              <Button onClick={() => setAttributeTypeModalVisible(false)}>
-                {t('pages.menuCenter.cancel')}
-              </Button>
-              <Button type="primary" htmlType="submit" loading={loading.creating}>
-                {editingAttributeType ? t('pages.menuCenter.update') : t('pages.menuCenter.create')}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+            {atOptions.length === 0 ? (
+              <div className="text-center py-5 rounded-md border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400">
+                {t('pages.menuCenter.noOptionsYet')}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {atOptions.map((opt, idx) => (
+                  <div key={opt.id} className="rounded-lg border border-slate-200 p-2.5">
+                    <div className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-4">
+                        <div className="text-xs text-slate-400 mb-1">{t('pages.menuCenter.optionValue')}</div>
+                        <input className="w-full text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-2 focus:outline-slate-900"
+                          placeholder={t('pages.menuCenter.optionValuePlaceholder')}
+                          value={opt.value} onChange={(e) => setAtOptions(prev => prev.map((o, i) => i === idx ? { ...o, value: e.target.value } : o))} />
+                      </div>
+                      <div className="col-span-4">
+                        <div className="text-xs text-slate-400 mb-1">{t('pages.menuCenter.displayName')}</div>
+                        <input className="w-full text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-2 focus:outline-slate-900"
+                          placeholder={t('pages.menuCenter.displayNameOptionPlaceholder')}
+                          value={opt.displayName} onChange={(e) => setAtOptions(prev => prev.map((o, i) => i === idx ? { ...o, displayName: e.target.value } : o))} />
+                      </div>
+                      <div className="col-span-3">
+                        <div className="text-xs text-slate-400 mb-1">{t('pages.menuCenter.priceModifier')}</div>
+                        <input type="number" step="0.01" className="w-full text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-2 focus:outline-slate-900"
+                          placeholder="0.00"
+                          value={opt.priceModifier} onChange={(e) => setAtOptions(prev => prev.map((o, i) => i === idx ? { ...o, priceModifier: Number(e.target.value) || 0 } : o))} />
+                      </div>
+                      <div className="col-span-1 flex justify-end pb-0.5">
+                        <button onClick={() => setAtOptions(prev => prev.filter((_, i) => i !== idx))} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-slate-400">{t('pages.menuCenter.sortByCreateOrder')}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </UI.Modal>
 
       {/* 属性选项创建/编辑模态框 */}
-      <Modal
-        title={editingAttributeOption ? t('pages.menuCenter.editAttributeOption') : t('pages.menuCenter.createAttributeOption')}
+      <UI.Modal
         open={attributeOptionModalVisible}
-        onCancel={() => setAttributeOptionModalVisible(false)}
-        footer={null}
-        width={600}
+        onOpenChange={(v) => !v && setAttributeOptionModalVisible(false)}
+        title={editingAttributeOption ? t('pages.menuCenter.editAttributeOption') : t('pages.menuCenter.createAttributeOption')}
+        size="lg"
+        footer={
+          <>
+            <UI.Btn variant="secondary" onClick={() => setAttributeOptionModalVisible(false)}>{t('pages.menuCenter.cancel')}</UI.Btn>
+            <UI.Btn variant="primary" loading={loading.creating} onClick={handleAttributeOptionSubmit}>
+              {editingAttributeOption ? t('pages.menuCenter.update') : t('pages.menuCenter.create')}
+            </UI.Btn>
+          </>
+        }
       >
-        <Form
-          form={attributeOptionForm}
-          layout="vertical"
-          onFinish={handleAttributeOptionSubmit}
-        >
-          <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 6 }}>
-            <Typography.Text strong style={{ color: '#0369a1' }}>{t('pages.menuCenter.fillExample')}</Typography.Text>
-            <div style={{ marginTop: 8 }}>
-              <Typography.Text>{t('pages.menuCenter.iceOptionExample')}</Typography.Text>
-              <ul style={{ margin: '4px 0', paddingLeft: 20, fontSize: '12px' }}>
-                <li>选项值: <Typography.Text code>normal_ice</Typography.Text> → 显示名称: 正常冰</li>
-                <li>选项值: <Typography.Text code>light_ice</Typography.Text> → 显示名称: 少冰</li>
-                <li>选项值: <Typography.Text code>more_ice</Typography.Text> → 显示名称: 多冰</li>
-                <li>选项值: <Typography.Text code>no_ice</Typography.Text> → 显示名称: 去冰</li>
-              </ul>
-            </div>
+        <div className="space-y-4">
+          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm">
+            <p className="font-medium text-blue-800">{t('pages.menuCenter.fillExample')}</p>
+            <p className="text-slate-600 mt-1">{t('pages.menuCenter.iceOptionExample')}</p>
+            <ul className="list-disc pl-5 mt-1 text-xs text-slate-500 space-y-0.5">
+              <li>选项值: <code className="font-mono">normal_ice</code> → 显示名称: 正常冰</li>
+              <li>选项值: <code className="font-mono">light_ice</code> → 显示名称: 少冰</li>
+              <li>选项值: <code className="font-mono">more_ice</code> → 显示名称: 多冰</li>
+              <li>选项值: <code className="font-mono">no_ice</code> → 显示名称: 去冰</li>
+            </ul>
           </div>
 
-          <Form.Item
-            name="value"
-            label={
-              <Space>
-                {t('pages.menuCenter.optionValue')}
-                <Tooltip title={t('pages.menuCenter.optionValueTooltip')}>
-                  <Button type="link" size="small" style={{ padding: 0 }}>?</Button>
-                </Tooltip>
-              </Space>
-            }
-            rules={[
-              { required: true, message: t('pages.menuCenter.optionValueRequired') },
-              { whitespace: true, message: t('pages.menuCenter.optionValueNoWhitespace') }
-            ]}
-          >
-            <Input 
-              placeholder={t('pages.menuCenter.optionValueExamplePlaceholder')} 
-              maxLength={255}
-              addonBefore={t('pages.menuCenter.systemStorage')}
-            />
-          </Form.Item>
+          <UI.Field label={t('pages.menuCenter.optionValue')} required error={aoErr.value} hint={`${t('pages.menuCenter.systemStorage')} · ${t('pages.menuCenter.optionValueTooltip')}`}>
+            <UI.TextInput value={aoValue} onChange={setAoValue} placeholder={t('pages.menuCenter.optionValueExamplePlaceholder')} maxLength={255} />
+          </UI.Field>
 
-          <Form.Item
-            name="displayName"
-            label={
-              <Space>
-                {t('pages.menuCenter.displayName')}
-                <Tooltip title={t('pages.menuCenter.displayNameTooltip')}>
-                  <Button type="link" size="small" style={{ padding: 0 }}>?</Button>
-                </Tooltip>
-              </Space>
-            }
-            rules={[
-              { required: true, message: t('pages.menuCenter.displayNameRequired') }
-            ]}
-          >
-            <Input 
-              placeholder={t('pages.menuCenter.displayNameExamplePlaceholder')} 
-              maxLength={255}
-              addonBefore={t('pages.menuCenter.userDisplay')}
-            />
-          </Form.Item>
+          <UI.Field label={t('pages.menuCenter.displayName')} required error={aoErr.displayName} hint={`${t('pages.menuCenter.userDisplay')} · ${t('pages.menuCenter.displayNameTooltip')}`}>
+            <UI.TextInput value={aoDisplayName} onChange={setAoDisplayName} placeholder={t('pages.menuCenter.displayNameExamplePlaceholder')} maxLength={255} />
+          </UI.Field>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="priceModifier"
-                label={t('pages.menuCenter.priceModifier')}
-                rules={[
-                  { type: 'number', message: t('pages.menuCenter.validNumberRequired') }
-                ]}
-              >
-                <InputNumber
-                  style={{ width: '100%' }}
-                  placeholder="0.00"
-                  precision={2}
-                  formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={value => value?.replace(/$\s?|(,*)/g, '') as any}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-
-          <Form.Item style={{ textAlign: 'right', marginBottom: 0 }}>
-            <Space>
-              <Button onClick={() => setAttributeOptionModalVisible(false)}>
-                {t('pages.menuCenter.cancel')}
-              </Button>
-              <Button type="primary" htmlType="submit" loading={loading.creating}>
-                {editingAttributeOption ? t('pages.menuCenter.update') : t('pages.menuCenter.create')}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+          <div className="w-1/2">
+            <UI.Field label={t('pages.menuCenter.priceModifier')}>
+              <UI.NumberInput value={aoPriceModifier} onChange={setAoPriceModifier} suffix="$" className="w-full" />
+            </UI.Field>
+          </div>
+        </div>
+      </UI.Modal>
 
       {/* 加料创建/编辑模态框 */}
       <Modal

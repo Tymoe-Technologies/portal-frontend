@@ -218,16 +218,15 @@ const ComboItemsInput: React.FC<{
       <p className="text-sm font-semibold text-slate-800 mb-2">{t('pages.menuCenter.selectComboItems')}</p>
 
       {/* 添加商品选择器 */}
-      <select
-        className="w-full mb-4 text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 cursor-pointer focus:outline-2 focus:outline-slate-900"
-        value=""
-        onChange={(e) => { if (e.target.value) handleAddItem(e.target.value) }}
-      >
-        <option value="">{t('pages.menuCenter.selectItemToAdd')}</option>
-        {availableItems.map(item => (
-          <option key={item.id} value={item.id}>{item.name} - {formatPrice(item.basePrice)}</option>
-        ))}
-      </select>
+      <div className="mb-4">
+        <UI.SelectInput
+          value=""
+          onChange={(v) => { if (v) handleAddItem(String(v)) }}
+          placeholder={t('pages.menuCenter.selectItemToAdd')}
+          className="w-full"
+          options={availableItems.map(item => ({ label: `${item.name} - ${formatPrice(item.basePrice)}`, value: item.id }))}
+        />
+      </div>
 
       {/* 已选商品列表 */}
       {selectedItems.length === 0 ? (

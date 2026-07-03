@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Card, Table, Button, Space, message, Tag, Modal, Typography } from 'antd'
-import { PlusOutlined, EditOutlined, CopyOutlined, CheckCircleOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Plus, Pencil, Copy, CheckCircle2, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRecipes, createRecipe, updateRecipe, deleteRecipe } from '@/services/recipe'
 import type { Recipe } from '@/services/recipe'
 import RecipeFormModal from './RecipeFormModal'
-import type { ColumnsType } from 'antd/es/table'
-
-const { Text } = Typography
+import { SectionCard, Table, type Column, Btn, ConfirmDialog, toast } from '@/components/ui-kit'
 
 interface ItemAttribute {
   name: string
@@ -29,11 +26,7 @@ interface RecipeByAttributeManagerProps {
   itemAttributes: ItemAttribute[]
 }
 
-const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({
-  itemId,
-  itemName,
-  itemAttributes
-}) => {
+const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({ itemId, itemName, itemAttributes }) => {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [recipes, setRecipes] = useState<Recipe[]>([])
@@ -41,6 +34,8 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({
   const [modalVisible, setModalVisible] = useState(false)
   const [editingRecipe, setEditingRecipe] = useState<Recipe | undefined>()
   const [selectedCombination, setSelectedCombination] = useState<AttributeCombination | undefined>()
+  // 确认框：承载「批量复制」与「删除」两种确认
+  const [confirm, setConfirm] = useState<{ title: string; description: string; onConfirm: () => void } | null>(null)
 
   useEffect(() => {
     if (itemId) {
@@ -55,7 +50,7 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({
       const data = await getRecipes(itemId)
       setRecipes(data)
     } catch (error: any) {
-      message.error(error.message || '加载配方失败')
+      toast.error(error.message || '加载配方失败')
     } finally {
       setLoading(false)
     }
@@ -68,18 +63,13 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({
     }
 
     const generate = (attrs: ItemAttribute[], index: number, current: Record<string, string>): Record<string, string>[] => {
-      if (index >= attrs.length) {
-        return [{ ...current }]
-      }
-
+      if (index >= attrs.length) return [{ ...current }]
       const attr = attrs[index]
       const results: Record<string, string>[] = []
-
       for (const option of attr.options) {
         const next = { ...current, [attr.name]: option.value }
         results.push(...generate(attrs, index + 1, next))
       }
-
       return results
     }
 
@@ -98,13 +88,7 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({
         return Object.keys(combo).every((k) => recipeAttrs[k] === combo[k])
       })
 
-      return {
-        key,
-        attributes: combo,
-        attributeLabels,
-        hasRecipe: !!recipe,
-        recipe
-      }
+      return { key, attributes: combo, attributeLabels, hasRecipe: !!recipe, recipe }
     })
 
     setCombinations(combinationsWithRecipes)
@@ -126,24 +110,21 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({
     setModalVisible(true)
   }
 
-  const handleCopyToAll = async (sourceRecipe: Recipe) => {
+  const handleCopyToAll = (sourceRecipe: Recipe) => {
     const targetCombinations = combinations.filter((c) => {
-      // 排除源配方自己
       const sourceAttrs = sourceRecipe.attributeConditions || {}
       return JSON.stringify(c.attributes) !== JSON.stringify(sourceAttrs)
     })
 
-    Modal.confirm({
+    setConfirm({
       title: '批量复制配方',
-      content: `确定要将此配方复制到其他 ${targetCombinations.length} 个属性组合吗？已存在的配方将被覆盖。`,
-      onOk: async () => {
+      description: `确定要将此配方复制到其他 ${targetCombinations.length} 个属性组合吗？已存在的配方将被覆盖。`,
+      onConfirm: async () => {
         let successCount = 0
         let updateCount = 0
-
         for (const combo of targetCombinations) {
           try {
             if (combo.hasRecipe && combo.recipe?.id) {
-              // 如果已有配方，使用 updateRecipe 更新
               await updateRecipe(combo.recipe.id, {
                 itemId: sourceRecipe.itemId,
                 name: sourceRecipe.name,
@@ -152,18 +133,17 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({
                 priority: sourceRecipe.priority,
                 isDefault: sourceRecipe.isDefault,
                 isActive: sourceRecipe.isActive,
-                steps: sourceRecipe.steps
+                steps: sourceRecipe.steps,
               })
               updateCount++
             } else {
-              // 如果没有配方，创建新配方
               await createRecipe({
                 itemId: sourceRecipe.itemId,
                 name: sourceRecipe.name,
                 description: sourceRecipe.description,
                 attributeConditions: combo.attributes,
                 priority: sourceRecipe.priority,
-                steps: sourceRecipe.steps
+                steps: sourceRecipe.steps,
               })
               successCount++
             }
@@ -171,26 +151,27 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({
             console.error('复制失败:', error)
           }
         }
-
-        message.success(`成功创建 ${successCount} 个配方，更新 ${updateCount} 个配方`)
+        toast.success(`成功创建 ${successCount} 个配方，更新 ${updateCount} 个配方`)
+        setConfirm(null)
         loadRecipes()
-      }
+      },
     })
   }
 
   const handleDeleteRecipe = (recipe: Recipe) => {
-    Modal.confirm({
+    setConfirm({
       title: t('pages.recipeGuide.deleteRecipe'),
-      content: '确定要删除这个配方吗？',
-      onOk: async () => {
+      description: '确定要删除这个配方吗？',
+      onConfirm: async () => {
         try {
           await deleteRecipe(recipe.id!)
-          message.success('删除成功')
+          toast.success('删除成功')
+          setConfirm(null)
           loadRecipes()
         } catch (error: any) {
-          message.error(error.message || '删除失败')
+          toast.error(error.message || '删除失败')
         }
-      }
+      },
     })
   }
 
@@ -199,107 +180,66 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({
     loadRecipes()
   }
 
-  const columns: ColumnsType<AttributeCombination> = useMemo(() => [
+  const columns: Column<AttributeCombination>[] = useMemo(() => [
     ...itemAttributes.map((attr) => ({
-      title: attr.label,
-      dataIndex: ['attributeLabels', attr.name],
       key: attr.name,
-      width: 120
+      title: attr.label,
+      width: 120,
+      render: (row: AttributeCombination) => row.attributeLabels[attr.name],
     })),
     {
-      title: t('pages.recipeGuide.printCode'),
       key: 'printCode',
+      title: t('pages.recipeGuide.printCode'),
       width: 150,
-      render: (_: any, record: AttributeCombination) => (
-        record.hasRecipe && record.recipe?.printCodeString ? (
-          <Text code style={{ fontSize: 12 }}>{record.recipe.printCodeString}</Text>
-        ) : (
-          <Text type="secondary">-</Text>
-        )
-      )
+      render: (row: AttributeCombination) => (
+        row.hasRecipe && row.recipe?.printCodeString
+          ? <code className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">{row.recipe.printCodeString}</code>
+          : <span className="text-slate-400">-</span>
+      ),
     },
     {
-      title: t('pages.recipeGuide.status'),
       key: 'status',
+      title: t('pages.recipeGuide.status'),
       width: 100,
-      render: (_: any, record: AttributeCombination) => (
-        record.hasRecipe ? (
-          <Tag icon={<CheckCircleOutlined />} color="success">
-            {t('pages.recipeGuide.configured')}
-          </Tag>
-        ) : (
-          <Tag color="default">{t('pages.recipeGuide.unconfigured')}</Tag>
-        )
-      )
+      render: (row: AttributeCombination) => (
+        row.hasRecipe
+          ? <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded ring-1 bg-green-50 text-green-600 ring-green-200"><CheckCircle2 className="w-3 h-3" />{t('pages.recipeGuide.configured')}</span>
+          : <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded ring-1 bg-slate-100 text-slate-500 ring-slate-200">{t('pages.recipeGuide.unconfigured')}</span>
+      ),
     },
     {
-      title: t('pages.recipeGuide.actions'),
       key: 'actions',
+      title: t('pages.recipeGuide.actions'),
       width: 280,
-      render: (_: any, record: AttributeCombination) => (
-        <Space>
-          {record.hasRecipe ? (
+      render: (row: AttributeCombination) => (
+        <div className="flex items-center gap-1">
+          {row.hasRecipe ? (
             <>
-              <Button
-                type="link"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => handleEditRecipe(record.recipe!)}
-              >
-                编辑
-              </Button>
-              <Button
-                type="link"
-                size="small"
-                icon={<CopyOutlined />}
-                onClick={() => handleCopyToAll(record.recipe!)}
-                title="复制到所有其他组合"
-              />
-              <Button
-                type="link"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleDeleteRecipe(record.recipe!)}
-                title="删除配方"
-              />
+              <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditRecipe(row.recipe!)}>编辑</Btn>
+              <Btn variant="link" icon={<Copy className="w-3.5 h-3.5" />} onClick={() => handleCopyToAll(row.recipe!)} />
+              <Btn variant="link" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => handleDeleteRecipe(row.recipe!)} />
             </>
           ) : (
-            <Button
-              type="primary"
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={() => handleCreateRecipe(record)}
-            >
-              {t('pages.recipeGuide.createRecipe')}
-            </Button>
+            <Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => handleCreateRecipe(row)}>{t('pages.recipeGuide.createRecipe')}</Btn>
           )}
-        </Space>
-      )
-    }
-  ], [t, recipes])
+        </div>
+      ),
+    },
+  ], [t, recipes, itemAttributes])
 
   const hasRecipeCount = combinations.filter((c) => c.hasRecipe).length
   const totalCount = combinations.length
 
   return (
-    <Card
+    <SectionCard
       title={
-        <Space>
+        <span className="inline-flex items-center gap-2">
           <span>{itemName} - {t('pages.recipeGuide.recipeManagement')}</span>
-          <Tag color="blue">
-            {hasRecipeCount} / {totalCount} {t('pages.recipeGuide.configured')}
-          </Tag>
-        </Space>
+          <span className="text-xs px-1.5 py-0.5 rounded ring-1 bg-blue-50 text-blue-600 ring-blue-200">{hasRecipeCount} / {totalCount} {t('pages.recipeGuide.configured')}</span>
+        </span>
       }
     >
-      <Table
-        columns={columns}
-        dataSource={combinations}
-        loading={loading}
-        pagination={false}
-        size="small"
-      />
+      <Table columns={columns} data={combinations} rowKey={(r) => r.key} loading={loading} />
 
       {modalVisible && (
         <RecipeFormModal
@@ -311,7 +251,15 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({
           onSuccess={handleModalSuccess}
         />
       )}
-    </Card>
+
+      <ConfirmDialog
+        open={!!confirm}
+        onOpenChange={(o) => !o && setConfirm(null)}
+        title={confirm?.title ?? ''}
+        description={confirm?.description}
+        onConfirm={() => confirm?.onConfirm()}
+      />
+    </SectionCard>
   )
 }
 

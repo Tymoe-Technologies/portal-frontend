@@ -476,18 +476,20 @@ const MenuCenter: React.FC = () => {
   const [catNameI18n, setCatNameI18n] = useState<Record<string, string>>({})
   const [catParentId, setCatParentId] = useState<string | undefined>(undefined)
   const [catErr, setCatErr] = useState('')
-  const [itemForm] = Form.useForm<{
-    name: string;
-    name_i18n?: Record<string, string>;
-    description?: string;
-    categoryId?: string;
-    basePrice: number;
-    cost?: number;
-    isActive?: boolean;
-    customFields?: any;
-    attributeConfigs?: ItemAttributeConfig[];
-    itemAddons?: ItemAddon[];
-  }>()
+  // 商品表单（受控，去 antd Form；提交时组装 values 传给 handleItemSubmit）
+  const [itemModalTab, setItemModalTab] = useState<'basic' | 'modifiers'>('basic')
+  const [itName, setItName] = useState('')
+  const [itNameI18n, setItNameI18n] = useState<Record<string, string>>({})
+  const [itDescription, setItDescription] = useState('')
+  const [itDescriptionI18n, setItDescriptionI18n] = useState<Record<string, string>>({})
+  const [itCategoryId, setItCategoryId] = useState<string | undefined>(undefined)
+  const [itBasePrice, setItBasePrice] = useState<number>(NaN)
+  const [itCost, setItCost] = useState<number>(NaN)
+  const [itIsActive, setItIsActive] = useState(true)
+  const [itScope, setItScope] = useState<string>('BRAND')
+  const [itVisibleStoreIds, setItVisibleStoreIds] = useState<string[]>([])
+  const [itCustomFields, setItCustomFields] = useState<any>(undefined)
+  const [itModifiers, setItModifiers] = useState<ItemModifierConfig[]>([])
   // 属性类型表单（受控，含动态选项列表）
   const [atName, setAtName] = useState('')
   const [atDisplayName, setAtDisplayName] = useState('')
@@ -1072,11 +1074,10 @@ const MenuCenter: React.FC = () => {
     }
     
     setEditingItem(null)
-    itemForm.resetFields()
-    itemForm.setFieldsValue({
-      isActive: true,
-      categoryId: selectedCategoryId
-    })
+    setItName(''); setItNameI18n({}); setItDescription(''); setItDescriptionI18n({})
+    setItCategoryId(selectedCategoryId || undefined); setItBasePrice(NaN); setItCost(NaN)
+    setItIsActive(true); setItScope('BRAND'); setItVisibleStoreIds([]); setItCustomFields(undefined); setItModifiers([])
+    setItemModalTab('basic')
     setPreviewImageUrl(undefined)
     setItemModalVisible(true)
   }
@@ -1091,16 +1092,6 @@ const MenuCenter: React.FC = () => {
         await loadAttributeOptions(attributeType.id)
       }
     }
-    
-    // 转换API返回的attributes为前端表单需要的attributeConfigs格式
-    const attributeConfigsData = item.attributes?.map(attr => ({
-      attributeTypeId: attr.attributeTypeId,
-      isRequired: attr.isRequired,
-      optionOverrides: attr.optionOverrides || {},
-      allowedOptions: attr.allowedOptions || [],
-      defaultOptionId: attr.defaultOptionId,
-      optionOrder: attr.optionOrder || []
-    })) || []
     
     // 加载商品的自定义选项配置（Modifier v2.0）
     let itemModifiersData: ItemModifierConfig[] = []
@@ -1162,43 +1153,25 @@ const MenuCenter: React.FC = () => {
     }
     
     // 将价格从分转换为元（后端存储的是分，表单显示的是元）
-    itemForm.resetFields()
-    itemForm.setFieldsValue({
-      name: item.name,
-      name_i18n: (item as any).name_i18n ?? {},
-      description: item.description,
-      description_i18n: (item as any).description_i18n ?? {},
-      categoryId: item.categoryId,
-      basePrice: fromMinorUnit(item.basePrice),
-      cost: item.cost !== undefined && item.cost !== null ? fromMinorUnit(item.cost) : undefined,
-      isActive: item.isActive,
-      customFields: item.customFields,
-      attributeConfigs: attributeConfigsData,
-      itemModifiers: itemModifiersData,
-      scope: item.scope || 'BRAND',
-      visibleStoreIds: item.visible_stores?.map(vs => vs.store_id) || []
-    } as any)
+    setItName(item.name)
+    setItNameI18n((item as any).name_i18n ?? {})
+    setItDescription(item.description || '')
+    setItDescriptionI18n((item as any).description_i18n ?? {})
+    setItCategoryId(item.categoryId)
+    setItBasePrice(fromMinorUnit(item.basePrice))
+    setItCost(item.cost !== undefined && item.cost !== null ? fromMinorUnit(item.cost) : NaN)
+    setItIsActive(item.isActive)
+    setItCustomFields(item.customFields)
+    setItModifiers(itemModifiersData)
+    setItScope(item.scope || 'BRAND')
+    setItVisibleStoreIds(item.visible_stores?.map(vs => vs.store_id) || [])
+    setItemModalTab('basic')
     setPreviewImageUrl(item.imageUrl)
     setItemModalVisible(true)
   }
 
-  // 图片上传前验证
-  const beforeImageUpload = (file: RcFile): boolean | string => {
-    const isValidType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
-    if (!isValidType) {
-      UI.toast.error('只支持 JPG、PNG、WebP 格式的图片')
-      return Upload.LIST_IGNORE
-    }
-    const isLt5M = file.size / 1024 / 1024 < 5
-    if (!isLt5M) {
-      UI.toast.error('图片大小不能超过 5MB')
-      return Upload.LIST_IGNORE
-    }
-    return true
-  }
-
   // 上传图片
-  const handleImageUpload = async (file: RcFile) => {
+  const handleImageUpload = async (file: File) => {
     if (!editingItem) {
       UI.toast.warning('请先保存商品，然后再上传图片')
       return false
@@ -1221,30 +1194,20 @@ const MenuCenter: React.FC = () => {
     return false
   }
 
-  // 删除图片
+  // 删除图片（kit ImageUpload 的删除按钮已是显式操作，直接删除）
   const handleImageDelete = async () => {
     if (!editingItem) return
-
-    Modal.confirm({
-      title: '确认删除图片',
-      content: '确定要删除这张商品图片吗？',
-      okText: '删除',
-      okType: 'danger',
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          await itemManagementService.deleteItemImage(editingItem.id)
-          setPreviewImageUrl(undefined)
-          setEditingItem({ ...editingItem, imageUrl: undefined })
-          UI.toast.success('图片删除成功')
-          loadItems()
-          loadAllItems()
-        } catch (error: any) {
-          console.error('Image delete failed:', error)
-          UI.toast.error(error?.response?.data?.error || '图片删除失败')
-        }
-      }
-    })
+    try {
+      await itemManagementService.deleteItemImage(editingItem.id)
+      setPreviewImageUrl(undefined)
+      setEditingItem({ ...editingItem, imageUrl: undefined })
+      UI.toast.success('图片删除成功')
+      loadItems()
+      loadAllItems()
+    } catch (error: any) {
+      console.error('Image delete failed:', error)
+      UI.toast.error(error?.response?.data?.error || '图片删除失败')
+    }
   }
 
   // 删除商品
@@ -2641,304 +2604,148 @@ const MenuCenter: React.FC = () => {
       </UI.Modal>
 
       {/* 商品创建/编辑模态框 */}
-      <Modal
-        title={editingItem ? t('pages.menuCenter.editItem') : t('pages.menuCenter.createItem')}
+      <UI.Modal
         open={itemModalVisible}
-        onCancel={() => setItemModalVisible(false)}
-        footer={null}
-        width={1200}
-        style={{ top: 20 }}
+        onOpenChange={(v) => !v && setItemModalVisible(false)}
+        title={editingItem ? t('pages.menuCenter.editItem') : t('pages.menuCenter.createItem')}
+        size="xl"
+        footer={
+          <>
+            <UI.Btn variant="secondary" onClick={() => setItemModalVisible(false)}>{t('pages.menuCenter.cancel')}</UI.Btn>
+            <UI.Btn variant="primary" loading={loading.creating} onClick={() => handleItemSubmit({
+              name: itName,
+              name_i18n: itNameI18n,
+              description: itDescription,
+              description_i18n: itDescriptionI18n,
+              categoryId: itCategoryId,
+              basePrice: itBasePrice,
+              cost: Number.isNaN(itCost) ? undefined : itCost,
+              isActive: itIsActive,
+              customFields: itCustomFields,
+              itemModifiers: itModifiers,
+              scope: itScope,
+              visibleStoreIds: itVisibleStoreIds,
+            })}>
+              {editingItem ? t('pages.menuCenter.update') : t('pages.menuCenter.create')}
+            </UI.Btn>
+          </>
+        }
       >
-        <Form
-          form={itemForm}
-          layout="vertical"
-          onFinish={handleItemSubmit}
-        >
-          <Tabs
-            defaultActiveKey="basic"
-            items={[
-              {
-                key: 'basic',
-                label: t('pages.menuCenter.basicInfo'),
-                children: (
-                  <div>
-                    <Card size="small" style={{ marginBottom: 16 }}>
-                      <Row gutter={24}>
-                        {/* 左栏：图片 */}
-                        <Col flex="140px">
-                          <Form.Item label="图片" style={{ marginBottom: 0 }}>
-                            {editingItem ? (
-                              previewImageUrl ? (
-                                <div style={{ position: 'relative', display: 'inline-block' }}>
-                                  <Image
-                                    src={previewImageUrl}
-                                    alt="商品图片"
-                                    width={120}
-                                    height={120}
-                                    style={{ objectFit: 'cover', borderRadius: 8, display: 'block' }}
-                                  />
-                                  <Button
-                                    type="text"
-                                    danger
-                                    size="small"
-                                    icon={<DeleteOutlined />}
-                                    loading={imageUploading}
-                                    onClick={handleImageDelete}
-                                    style={{
-                                      position: 'absolute',
-                                      top: 4,
-                                      right: 4,
-                                      background: 'rgba(255,255,255,0.9)',
-                                      borderRadius: '50%',
-                                      padding: 4,
-                                      minWidth: 24,
-                                      height: 24,
-                                    }}
-                                  />
-                                </div>
-                              ) : (
-                                <Upload
-                                  accept=".jpg,.jpeg,.png,.webp"
-                                  showUploadList={false}
-                                  beforeUpload={beforeImageUpload}
-                                  customRequest={({ file }) => handleImageUpload(file as RcFile)}
-                                  disabled={imageUploading}
-                                >
-                                  <div style={{
-                                    width: 120,
-                                    height: 120,
-                                    border: '1px dashed #d9d9d9',
-                                    borderRadius: 8,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    background: '#fafafa',
-                                  }}>
-                                    {imageUploading ? (
-                                      <LoadingOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-                                    ) : (
-                                      <>
-                                        <PictureOutlined style={{ fontSize: 24, color: '#999' }} />
-                                        <span style={{ marginTop: 8, color: '#999', fontSize: 12 }}>上传图片</span>
-                                      </>
-                                    )}
-                                  </div>
-                                </Upload>
-                              )
-                            ) : (
-                              <div style={{
-                                width: 120,
-                                height: 120,
-                                border: '1px dashed #d9d9d9',
-                                borderRadius: 8,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: '#fafafa',
-                              }}>
-                                <PictureOutlined style={{ fontSize: 24, color: '#d9d9d9' }} />
-                                <span style={{ marginTop: 8, color: '#bbb', fontSize: 11, textAlign: 'center', padding: '0 8px' }}>保存后可上传</span>
-                              </div>
-                            )}
-                            <div style={{ color: '#bbb', fontSize: 11, marginTop: 6 }}>JPG / PNG / WebP，≤5MB</div>
-                          </Form.Item>
-                        </Col>
+        <UI.Tabs
+          value={itemModalTab}
+          onChange={(k) => setItemModalTab(k as 'basic' | 'modifiers')}
+          items={[
+            { key: 'basic', label: t('pages.menuCenter.basicInfo') },
+            { key: 'modifiers', label: '自定义选项配置' },
+          ]}
+        />
 
-                        {/* 中栏：名称 + 描述（所有语言） */}
-                        <Col flex="1" style={{ minWidth: 0 }}>
-                          <Row gutter={12}>
-                            <Col span={12}>
-                              <Form.Item
-                                name="name"
-                                label="名称（English，默认）"
-                                rules={[
-                                  { required: true, message: t('pages.menuCenter.itemNameRequired') },
-                                  { max: 255, message: t('pages.menuCenter.itemNameMaxLength') },
-                                  { whitespace: true, message: t('pages.menuCenter.itemNameNoWhitespace') }
-                                ]}
-                                style={{ marginBottom: 12 }}
-                              >
-                                <Input placeholder={t('pages.menuCenter.itemNamePlaceholder')} maxLength={100} />
-                              </Form.Item>
-                              {additionalLocales.map(locale => (
-                                <Form.Item
-                                  key={locale}
-                                  name={['name_i18n', locale]}
-                                  label={`名称（${LOCALE_LABELS[locale] ?? locale}）`}
-                                  style={{ marginBottom: 12 }}
-                                >
-                                  <Input placeholder={`可选`} maxLength={100} />
-                                </Form.Item>
-                              ))}
-                            </Col>
-                            <Col span={12}>
-                              <Form.Item
-                                name="description"
-                                label="简介（English，默认）"
-                                style={{ marginBottom: 12 }}
-                              >
-                                <Input.TextArea rows={2} placeholder={t('pages.menuCenter.itemDescriptionPlaceholder')} maxLength={500} />
-                              </Form.Item>
-                              {additionalLocales.map(locale => (
-                                <Form.Item
-                                  key={locale}
-                                  name={['description_i18n', locale]}
-                                  label={`简介（${LOCALE_LABELS[locale] ?? locale}）`}
-                                  style={{ marginBottom: 12 }}
-                                >
-                                  <Input.TextArea rows={2} placeholder="可选" maxLength={500} />
-                                </Form.Item>
-                              ))}
-                            </Col>
-                          </Row>
-                        </Col>
-
-                        {/* 右栏：分类、价格、状态 */}
-                        <Col flex="220px">
-                          <Form.Item
-                            name="categoryId"
-                            label={t('pages.menuCenter.itemCategory')}
-                            rules={[{ required: true, message: t('pages.menuCenter.selectCategoryRequired') }]}
-                            style={{ marginBottom: 12 }}
-                          >
-                            <Select placeholder={t('pages.menuCenter.selectCategory')} allowClear>
-                              {flatCategories.map(cat => (
-                                <Select.Option key={cat.id} value={cat.id}>
-                                  {cat.level && cat.level > 0 ? (
-                                    <span style={{ color: '#666' }}>　└─ {cat.name}</span>
-                                  ) : (
-                                    <span style={{ fontWeight: 500 }}>{cat.name}</span>
-                                  )}
-                                </Select.Option>
-                              ))}
-                            </Select>
-                          </Form.Item>
-                          <Row gutter={12}>
-                            <Col span={12}>
-                              <Form.Item
-                                name="basePrice"
-                                label={t('pages.menuCenter.basePrice')}
-                                rules={[
-                                  { required: true, message: t('pages.menuCenter.basePriceRequired') },
-                                  { type: 'number', message: t('pages.menuCenter.validNumber') }
-                                ]}
-                                style={{ marginBottom: 12 }}
-                              >
-                                <InputNumber style={{ width: '100%' }} placeholder="0.00" precision={2} />
-                              </Form.Item>
-                            </Col>
-                            <Col span={12}>
-                              <Form.Item
-                                name="cost"
-                                label={t('pages.menuCenter.cost')}
-                                rules={[
-                                  { type: 'number', message: t('pages.menuCenter.validNumber') },
-                                  {
-                                    validator: (_, value) => {
-                                      if (value !== undefined && value !== null && value !== '' && value < 0) {
-                                        return Promise.reject(new Error(t('pages.menuCenter.costCannotBeNegative')))
-                                      }
-                                      return Promise.resolve()
-                                    }
-                                  }
-                                ]}
-                                style={{ marginBottom: 12 }}
-                              >
-                                <InputNumber style={{ width: '100%' }} placeholder="0.00" precision={2} />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-                          <Form.Item
-                            name="isActive"
-                            label={t('pages.menuCenter.status')}
-                            valuePropName="checked"
-                            style={{ marginBottom: 12 }}
-                          >
-                            <Switch checkedChildren={t('pages.menuCenter.active')} unCheckedChildren={t('pages.menuCenter.inactive')} />
-                          </Form.Item>
-                          {/* 商品范围（仅主店可配置） */}
-                          {isMain && (
-                            <>
-                              <Form.Item
-                                name="scope"
-                                label="商品范围"
-                                initialValue="BRAND"
-                                style={{ marginBottom: 12 }}
-                              >
-                                <Select>
-                                  <Select.Option value="BRAND">品牌商品（全部门店）</Select.Option>
-                                  <Select.Option value="STORE_EXCLUSIVE">店铺专属</Select.Option>
-                                </Select>
-                              </Form.Item>
-                              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.scope !== cur.scope}>
-                                {({ getFieldValue }) => getFieldValue('scope') === 'STORE_EXCLUSIVE' && (
-                                  <Form.Item
-                                    name="visibleStoreIds"
-                                    label="可见门店"
-                                    rules={[{ required: true, message: '请至少选择一个可见门店', type: 'array', min: 1 }]}
-                                    style={{ marginBottom: 0 }}
-                                  >
-                                    <Select mode="multiple" placeholder="选择可见门店">
-                                      {organizations.map((o: any) => (
-                                        <Select.Option key={o.id} value={o.id}>
-                                          {o.orgName}
-                                          {o.orgType === 'MAIN' ? ' (主店)' : o.orgType === 'FRANCHISE' ? ' (加盟)' : ' (分店)'}
-                                        </Select.Option>
-                                      ))}
-                                    </Select>
-                                  </Form.Item>
-                                )}
-                              </Form.Item>
-                            </>
-                          )}
-                        </Col>
-                      </Row>
-                    </Card>
+        <div className="pt-4">
+          {itemModalTab === 'basic' ? (
+            <div className="flex flex-col lg:flex-row gap-5">
+              {/* 左：图片 */}
+              <div className="shrink-0">
+                <div className="text-sm font-medium text-slate-700 mb-1.5">图片</div>
+                {editingItem ? (
+                  <UI.ImageUpload url={previewImageUrl} loading={imageUploading} onPick={handleImageUpload} onRemove={handleImageDelete} hint="JPG / PNG / WebP，≤5MB" />
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-slate-400" style={{ width: 120, height: 120 }}>
+                    <ImageIcon className="w-6 h-6" />
+                    <span className="text-[11px] mt-1.5 text-center px-2">保存后可上传</span>
                   </div>
-                )
-              },
-              {
-                key: 'modifiers',
-                label: '自定义选项配置',
-                children: (
-                  <Form.Item
-                    name="itemModifiers"
-                    label={
-                      <Space>
-                        <span>自定义选项配置</span>
-                        <Tooltip title="为商品配置自定义选项组，包括选择规则、默认选项和价格">
-                          <Button type="link" size="small" style={{ padding: 0 }}>
-                            ?
-                          </Button>
-                        </Tooltip>
-                      </Space>
-                    }
-                  >
-                    <ItemModifierConfigInput
-                      modifierGroups={modifierGroups}
-                      t={t}
-                    />
-                  </Form.Item>
-                )
-              }
-            ]}
-          />
+                )}
+              </div>
 
-          <Form.Item style={{ textAlign: 'right', marginBottom: 0, marginTop: 16 }}>
-            <Space>
-              <Button onClick={() => setItemModalVisible(false)}>
-                {t('pages.menuCenter.cancel')}
-              </Button>
-              <Button type="primary" htmlType="submit" loading={loading.creating}>
-                {editingItem ? t('pages.menuCenter.update') : t('pages.menuCenter.create')}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+              {/* 中：名称 + 简介（多语言） */}
+              <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-3">
+                  <UI.Field label="名称（English，默认）" required>
+                    <UI.TextInput value={itName} onChange={setItName} placeholder={t('pages.menuCenter.itemNamePlaceholder')} maxLength={100} />
+                  </UI.Field>
+                  {additionalLocales.map(locale => (
+                    <UI.Field key={locale} label={`名称（${LOCALE_LABELS[locale] ?? locale}）`}>
+                      <UI.TextInput value={itNameI18n[locale] ?? ''} onChange={(v) => setItNameI18n(prev => ({ ...prev, [locale]: v }))} placeholder="可选" maxLength={100} />
+                    </UI.Field>
+                  ))}
+                </div>
+                <div className="space-y-3">
+                  <UI.Field label="简介（English，默认）">
+                    <UI.Textarea value={itDescription} onChange={setItDescription} rows={2} placeholder={t('pages.menuCenter.itemDescriptionPlaceholder')} />
+                  </UI.Field>
+                  {additionalLocales.map(locale => (
+                    <UI.Field key={locale} label={`简介（${LOCALE_LABELS[locale] ?? locale}）`}>
+                      <UI.Textarea value={itDescriptionI18n[locale] ?? ''} onChange={(v) => setItDescriptionI18n(prev => ({ ...prev, [locale]: v }))} rows={2} placeholder="可选" />
+                    </UI.Field>
+                  ))}
+                </div>
+              </div>
+
+              {/* 右：分类、价格、状态、范围 */}
+              <div className="shrink-0 w-full lg:w-60 space-y-3">
+                <UI.Field label={t('pages.menuCenter.itemCategory')} required>
+                  <UI.SelectInput
+                    value={itCategoryId ?? ''}
+                    onChange={(v) => setItCategoryId(v || undefined)}
+                    className="w-full"
+                    options={[
+                      { label: t('pages.menuCenter.selectCategory'), value: '' },
+                      ...flatCategories.map(cat => ({ label: (cat.level && cat.level > 0 ? '　└─ ' : '') + cat.name, value: cat.id })),
+                    ]}
+                  />
+                </UI.Field>
+                <div className="grid grid-cols-2 gap-2">
+                  <UI.Field label={t('pages.menuCenter.basePrice')} required>
+                    <UI.NumberInput value={itBasePrice} onChange={setItBasePrice} min={0} className="w-full" />
+                  </UI.Field>
+                  <UI.Field label={t('pages.menuCenter.cost')}>
+                    <UI.NumberInput value={itCost} onChange={setItCost} min={0} className="w-full" />
+                  </UI.Field>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-700">{t('pages.menuCenter.status')}</span>
+                  <UI.Switch checked={itIsActive} onCheckedChange={setItIsActive} />
+                </div>
+                {isMain && (
+                  <>
+                    <UI.Field label="商品范围">
+                      <UI.SelectInput
+                        value={itScope}
+                        onChange={(v) => setItScope(String(v))}
+                        className="w-full"
+                        options={[
+                          { label: '品牌商品（全部门店）', value: 'BRAND' },
+                          { label: '店铺专属', value: 'STORE_EXCLUSIVE' },
+                        ]}
+                      />
+                    </UI.Field>
+                    {itScope === 'STORE_EXCLUSIVE' && (
+                      <UI.Field label="可见门店">
+                        <div className="space-y-1.5 max-h-40 overflow-y-auto sidebar-scroll rounded-lg border border-slate-200 p-2">
+                          {organizations.map((o: any) => (
+                            <UI.Checkbox
+                              key={o.id}
+                              checked={itVisibleStoreIds.includes(o.id)}
+                              onCheckedChange={(c) => setItVisibleStoreIds(prev => c ? [...prev, o.id] : prev.filter(id => id !== o.id))}
+                              label={`${o.orgName}${o.orgType === 'MAIN' ? ' (主店)' : o.orgType === 'FRANCHISE' ? ' (加盟)' : ' (分店)'}`}
+                            />
+                          ))}
+                        </div>
+                      </UI.Field>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <ItemModifierConfigInput
+              value={itModifiers}
+              onChange={setItModifiers}
+              modifierGroups={modifierGroups}
+              t={t}
+            />
+          )}
+        </div>
+      </UI.Modal>
 
       {/* 属性类型创建/编辑模态框 */}
       <UI.Modal

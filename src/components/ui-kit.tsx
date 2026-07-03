@@ -834,9 +834,9 @@ export function Modal({ open, onOpenChange, title, description, children, footer
   description?: React.ReactNode
   children?: React.ReactNode
   footer?: React.ReactNode
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }) {
-  const maxW = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl' }[size]
+  const maxW = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-5xl' }[size]
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>

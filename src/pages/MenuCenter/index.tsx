@@ -473,7 +473,11 @@ const MenuCenter: React.FC = () => {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | undefined>(undefined)
 
   // 表单
-  const [catForm] = Form.useForm<{ name: string; parentId?: string }>()
+  // 分类表单（受控，去 antd Form）
+  const [catName, setCatName] = useState('')
+  const [catNameI18n, setCatNameI18n] = useState<Record<string, string>>({})
+  const [catParentId, setCatParentId] = useState<string | undefined>(undefined)
+  const [catErr, setCatErr] = useState('')
   const [itemForm] = Form.useForm<{
     name: string;
     name_i18n?: Record<string, string>;
@@ -958,18 +962,17 @@ const MenuCenter: React.FC = () => {
   // 创建分类
   const handleCreateCategory = () => {
     setEditingCategory(null)
-    catForm.resetFields()
+    setCatName(''); setCatNameI18n({}); setCatParentId(undefined); setCatErr('')
     setCategoryModalVisible(true)
   }
 
   // 编辑分类
   const handleEditCategory = (category: Category) => {
     setEditingCategory(category)
-    catForm.setFieldsValue({
-      name: category.name,
-      name_i18n: (category as any).name_i18n ?? {},
-      parentId: category.parentId
-    })
+    setCatName(category.name)
+    setCatNameI18n((category as any).name_i18n ?? {})
+    setCatParentId(category.parentId)
+    setCatErr('')
     setCategoryModalVisible(true)
   }
   // 删除分类
@@ -991,33 +994,32 @@ const MenuCenter: React.FC = () => {
   }
 
   // 提交分类表单
-  const handleCategorySubmit = async (values: any) => {
+  const handleCategorySubmit = async () => {
+    if (!catName.trim()) { setCatErr(t('pages.menuCenter.categoryNameRequired')); return }
     setLoading(prev => ({ ...prev, creating: true }))
     try {
-      const name_i18n = values.name_i18n && Object.values(values.name_i18n).some(Boolean)
-        ? values.name_i18n : undefined
+      const i18nRaw = Object.fromEntries(Object.entries(catNameI18n).filter(([, v]) => v))
+      const name_i18n = Object.keys(i18nRaw).length ? i18nRaw : undefined
 
       if (editingCategory) {
-        // 更新分类 - 不传递 tenant_id，由后端从JWT自动提取
         const updatePayload: UpdateCategoryPayload = {
-          name: values.name,
-          parentId: values.parentId || undefined,
+          name: catName,
+          parentId: catParentId || undefined,
           ...(name_i18n && { name_i18n }) as any,
         }
         await itemManagementService.updateCategory(editingCategory.id, updatePayload)
         UI.toast.success('分类更新成功')
       } else {
-        // 创建分类 - 不传递 tenant_id，由后端从JWT自动提取
         const createPayload: CreateCategoryPayload = {
-          name: values.name,
-          parentId: values.parentId || undefined, // 确保空值转为 undefined
+          name: catName,
+          parentId: catParentId || undefined,
           ...(name_i18n && { name_i18n }) as any,
         }
         const newCategory = await itemManagementService.createCategory(createPayload)
         UI.toast.success('分类创建成功')
         setSelectedCategoryId(newCategory.id)
       }
-      
+
       setCategoryModalVisible(false)
       loadCategories()
     } catch (error) {
@@ -2593,69 +2595,45 @@ const MenuCenter: React.FC = () => {
       />
 
       {/* 分类创建/编辑模态框 */}
-      <Modal
-        title={editingCategory ? t('pages.menuCenter.editCategory') : t('pages.menuCenter.createCategory')}
+      <UI.Modal
         open={categoryModalVisible}
-        onCancel={() => setCategoryModalVisible(false)}
-        footer={null}
-        width={500}
+        onOpenChange={(v) => !v && setCategoryModalVisible(false)}
+        title={editingCategory ? t('pages.menuCenter.editCategory') : t('pages.menuCenter.createCategory')}
+        footer={
+          <>
+            <UI.Btn variant="secondary" onClick={() => setCategoryModalVisible(false)}>{t('pages.menuCenter.cancel')}</UI.Btn>
+            <UI.Btn variant="primary" loading={loading.creating} onClick={handleCategorySubmit}>
+              {editingCategory ? t('pages.menuCenter.update') : t('pages.menuCenter.create')}
+            </UI.Btn>
+          </>
+        }
       >
-        <Form
-          form={catForm}
-          layout="vertical"
-          onFinish={handleCategorySubmit}
-        >
-          <Form.Item
-            name="name"
-            label={`${t('pages.menuCenter.categoryName')}（English，默认）`}
-            rules={[{ required: true, message: t('pages.menuCenter.categoryNameRequired') }]}
-          >
-            <Input placeholder={t('pages.menuCenter.categoryNamePlaceholder')} maxLength={50} />
-          </Form.Item>
+        <div className="space-y-4">
+          <UI.Field label={`${t('pages.menuCenter.categoryName')}（English，默认）`} required error={catErr}>
+            <UI.TextInput value={catName} onChange={setCatName} placeholder={t('pages.menuCenter.categoryNamePlaceholder')} maxLength={50} />
+          </UI.Field>
           {additionalLocales.map(locale => (
-            <Form.Item
-              key={locale}
-              name={['name_i18n', locale]}
-              label={`分类名称（${LOCALE_LABELS[locale] ?? locale}）`}
-            >
-              <Input placeholder={`${LOCALE_LABELS[locale] ?? locale} 译名（可选）`} maxLength={50} />
-            </Form.Item>
+            <UI.Field key={locale} label={`分类名称（${LOCALE_LABELS[locale] ?? locale}）`}>
+              <UI.TextInput value={catNameI18n[locale] ?? ''} onChange={(v) => setCatNameI18n(prev => ({ ...prev, [locale]: v }))} placeholder={`${LOCALE_LABELS[locale] ?? locale} 译名（可选）`} maxLength={50} />
+            </UI.Field>
           ))}
 
-          <Form.Item
-            name="parentId"
+          <UI.Field
             label={t('pages.menuCenter.parentCategory')}
-            tooltip={t('pages.menuCenter.parentCategoryTooltip')}
+            hint={flatCategories.filter(cat => (cat.level || 0) === 0).length === 0 ? t('pages.menuCenter.noParentCategoryHint') : t('pages.menuCenter.parentCategoryTooltip')}
           >
-            <Select placeholder={t('pages.menuCenter.parentCategoryPlaceholder')} allowClear>
-              {flatCategories
-                .filter(cat => (cat.level || 0) === 0) // 只显示根分类
-                .map(cat => (
-                  <Select.Option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </Select.Option>
-                ))}
-            </Select>
-          </Form.Item>
-          
-          {flatCategories.filter(cat => (cat.level || 0) === 0).length === 0 && (
-            <Typography.Text type="secondary" style={{ fontSize: '12px', display: 'block', marginTop: -16, marginBottom: 16 }}>
-              {t('pages.menuCenter.noParentCategoryHint')}
-            </Typography.Text>
-          )}
-
-          <Form.Item style={{ textAlign: 'right', marginBottom: 0 }}>
-            <Space>
-              <Button onClick={() => setCategoryModalVisible(false)}>
-                {t('pages.menuCenter.cancel')}
-              </Button>
-              <Button type="primary" htmlType="submit" loading={loading.creating}>
-                {editingCategory ? t('pages.menuCenter.update') : t('pages.menuCenter.create')}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+            <UI.SelectInput
+              value={catParentId ?? ''}
+              onChange={(v) => setCatParentId(v || undefined)}
+              className="w-full"
+              options={[
+                { label: t('pages.menuCenter.parentCategoryPlaceholder'), value: '' },
+                ...flatCategories.filter(cat => (cat.level || 0) === 0).map(cat => ({ label: cat.name, value: cat.id })),
+              ]}
+            />
+          </UI.Field>
+        </div>
+      </UI.Modal>
 
       {/* 商品创建/编辑模态框 */}
       <Modal

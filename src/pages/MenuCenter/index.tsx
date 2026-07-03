@@ -1,47 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import './index.css' // 添加样式文件
-import {
-  Card,
-  Button,
-  Space,
-  Typography,
-  List,
-  Input,
-  Select,
-  Form,
-  Empty,
-  Row,
-  Col,
-  Divider,
-  message,
-  Modal,
-  Tag,
-  Spin,
-  InputNumber,
-  Popconfirm,
-  Switch,
-  Tree,
-  Dropdown,
-  Tooltip,
-  Table,
-  Tabs,
-  Upload,
-  Image,
-  Radio
-} from 'antd'
-import type { RcFile } from 'antd/es/upload/interface'
-import {
-  EditOutlined,
-  DeleteOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  MoreOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
-  LoadingOutlined,
-  PictureOutlined,
-  BranchesOutlined
-} from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '../../auth/AuthProvider'
 import { debugOrganizationIsolation } from '../../utils/debug-org'
@@ -410,7 +368,6 @@ const MenuCenter: React.FC = () => {
   const [storeConfigs, setStoreConfigs] = useState<Map<string, StoreMenuConfig>>(new Map())
 
   // 自定义加载图标
-  const loadingIcon = <LoadingOutlined style={{ fontSize: 24, color: '#1890ff' }} spin />
 
   // 状态管理
   const [categories, setCategories] = useState<Category[]>([])
@@ -458,6 +415,9 @@ const MenuCenter: React.FC = () => {
   const [comboDeleteTarget, setComboDeleteTarget] = useState<Combo | null>(null)
   const [itemDeleteTarget, setItemDeleteTarget] = useState<Item | null>(null)
   const [categoryDeleteTarget, setCategoryDeleteTarget] = useState<Category | null>(null)
+  // 门店改价（替代原 Modal.confirm + getElementById DOM hack）
+  const [priceOverrideTarget, setPriceOverrideTarget] = useState<Item | null>(null)
+  const [priceOverrideValue, setPriceOverrideValue] = useState<number>(NaN)
   // 套餐增强功能状态
   const [comboImageUrl, setComboImageUrl] = useState<string | undefined>()
   // 新建套餐时选择的待上传图片文件（保存套餐成功后自动上传）
@@ -507,8 +467,6 @@ const MenuCenter: React.FC = () => {
   const [aoDisplayName, setAoDisplayName] = useState('')
   const [aoPriceModifier, setAoPriceModifier] = useState<number>(0)
   const [aoErr, setAoErr] = useState<{ value?: string; displayName?: string }>({})
-  const [modifierGroupForm] = Form.useForm<CreateModifierGroupPayload & { options: ModifierOption[] }>()
-  const [modifierOptionForm] = Form.useForm<CreateModifierOptionPayload>()
   // 套餐表单（受控，基础字段；图片/分组/时段/类型另有独立 state）
   const [cbName, setCbName] = useState('')
   const [cbDescription, setCbDescription] = useState('')
@@ -1740,8 +1698,8 @@ const MenuCenter: React.FC = () => {
   // 如果未认证，显示提示
   if (!isAuthenticated) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <Typography.Text>{t('pages.menuCenter.loginRequired')}</Typography.Text>
+      <div className="p-6 text-center text-slate-600">
+        {t('pages.menuCenter.loginRequired')}
       </div>
     )
   }
@@ -1777,485 +1735,225 @@ const MenuCenter: React.FC = () => {
           />
           <div className="mt-4">
           {productsTab === 'items' && (
-              <Row gutter={16}>
-        <Col xs={24} md={10} lg={8}>
-          <Card 
-            size="small" 
-            title={
-              <Space>
-                {t('pages.menuCenter.categoriesTitle')}
-                {isMain && (
-                  <Button
-                    type="primary"
-                    size="small"
-                    icon={<PlusOutlined />}
-                    onClick={handleCreateCategory}
-                  >
-                    {t('pages.menuCenter.addCategory')}
-                  </Button>
-                )}
-                <Button 
-                  size="small" 
-                  icon={<ReloadOutlined />}
-                  onClick={loadCategories}
-                  loading={loading.categories}
-                >
-                  {t('pages.menuCenter.refresh')}
-                </Button>
-              </Space>
+              <div className="flex flex-col md:flex-row gap-4 items-start">
+        <div className="w-full md:w-72 shrink-0">
+          <UI.SectionCard
+            title={t('pages.menuCenter.categoriesTitle')}
+            action={
+              <div className="flex items-center gap-1.5">
+                {isMain && <UI.Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateCategory}>{t('pages.menuCenter.addCategory')}</UI.Btn>}
+                <UI.Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading.categories} onClick={loadCategories} />
+              </div>
             }
           >
-            <Spin spinning={loading.categories} indicator={loadingIcon} tip={t('pages.menuCenter.loadingCategories')}>
-              {categories.length === 0 ? (
-                <Empty description={t('pages.menuCenter.emptyCategories')}>
-                  <Button type="primary" onClick={handleCreateCategory}>
-                    {t('pages.menuCenter.createFirstCategoryCTA')}
-                  </Button>
-                </Empty>
-              ) : (
-                <div className="space-y-0.5">{renderCategoryNodes(categoryTree)}</div>
-              )}
-            </Spin>
-          </Card>
-        </Col>
+            {loading.categories ? (
+              <UI.Spinner />
+            ) : categories.length === 0 ? (
+              <UI.EmptyState title={t('pages.menuCenter.emptyCategories')} action={<UI.Btn variant="primary" onClick={handleCreateCategory}>{t('pages.menuCenter.createFirstCategoryCTA')}</UI.Btn>} />
+            ) : (
+              <div className="space-y-0.5">{renderCategoryNodes(categoryTree)}</div>
+            )}
+          </UI.SectionCard>
+        </div>
 
-        <Col xs={24} md={14} lg={16}>
-          <Card 
-            size="small" 
-            title={
-              <Space>
-                {t('pages.menuCenter.itemsTitle')}
-                {selectedCategory && (
-                  <>
-                    {isMain && (
-                      <Button
-                        type="primary"
-                        size="small"
-                        icon={<PlusOutlined />}
-                        onClick={handleCreateItem}
-                      >
-                        {t('pages.menuCenter.addItem')}
-                      </Button>
-                    )}
-                    <Button 
-                      size="small" 
-                      icon={<ReloadOutlined />}
-                      onClick={loadItems}
-                      loading={loading.items}
-                    >
-                      {t('pages.menuCenter.refresh')}
-                    </Button>
-                  </>
-                )}
-              </Space>
-            }
+        <div className="flex-1 min-w-0 w-full">
+          <UI.SectionCard
+            title={t('pages.menuCenter.itemsTitle')}
+            action={selectedCategory && (
+              <div className="flex items-center gap-1.5">
+                {isMain && <UI.Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateItem}>{t('pages.menuCenter.addItem')}</UI.Btn>}
+                <UI.Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading.items} onClick={loadItems} />
+              </div>
+            )}
+            bodyClassName="p-0"
           >
-            <Spin spinning={loading.items} indicator={loadingIcon} tip={t('pages.menuCenter.loadingItems')}>
-            {!selectedCategory ? (
-              <Empty description={t('pages.menuCenter.selectCategoryPlaceholder')} />
+            <div className="p-4">
+            {loading.items ? (
+              <UI.Spinner />
+            ) : !selectedCategory ? (
+              <UI.EmptyState title={t('pages.menuCenter.selectCategoryPlaceholder')} />
             ) : (
               <>
-                  <Typography.Text type="secondary">
-                    {t('pages.menuCenter.currentCategory', { name: selectedCategory.name })}
-                  </Typography.Text>
-                  <Divider style={{ margin: '12px 0' }} />
+                <p className="text-sm text-slate-500 pb-3 mb-3 border-b border-slate-100">
+                  {t('pages.menuCenter.currentCategory', { name: selectedCategory.name })}
+                </p>
 
                 {categoryItems.length === 0 ? (
-                    <Empty description={t('pages.menuCenter.emptyItems')}>
-                      {isMain && (
-                        <Button type="primary" onClick={handleCreateItem}>
-                          创建第一个商品
-                        </Button>
-                      )}
-                    </Empty>
+                  <UI.EmptyState title={t('pages.menuCenter.emptyItems')} action={isMain ? <UI.Btn variant="primary" onClick={handleCreateItem}>创建第一个商品</UI.Btn> : undefined} />
                 ) : (
-                  <List
-                    dataSource={categoryItems}
-                      renderItem={(item) => (
-                        <List.Item
-                          actions={isMain ? [
-                            <Button
-                              key="edit"
-                              type="link"
-                              size="small"
-                              icon={<EditOutlined />}
-                              onClick={() => handleEditItem(item)}
-                            >
-                              {t('pages.menuCenter.edit')}
-                            </Button>,
-                            <Button
-                              key="channel"
-                              type="link"
-                              size="small"
-                              icon={<BranchesOutlined />}
-                              onClick={() => setChannelModal({ id: item.id, name: item.name })}
-                            >
-                              可售范围
-                            </Button>,
-                            <Popconfirm
-                              key="delete"
-                              title={t('pages.menuCenter.deleteItemConfirm')}
-                              onConfirm={() => handleDeleteItem(item.id)}
-                              okText={t('pages.menuCenter.delete')}
-                              cancelText={t('pages.menuCenter.cancel')}
-                            >
-                              <Button
-                                type="link"
-                                size="small"
-                                danger
-                                icon={<DeleteOutlined />}
-                              >
-                                {t('pages.menuCenter.delete')}
-                              </Button>
-                            </Popconfirm>
-                          ] : [
-                            <Switch
-                              key="avail"
-                              size="small"
-                              checked={storeConfigs.get(item.id)?.isAvailable ?? true}
-                              checkedChildren="上架"
-                              unCheckedChildren="下架"
-                              onChange={async (val) => {
-                                await storeMenuService.upsertStoreMenuConfig(item.id, { isAvailable: val })
-                                setStoreConfigs(prev => {
-                                  const next = new Map(prev)
-                                  const existing = prev.get(item.id)
-                                  next.set(item.id, { ...(existing ?? { catalogItemId: item.id, priceOverride: null }), isAvailable: val })
-                                  return next
-                                })
-                              }}
-                            />,
-                            <Button
-                              key="price"
-                              type="link"
-                              size="small"
-                              icon={<EditOutlined />}
-                              onClick={() => {
-                                const cfg = storeConfigs.get(item.id)
-                                Modal.confirm({
-                                  title: `改价 — ${item.name}`,
-                                  content: (
-                                    <InputNumber
-                                      id="price-override-input"
-                                      defaultValue={cfg?.priceOverride ?? undefined}
-                                      min={0}
-                                      precision={2}
-                                      placeholder={`品牌定价 ${formatPrice(item.basePrice)}，留空恢复默认`}
-                                      style={{ width: '100%', marginTop: 8 }}
-                                    />
-                                  ),
-                                  onOk: async () => {
-                                    const el = document.getElementById('price-override-input') as HTMLInputElement
-                                    const val = el?.value ? Number(el.value) : undefined
-                                    await storeMenuService.upsertStoreMenuConfig(item.id, {
-                                      priceOverride: val,
-                                      isAvailable: storeConfigs.get(item.id)?.isAvailable ?? true,
-                                    })
-                                    await loadStoreConfigs()
-                                    UI.toast.success('价格已更新')
-                                  },
-                                  okText: '保存',
-                                  cancelText: '取消',
-                                })
-                              }}
-                            >
-                              改价
-                            </Button>,
-                            <Button
-                              key="channel"
-                              type="link"
-                              size="small"
-                              icon={<BranchesOutlined />}
-                              onClick={() => setChannelModal({ id: item.id, name: item.name })}
-                            >
-                              可售范围
-                            </Button>
-                          ]}
-                        >
-                          <List.Item.Meta
-                            title={
-                              <Space>
-                                {item.name}
-                                <Tag color={item.isActive ? 'green' : 'red'}>
-                                  {item.isActive ? t('pages.menuCenter.active') : t('pages.menuCenter.inactive')}
-                                </Tag>
-                                {item.scope === 'STORE_EXCLUSIVE' && (
-                                  <Tag color="purple">专属</Tag>
-                                )}
-                              </Space>
-                            }
-                            description={
-                              <Space direction="vertical" size={4}>
-                                {item.description && (
-                                  <Typography.Text type="secondary">
-                                    {item.description}
-                                  </Typography.Text>
-                                )}
-                                <Space>
-                                  <Typography.Text strong>
-                                    {t('pages.menuCenter.salePrice')}: {formatPrice(item.basePrice)}
-                                  </Typography.Text>
-                                  {!isMain && storeConfigs.get(item.id)?.priceOverride != null && (
-                                    <>
-                                      <Tag color="orange">已改价</Tag>
-                                      <Typography.Text type="warning" strong>
-                                        本店售价: {Number(storeConfigs.get(item.id)!.priceOverride!).toFixed(2)}
-                                      </Typography.Text>
-                                    </>
-                                  )}
-                                  {item.cost && (
-                                    <Typography.Text type="secondary">
-                                      {t('pages.menuCenter.cost')}: {formatPrice(item.cost)}
-                                    </Typography.Text>
-                                  )}
-                                </Space>
-                                {item.attributes && item.attributes.length > 0 && (
-                                  <div style={{ marginTop: 4 }}>
-                                    <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-                                      {t('pages.menuCenter.attributeConfig')}: 
-                                    </Typography.Text>
-                                    {item.attributes.map((attr, index) => {
-                                      const attributeType = attr.attributeType || attributeTypes.find(type => type.id === attr.attributeTypeId)
-                                      if (!attributeType) return null
-                                      
-                                      // 获取该属性类型的所有选项
-                                      const allOptions = attributeOptions[attributeType.id] || []
-                                      
-                                      // 获取允许的选项（如果没有设置则显示所有）
-                                      const allowedOptions = attr.allowedOptions && attr.allowedOptions.length > 0 
-                                        ? allOptions.filter(opt => attr.allowedOptions!.includes(opt.id))
-                                        : allOptions
-                                      
-                                      const optionNames = allowedOptions.map(opt => opt.displayName).join(', ')
-                                      
-                                      return (
-                                        <Tag 
-                                          key={index} 
-                                          color="purple" 
-                                          style={{ 
-                                            marginBottom: 2, 
-                                            fontWeight: 'bold',
-                                            fontSize: '12px',
-                                            padding: '2px 8px'
-                                          }}
-                                        >
-                                          🏷️ {attributeType.displayName}({optionNames})
-                                          {attr.isRequired && <span style={{ color: 'red', fontWeight: 'bold' }}> *</span>}
-                                        </Tag>
-                                      )
-                                    })}
-                                  </div>
-                                )}
-                                {/* 显示加料信息 */}
-                                {itemAddons[item.id] && itemAddons[item.id].length > 0 && (
-                                  <div style={{ marginTop: 4 }}>
-                                    <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-                                      加料配置: 
-                                    </Typography.Text>
-                                    {itemAddons[item.id]
-                                      .map((itemAddon, index) => {
-                                        const addon = itemAddon.addon || addons.find(a => a.id === itemAddon.addonId)
-                                        if (!addon) return null
-                                        
-                                        return (
-                                          <Tag 
-                                            key={index} 
-                                            color="green" 
-                                            style={{ 
-                                              marginBottom: 2, 
-                                              fontWeight: 'bold',
-                                              fontSize: '12px',
-                                              padding: '2px 8px'
-                                            }}
-                                          >
-                                            {addon.name}
-                                            <span style={{ fontSize: '10px', marginLeft: 4 }}>x{itemAddon.maxQuantity}</span>
-                                            <span style={{ fontSize: '10px', marginLeft: 4 }}>{formatPrice(addon.price)}</span>
-                                          </Tag>
-                                        )
-                                      })}
-                                  </div>
-                                )}
-                                {item.customFields && Object.keys(item.customFields).length > 0 && (
-                                  <div style={{ marginTop: 4 }}>
-                                    <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-                                      自定义: 
-                                    </Typography.Text>
-                                    {Object.entries(item.customFields).map(([key, value]) => (
-                                      <Tag key={key} color="blue" style={{ marginBottom: 2 }}>
-                                        {key}: {String(value)}
-                                      </Tag>
-                                    ))}
-                                  </div>
-                                )}
-                              </Space>
-                            }
-                          />
-                      </List.Item>
-                    )}
-                  />
+                  <div className="divide-y divide-slate-100">
+                    {categoryItems.map(item => (
+                      <div key={item.id} className="flex items-start justify-between gap-3 py-3">
+                        <div className="min-w-0 flex-1">
+                          {/* 标题行 */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-slate-800">{item.name}</span>
+                            <UI.Badge variant={item.isActive ? 'green' : 'red'}>{item.isActive ? t('pages.menuCenter.active') : t('pages.menuCenter.inactive')}</UI.Badge>
+                            {item.scope === 'STORE_EXCLUSIVE' && <UI.Badge variant="gold">专属</UI.Badge>}
+                          </div>
+                          {/* 描述 + 价格 */}
+                          {item.description && <p className="text-sm text-slate-500 mt-1">{item.description}</p>}
+                          <div className="flex items-center gap-2 flex-wrap mt-1 text-sm">
+                            <span className="font-medium text-slate-700">{t('pages.menuCenter.salePrice')}: {formatPrice(item.basePrice)}</span>
+                            {!isMain && storeConfigs.get(item.id)?.priceOverride != null && (
+                              <>
+                                <UI.Badge variant="gold">已改价</UI.Badge>
+                                <span className="font-medium text-amber-600">本店售价: {Number(storeConfigs.get(item.id)!.priceOverride!).toFixed(2)}</span>
+                              </>
+                            )}
+                            {item.cost && <span className="text-slate-400">{t('pages.menuCenter.cost')}: {formatPrice(item.cost)}</span>}
+                          </div>
+                          {/* 属性配置 */}
+                          {item.attributes && item.attributes.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap mt-1.5">
+                              <span className="text-xs text-slate-400">{t('pages.menuCenter.attributeConfig')}:</span>
+                              {item.attributes.map((attr, index) => {
+                                const attributeType = attr.attributeType || attributeTypes.find(type => type.id === attr.attributeTypeId)
+                                if (!attributeType) return null
+                                const allOptions = attributeOptions[attributeType.id] || []
+                                const allowedOptions = attr.allowedOptions && attr.allowedOptions.length > 0 ? allOptions.filter(opt => attr.allowedOptions!.includes(opt.id)) : allOptions
+                                const optionNames = allowedOptions.map(opt => opt.displayName).join(', ')
+                                return (
+                                  <UI.Badge key={index} variant="blue">🏷️ {attributeType.displayName}({optionNames}){attr.isRequired && <span className="text-red-500 font-bold"> *</span>}</UI.Badge>
+                                )
+                              })}
+                            </div>
+                          )}
+                          {/* 加料 */}
+                          {itemAddons[item.id] && itemAddons[item.id].length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap mt-1.5">
+                              <span className="text-xs text-slate-400">加料配置:</span>
+                              {itemAddons[item.id].map((itemAddon, index) => {
+                                const addon = itemAddon.addon || addons.find(a => a.id === itemAddon.addonId)
+                                if (!addon) return null
+                                return <UI.Badge key={index} variant="green">{addon.name} x{itemAddon.maxQuantity} {formatPrice(addon.price)}</UI.Badge>
+                              })}
+                            </div>
+                          )}
+                          {/* 自定义字段 */}
+                          {item.customFields && Object.keys(item.customFields).length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap mt-1.5">
+                              <span className="text-xs text-slate-400">自定义:</span>
+                              {Object.entries(item.customFields).map(([key, value]) => (
+                                <UI.Badge key={key} variant="blue">{key}: {String(value)}</UI.Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {/* 操作 */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {isMain ? (
+                            <>
+                              <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditItem(item)}>{t('pages.menuCenter.edit')}</UI.Btn>
+                              <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>可售范围</UI.Btn>
+                              <button title={t('pages.menuCenter.delete')} onClick={() => setItemDeleteTarget(item)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                            </>
+                          ) : (
+                            <>
+                              <UI.Switch
+                                checked={storeConfigs.get(item.id)?.isAvailable ?? true}
+                                onCheckedChange={async (val) => {
+                                  await storeMenuService.upsertStoreMenuConfig(item.id, { isAvailable: val })
+                                  setStoreConfigs(prev => {
+                                    const next = new Map(prev)
+                                    const existing = prev.get(item.id)
+                                    next.set(item.id, { ...(existing ?? { catalogItemId: item.id, priceOverride: null }), isAvailable: val })
+                                    return next
+                                  })
+                                }}
+                              />
+                              <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => { setPriceOverrideTarget(item); setPriceOverrideValue(storeConfigs.get(item.id)?.priceOverride ?? NaN) }}>改价</UI.Btn>
+                              <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>可售范围</UI.Btn>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
 
                 {/* 套餐列表 */}
                 {categoryCombos.length > 0 && (
                   <>
-                    <Divider style={{ margin: '16px 0' }}>
-                      <Typography.Text type="secondary">{t('pages.menuCenter.combosInCategory')}</Typography.Text>
-                    </Divider>
-                    <List
-                      dataSource={categoryCombos}
-                      renderItem={(combo) => {
-                        // 价格以分为单位
+                    <div className="flex items-center gap-2 my-4">
+                      <span className="text-xs font-medium text-slate-400">{t('pages.menuCenter.combosInCategory')}</span>
+                      <span className="flex-1 h-px bg-slate-100" />
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {categoryCombos.map(combo => {
                         const basePrice = Number(combo.basePrice) || 0
                         const discount = Number(combo.discount) || 0
-                        let finalPrice = basePrice
-
-                        if (combo.discountType === 'percentage') {
-                          finalPrice = basePrice * (1 - discount / 100)
-                        } else {
-                          finalPrice = basePrice - discount
-                        }
-                        finalPrice = Math.max(0, finalPrice)
-                        
+                        const finalPrice = Math.max(0, combo.discountType === 'percentage' ? basePrice * (1 - discount / 100) : basePrice - discount)
                         return (
-                          <List.Item
-                            actions={[
-                              <Button 
-                                key="edit"
-                                type="link" 
-                                size="small" 
-                                icon={<EditOutlined />}
-                                onClick={() => handleEditCombo(combo)}
-                              >
-                                {t('pages.menuCenter.edit')}
-                              </Button>,
-                              <Popconfirm
-                                key="delete"
-                                title={t('pages.menuCenter.deleteComboConfirm')}
-                                onConfirm={() => handleDeleteCombo(combo.id)}
-                                okText={t('pages.menuCenter.delete')}
-                                cancelText={t('pages.menuCenter.cancel')}
-                              >
-                                <Button 
-                                  type="link" 
-                                  size="small" 
-                                  danger 
-                                  icon={<DeleteOutlined />}
-                                >
-                                  {t('pages.menuCenter.delete')}
-                                </Button>
-                              </Popconfirm>
-                            ]}
-                          >
-                            <List.Item.Meta
-                              title={
-                                <Space>
-                                  <Tag color="orange">{t('pages.menuCenter.comboTag')}</Tag>
-                                  {/* 套餐类型标签 */}
-                                  {combo.itemGroups && combo.itemGroups.length > 0 ? (
-                                    <Tag color="purple">可选套餐</Tag>
-                                  ) : (
-                                    <Tag color="cyan">固定套餐</Tag>
-                                  )}
-                                  <Typography.Text strong>{combo.name}</Typography.Text>
-                                  {!combo.isActive && <Tag color="red">{t('pages.menuCenter.deactivated')}</Tag>}
-                                </Space>
-                              }
-                              description={
-                                <div>
-                                  {combo.description && (
-                                    <div style={{ marginBottom: 4 }}>
-                                      <Typography.Text type="secondary">{combo.description}</Typography.Text>
-                                    </div>
-                                  )}
-                                  
-                                  {/* 固定套餐：显示商品列表 */}
-                                  {(!combo.itemGroups || combo.itemGroups.length === 0) && combo.comboItems && combo.comboItems.length > 0 && (
-                                    <div style={{ marginTop: 4 }}>
-                                      <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-                                        {t('pages.menuCenter.includedItems')}: 
-                                      </Typography.Text>
-                                      {combo.comboItems.map((comboItem, index) => (
-                                        <Tag key={index} color="blue" style={{ margin: '2px' }}>
-                                          {allItems.find(i => i.id === comboItem.itemId)?.name || comboItem.item?.name || '未知'} ×{comboItem.quantity}
-                                        </Tag>
-                                      ))}
-                                    </div>
-                                  )}
-                                  
-                                  {/* 可选套餐：显示分组信息 */}
-                                  {combo.itemGroups && combo.itemGroups.length > 0 && (
-                                    <div style={{ marginTop: 4 }}>
-                                      <Typography.Text type="secondary" style={{ fontSize: '12px' }}>
-                                        套餐分组: 
-                                      </Typography.Text>
-                                      <div style={{ marginTop: 4 }}>
-                                        {combo.itemGroups.map((group, index) => {
-                                          const groupItems = (combo.comboItems || []).filter(item => item.groupId === group.id);
-                                          const groupItemCount = groupItems.length;
-                                          const selectionText = group.selectionType === 'single' 
-                                            ? '单选' 
-                                            : `${groupItemCount}选${group.maxSelections || 1}`;
-                                          
-                                          return (
-                                            <div key={index} style={{ marginBottom: 4 }}>
-                                              <Tag color="geekblue" style={{ marginRight: 4 }}>
-                                                {group.name} ({selectionText})
-                                              </Tag>
-                                              {groupItems.map((item, idx) => (
-                                                <Tag key={idx} style={{ margin: '2px', fontSize: '12px' }}>
-                                                  {allItems.find(i => i.id === item.itemId)?.name || '未知'}
-                                                  {item.additionalPrice ? ` +${(item.additionalPrice / 100).toFixed(2)}` : ''}
-                                                </Tag>
-                                              ))}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-                                  <div style={{ marginTop: 8 }}>
-                                    <Space size="large">
-                                      <span>
-                                        <Typography.Text type="secondary" style={{ fontSize: '12px' }}>{t('pages.menuCenter.originalPrice')}: </Typography.Text>
-                                        <Typography.Text style={{ textDecoration: discount > 0 ? 'line-through' : 'none' }}>
-                                          {formatPrice(basePrice)}
-                                        </Typography.Text>
-                                      </span>
-                                      {discount > 0 && (
-                                        <>
-                                          <span>
-                                            <Typography.Text type="secondary" style={{ fontSize: '12px' }}>{t('pages.menuCenter.discount')}: </Typography.Text>
-                                            <Typography.Text type="danger">
-                                              {combo.discountType === 'percentage' ? `-${discount}%` : `-${formatPrice(discount)}`}
-                                            </Typography.Text>
-                                          </span>
-                                          <span>
-                                            <Typography.Text type="secondary" style={{ fontSize: '12px' }}>{t('pages.menuCenter.finalPrice')}: </Typography.Text>
-                                            <Typography.Text strong style={{ color: '#52c41a', fontSize: '16px' }}>
-                                              {formatPrice(finalPrice)}
-                                            </Typography.Text>
-                                          </span>
-                                        </>
-                                      )}
-                                    </Space>
-                                  </div>
+                          <div key={combo.id} className="flex items-start justify-between gap-3 py-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <UI.Badge variant="gold">{t('pages.menuCenter.comboTag')}</UI.Badge>
+                                {combo.itemGroups && combo.itemGroups.length > 0 ? <UI.Badge variant="gold">可选套餐</UI.Badge> : <UI.Badge variant="blue">固定套餐</UI.Badge>}
+                                <span className="font-medium text-slate-800">{combo.name}</span>
+                                {!combo.isActive && <UI.Badge variant="red">{t('pages.menuCenter.deactivated')}</UI.Badge>}
+                              </div>
+                              {combo.description && <p className="text-sm text-slate-500 mt-1">{combo.description}</p>}
+                              {(!combo.itemGroups || combo.itemGroups.length === 0) && combo.comboItems && combo.comboItems.length > 0 && (
+                                <div className="flex items-center gap-1 flex-wrap mt-1.5">
+                                  <span className="text-xs text-slate-400">{t('pages.menuCenter.includedItems')}:</span>
+                                  {combo.comboItems.map((comboItem, index) => (
+                                    <UI.Badge key={index} variant="blue">{allItems.find(i => i.id === comboItem.itemId)?.name || comboItem.item?.name || '未知'} ×{comboItem.quantity}</UI.Badge>
+                                  ))}
                                 </div>
-                              }
-                            />
-                          </List.Item>
+                              )}
+                              {combo.itemGroups && combo.itemGroups.length > 0 && (
+                                <div className="mt-1.5 space-y-1">
+                                  <span className="text-xs text-slate-400">套餐分组:</span>
+                                  {combo.itemGroups.map((group, index) => {
+                                    const groupItems = (combo.comboItems || []).filter(item => item.groupId === group.id)
+                                    const selectionText = group.selectionType === 'single' ? '单选' : `${groupItems.length}选${group.maxSelections || 1}`
+                                    return (
+                                      <div key={index} className="flex items-center gap-1 flex-wrap">
+                                        <UI.Badge variant="blue">{group.name} ({selectionText})</UI.Badge>
+                                        {groupItems.map((item, idx) => (
+                                          <UI.Badge key={idx}>{allItems.find(i => i.id === item.itemId)?.name || '未知'}{item.additionalPrice ? ` +${(item.additionalPrice / 100).toFixed(2)}` : ''}</UI.Badge>
+                                        ))}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-4 mt-2 text-sm">
+                                <span>
+                                  <span className="text-xs text-slate-400">{t('pages.menuCenter.originalPrice')}: </span>
+                                  <span className={discount > 0 ? 'line-through text-slate-400' : 'text-slate-700'}>{formatPrice(basePrice)}</span>
+                                </span>
+                                {discount > 0 && (
+                                  <>
+                                    <span>
+                                      <span className="text-xs text-slate-400">{t('pages.menuCenter.discount')}: </span>
+                                      <span className="text-red-600">{combo.discountType === 'percentage' ? `-${discount}%` : `-${formatPrice(discount)}`}</span>
+                                    </span>
+                                    <span>
+                                      <span className="text-xs text-slate-400">{t('pages.menuCenter.finalPrice')}: </span>
+                                      <span className="font-semibold text-emerald-600">{formatPrice(finalPrice)}</span>
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditCombo(combo)}>{t('pages.menuCenter.edit')}</UI.Btn>
+                              <button title={t('pages.menuCenter.delete')} onClick={() => setComboDeleteTarget(combo)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                          </div>
                         )
-                      }}
-                    />
+                      })}
+                    </div>
                   </>
                 )}
               </>
             )}
-            </Spin>
-          </Card>
-        </Col>
-              </Row>
+            </div>
+          </UI.SectionCard>
+        </div>
+              </div>
           )}
           {productsTab === 'modifiers' && (
             <ModifierGroupManager readOnly={!isMain} isMain={isMain} additionalLocales={additionalLocales} />
@@ -2264,30 +1962,17 @@ const MenuCenter: React.FC = () => {
         </>
       )}
       {topTab === 'combos' && (
-              <Card
-                size="small"
-                title={
-                  <Space>
-                    {t('pages.menuCenter.comboList')}
-                    <Button 
-                      type="primary" 
-                      size="small" 
-                      icon={<PlusOutlined />}
-                      onClick={handleCreateCombo}
-                    >
-                      {t('pages.menuCenter.createCombo')}
-                    </Button>
-                    <Button 
-                      size="small" 
-                      icon={<ReloadOutlined />}
-                      onClick={loadCombos}
-                      loading={loading.combos}
-                    >
-                      {t('pages.menuCenter.refresh')}
-                    </Button>
-                  </Space>
+              <UI.SectionCard
+                title={t('pages.menuCenter.comboList')}
+                action={
+                  <div className="flex items-center gap-1.5">
+                    <UI.Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateCombo}>{t('pages.menuCenter.createCombo')}</UI.Btn>
+                    <UI.Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading.combos} onClick={loadCombos} />
+                  </div>
                 }
+                bodyClassName="p-0"
               >
+                <div className="p-4">
                 <UI.Table
                   data={combos}
                   rowKey={(r: Combo) => r.id}
@@ -2368,7 +2053,8 @@ const MenuCenter: React.FC = () => {
                     },
                   ]}
                 />
-              </Card>
+                </div>
+              </UI.SectionCard>
       )}
       {topTab === 'supplies' && <SupplyTab />}
       {topTab === 'locale-settings' && isMain && <BrandLocaleSettings />}
@@ -2835,6 +2521,32 @@ const MenuCenter: React.FC = () => {
           {/* 时段限制配置 */}
           <ComboAvailabilityConfig value={comboAvailabilityRules} onChange={setComboAvailabilityRules} />
         </div>
+      </UI.Modal>
+
+      {/* 门店改价弹窗（受控，替代原 Modal.confirm DOM hack） */}
+      <UI.Modal
+        open={!!priceOverrideTarget}
+        onOpenChange={(v) => !v && setPriceOverrideTarget(null)}
+        title={priceOverrideTarget ? `改价 — ${priceOverrideTarget.name}` : '改价'}
+        footer={
+          <>
+            <UI.Btn variant="secondary" onClick={() => setPriceOverrideTarget(null)}>取消</UI.Btn>
+            <UI.Btn variant="primary" onClick={async () => {
+              if (!priceOverrideTarget) return
+              await storeMenuService.upsertStoreMenuConfig(priceOverrideTarget.id, {
+                priceOverride: Number.isNaN(priceOverrideValue) ? undefined : priceOverrideValue,
+                isAvailable: storeConfigs.get(priceOverrideTarget.id)?.isAvailable ?? true,
+              })
+              await loadStoreConfigs()
+              UI.toast.success('价格已更新')
+              setPriceOverrideTarget(null)
+            }}>保存</UI.Btn>
+          </>
+        }
+      >
+        <UI.Field label="本店售价（元）" hint={priceOverrideTarget ? `品牌定价 ${formatPrice(priceOverrideTarget.basePrice)}，留空恢复默认` : undefined}>
+          <UI.NumberInput value={priceOverrideValue} onChange={setPriceOverrideValue} min={0} className="w-full" />
+        </UI.Field>
       </UI.Modal>
 
       {channelModal && (

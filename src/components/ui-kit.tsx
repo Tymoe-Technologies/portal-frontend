@@ -125,6 +125,30 @@ export function Checkbox({ checked, onCheckedChange, label, disabled }: {
   )
 }
 
+// ─── 滑块（原生 range + slate 强调色） ───────────────────────────────────────────
+
+export function Slider({ value, onChange, min = 0, max = 100, step = 1, disabled }: {
+  value: number
+  onChange: (v: number) => void
+  min?: number
+  max?: number
+  step?: number
+  disabled?: boolean
+}) {
+  return (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      disabled={disabled}
+      onChange={e => onChange(Number(e.target.value))}
+      className="w-full accent-slate-900 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+    />
+  )
+}
+
 // ─── 提示框 ─────────────────────────────────────────────────────────────────────
 
 export function AlertBox({ type = 'info', title, description, action }: {

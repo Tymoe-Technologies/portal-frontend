@@ -7,6 +7,7 @@ import type {
   BookingSettings,
   BookableResource,
   Booking,
+  FloorPlan,
 } from '@/types/booking'
 import { mapSettings, mapSettingsToBackend, mapResource, mapResourceToBackend, mapBooking } from './mappers'
 
@@ -63,6 +64,65 @@ export const resourcesApi = {
   async delete(id: string): Promise<void> {
     await httpService.delete(`${BASE}/resources/${id}`)
   },
+
+  async uploadImage(id: string, file: File): Promise<{ resource: BookableResource; image: { url: string; publicId: string } }> {
+    const formData = new FormData()
+    formData.append('image', file)
+    const response = await httpService.post<{ success?: boolean; data?: { resource: BackendResource; image: { url: string; publicId: string } } }>(
+      `${BASE}/resources/${id}/image`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    const data = unwrap<{ resource: BackendResource; image: { url: string; publicId: string } }>(response)
+    return {
+      resource: mapResource(data.resource),
+      image: data.image,
+    }
+  },
+}
+
+// ─── ResourceAssignment API ──────────────────────────────────────────
+
+export interface ResourceAssignment {
+  id: string
+  orgId: string
+  productId: string
+  resourceId: string
+  priceOverride: number | null
+  resource: { id: string; name: string; resourceType: string }
+  createdAt: string
+  updatedAt: string
+}
+
+export const assignmentsApi = {
+  // 获取某 PRODUCT 的所有关联（人员/空间）
+  async list(productId: string): Promise<ResourceAssignment[]> {
+    return unwrap<ResourceAssignment[]>(
+      await httpService.get(`${BASE}/resources/${productId}/assignments`)
+    ) ?? []
+  },
+
+  // 全量同步（PUT 替换）
+  async sync(
+    productId: string,
+    assignments: { resourceId: string; priceOverride?: number | null }[],
+  ): Promise<ResourceAssignment[]> {
+    return unwrap<ResourceAssignment[]>(
+      await httpService.put(`${BASE}/resources/${productId}/assignments`, { assignments })
+    ) ?? []
+  },
+
+  // 新增单条
+  async add(productId: string, resourceId: string, priceOverride?: number | null): Promise<ResourceAssignment> {
+    return unwrap<ResourceAssignment>(
+      await httpService.post(`${BASE}/resources/${productId}/assignments`, { resourceId, priceOverride })
+    )
+  },
+
+  // 删除单条
+  async remove(productId: string, resourceId: string): Promise<void> {
+    await httpService.delete(`${BASE}/resources/${productId}/assignments/${resourceId}`)
+  },
 }
 
 // ─── Bookings API ────────────────────────────────────────────────────
@@ -74,8 +134,12 @@ export const bookingsApi = {
     if (query?.date) params.set('date', query.date)
     if (query?.search) params.set('search', query.search)
     const qs = params.toString() ? `?${params}` : ''
-    const raw = unwrap<BackendBooking[]>(await httpService.get(`${BASE}/bookings${qs}`))
-    return (raw ?? []).map(mapBooking)
+    const raw = unwrap<{ bookings: BackendBooking[]; pagination: unknown } | BackendBooking[]>(
+      await httpService.get(`${BASE}/bookings${qs}`)
+    )
+    // 后端返回 { bookings: [], pagination: {} } 或直接数组
+    const list = Array.isArray(raw) ? raw : (raw as { bookings: BackendBooking[] })?.bookings ?? []
+    return list.map(mapBooking)
   },
 
   async create(data: Record<string, unknown>): Promise<Booking> {
@@ -105,6 +169,104 @@ export const availabilityApi = {
     const params = new URLSearchParams({ date })
     if (partySize) params.set('partySize', String(partySize))
     return unwrap(await httpService.get(`${BASE}/availability?${params}`))
+  },
+
+  // 查询 TABLE 模式的最大可接待人数
+  async getCapacity(): Promise<{ maxPartySize: number; tableCount: number }> {
+    return unwrap(await httpService.get(`${BASE}/availability/capacity`))
+  },
+}
+
+// ─── Floor Plan API ──────────────────────────────────────────────────
+
+export const floorPlanApi = {
+  async list(): Promise<FloorPlan[]> {
+    return unwrap<FloorPlan[]>(await httpService.get(`${BASE}/floor-plans`)) ?? []
+  },
+
+  async get(id: string): Promise<FloorPlan> {
+    return unwrap<FloorPlan>(await httpService.get(`${BASE}/floor-plans/${id}`))
+  },
+
+  async create(data: { name: string; width?: number; height?: number }): Promise<FloorPlan> {
+    return unwrap<FloorPlan>(await httpService.post(`${BASE}/floor-plans`, data))
+  },
+
+  async update(id: string, data: { name?: string; width?: number; height?: number }): Promise<FloorPlan> {
+    return unwrap<FloorPlan>(await httpService.put(`${BASE}/floor-plans/${id}`, data))
+  },
+
+  async setDefault(id: string): Promise<FloorPlan> {
+    return unwrap<FloorPlan>(await httpService.put(`${BASE}/floor-plans/${id}/set-default`, {}))
+  },
+
+  async delete(id: string): Promise<void> {
+    await httpService.delete(`${BASE}/floor-plans/${id}`)
+  },
+
+  // 桌位操作
+  async addTable(
+    floorPlanId: string,
+    data: { name?: string; shape?: string; minCapacity?: number; maxCapacity?: number; posX?: number; posY?: number }
+  ): Promise<BookableResource> {
+    const raw = unwrap<BackendResource>(await httpService.post(`${BASE}/floor-plans/${floorPlanId}/tables`, data))
+    return mapResource(raw)
+  },
+
+  async savePositions(
+    floorPlanId: string,
+    updates: Array<{ id: string; posX: number; posY: number }>
+  ): Promise<void> {
+    await httpService.put(`${BASE}/floor-plans/${floorPlanId}/tables/positions`, { updates })
+  },
+
+  async updateTable(
+    floorPlanId: string,
+    tableId: string,
+    data: { name?: string; config?: unknown; status?: string; isActive?: boolean }
+  ): Promise<BookableResource> {
+    const raw = unwrap<BackendResource>(
+      await httpService.put(`${BASE}/floor-plans/${floorPlanId}/tables/${tableId}`, data)
+    )
+    return mapResource(raw)
+  },
+
+  async removeTable(floorPlanId: string, tableId: string): Promise<void> {
+    await httpService.delete(`${BASE}/floor-plans/${floorPlanId}/tables/${tableId}`)
+  },
+}
+
+// ─── Organization Profile API ───────────────────────────────────────
+
+export interface OrganizationProfile {
+  id: string
+  orgId: string
+  slug: string
+  displayName?: string
+  logoUrl?: string
+  description?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export const orgProfileApi = {
+  async get(): Promise<OrganizationProfile> {
+    return unwrap<OrganizationProfile>(await httpService.get(`${BASE}/org-profile`))
+  },
+
+  async update(data: {
+    slug?: string
+    displayName?: string
+    logoUrl?: string
+    description?: string
+  }): Promise<OrganizationProfile> {
+    return unwrap<OrganizationProfile>(await httpService.put(`${BASE}/org-profile`, data))
+  },
+
+  async checkSlug(slug: string): Promise<{ slug: string; available: boolean }> {
+    return unwrap<{ slug: string; available: boolean }>(
+      await httpService.get(`${BASE}/org-profile/check-slug?slug=${slug}`)
+    )
   },
 }
 

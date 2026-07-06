@@ -1,17 +1,25 @@
-/* 国际电话号码输入组件样式 */
+/* 国际电话号码输入组件样式 — 匹配 Ant Design Input 风格 */
 .PhoneInput {
   width: 100% !important;
-  height: 100% !important;
-  border: none !important;
-  border-radius: 0 !important;
+  height: 32px !important;
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 6px !important;
   transition: all 0.3s ease !important;
   background: #ffffff !important;
   display: flex !important;
   align-items: center !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
-/* Hover 和 focus 样式由外层包装器处理 */
+.PhoneInput:hover {
+  border-color: #40a9ff !important;
+}
+
+.PhoneInput:focus-within {
+  border-color: #40a9ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
 
 .PhoneInputCountry {
   padding: 0 8px !important;
@@ -70,18 +78,8 @@
   cursor: not-allowed !important;
 }
 
-/* 额外的重置样式，确保边框完整和背景颜色 */
 .PhoneInput * {
   box-sizing: border-box !important;
-  background-color: #ffffff !important;
-}
-
-/* 包装器样式 */
-.phone-input-wrapper {
-  background-color: #ffffff !important;
-}
-
-.phone-input-wrapper * {
   background-color: #ffffff !important;
 }
 

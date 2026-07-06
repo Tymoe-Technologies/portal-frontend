@@ -23,7 +23,7 @@ https://tymoe.com/api/item-manage/v1
 - `GET https://tymoe.com/api/item-manage/v1/categories` - 分类管理
 - `GET https://tymoe.com/api/item-manage/v1/combos` - 套餐管理
 - `GET https://tymoe.com/api/item-manage/v1/recipes` - 配方管理
-- `GET https://tymoe.com/api/item-manage/v1/modifier-groups` - 修饰符管理
+- `GET https://tymoe.com/api/item-manage/v1/modifier-groups` - 自定义选项管理
 - 其他所有 API 端点见下方详细文档
 
 ---
@@ -45,7 +45,7 @@ https://tymoe.com/api/item-manage/v1
 1. [分类管理 (Categories)](#1-分类管理)
 2. [商品管理 (Items)](#2-商品管理)
 3. [套餐管理 (Combos)](#3-套餐管理)
-4. [修饰符管理 (Modifiers)](#4-修饰符管理)
+4. [自定义选项管理 (Modifiers)](#4-自定义选项管理)
 5. [制作指引管理 (Recipes)](#5-制作指引管理)
 6. [步骤类型管理 (Step Types)](#6-步骤类型管理)
 7. [价格管理 (Pricing & Channels)](#7-价格管理)
@@ -285,17 +285,17 @@ DELETE /combos/{comboId}/items/{itemId}
 
 ---
 
-## 4️⃣ 修饰符管理
+## 4️⃣ 自定义选项管理
 
 ## 🎯 核心设计原则
 
-### ✅ 修饰符配置的三层结构
+### ✅ 自定义选项配置的三层结构
 
 ```
-1️⃣ 修饰符组级 (ModifierGroup)
-   └─ 定义什么是修饰符组 (如"杯型"、"加料")
+1️⃣ 自定义选项组级 (ModifierGroup)
+   └─ 定义什么是自定义选项组 (如"杯型"、"加料")
 
-2️⃣ 修饰符选项级 (ModifierOption)
+2️⃣ 自定义选项选项级 (ModifierOption)
    └─ 定义选项本身 (如"大杯"、"中杯")
    └─ 定义属性: 名称、显示名称、默认价格、成本
    └─ ❌ 不定义: 是否默认选中、启用状态、排序顺序
@@ -305,20 +305,20 @@ DELETE /combos/{comboId}/items/{itemId}
    └─ 定义属性: 是否默认、是否启用、显示顺序
 ```
 
-### 商品和套餐的修饰符
+### 商品和套餐的自定义选项
 
-- **商品 (Item)**: 有自己的修饰符配置
-- **套餐 (Combo)**: ❌ 不需要自己的修饰符
-  - ComboItem 通过关联 Item 来动态继承 Item 的修饰符配置
-  - 用户为每个 ComboItem 分别选择修饰符
+- **商品 (Item)**: 有自己的自定义选项配置
+- **套餐 (Combo)**: ❌ 不需要自己的自定义选项
+  - ComboItem 通过关联 Item 来动态继承 Item 的自定义选项配置
+  - 用户为每个 ComboItem 分别选择自定义选项
 
 ---
 
 ## 📚 API 端点详解
 
-### 1️⃣ 修饰符组管理
+### 1️⃣ 自定义选项组管理
 
-#### 🔍 获取修饰符组列表
+#### 🔍 获取自定义选项组列表
 ```http
 GET /modifier-groups?groupType=property&isActive=true&nocache=1
 ```
@@ -370,7 +370,7 @@ GET /modifier-groups?groupType=property&isActive=true&nocache=1
 
 ---
 
-#### ➕ 创建修饰符组
+#### ➕ 创建自定义选项组
 ```http
 POST /modifier-groups
 Content-Type: application/json
@@ -389,11 +389,11 @@ Content-Type: application/json
 - `groupType`: `property` 属性 | `addon` 加料 | `custom` 自定义
 - `description`: 描述 (可选)
 
-**注意:** 修饰符组本身不定义选择规则，规则在 ItemModifierGroup 中定义
+**注意:** 自定义选项组本身不定义选择规则，规则在 ItemModifierGroup 中定义
 
 ---
 
-#### ✏️ 更新修饰符组
+#### ✏️ 更新自定义选项组
 ```http
 PUT /modifier-groups/{groupId}
 Content-Type: application/json
@@ -409,7 +409,7 @@ Content-Type: application/json
 **可更新字段:**
 - `displayName`: 显示名称
 - `description`: 描述
-- `groupType`: 修饰符类型
+- `groupType`: 自定义选项类型
 - `isActive`: 是否启用
 
 **⚠️ 不可修改字段:**
@@ -419,19 +419,19 @@ Content-Type: application/json
 
 ---
 
-#### ❌ 删除修饰符组
+#### ❌ 删除自定义选项组
 ```http
 DELETE /modifier-groups/{groupId}
 ```
 
 **说明：**
-- 删除整个修饰符组及其所有关联的选项
+- 删除整个自定义选项组及其所有关联的选项
 - 会级联删除该组包含的所有选项
 - 注意：删除前应确保没有商品关联该组
 
 ---
 
-#### 🎨 添加修饰符选项
+#### 🎨 添加自定义选项选项
 ```http
 POST /modifier-groups/{groupId}/options
 Content-Type: application/json
@@ -457,7 +457,7 @@ Content-Type: application/json
 
 ---
 
-#### ✏️ 更新修饰符选项
+#### ✏️ 更新自定义选项选项
 ```http
 PUT /modifier-groups/{groupId}/options/{optionId}
 Content-Type: application/json
@@ -485,20 +485,20 @@ Content-Type: application/json
 
 ---
 
-#### 🗑️ 删除修饰符选项
+#### 🗑️ 删除自定义选项选项
 ```http
 DELETE /modifier-groups/{groupId}/options/{optionId}
 ```
 
 **说明：**
-- 删除特定的修饰符选项
+- 删除特定的自定义选项选项
 - 会自动清除该选项的所有价格配置和关联信息
 
 ---
 
-### 商品修饰符配置
+### 商品自定义选项配置
 
-#### 📖 获取商品的修饰符配置（包含价格）
+#### 📖 获取商品的自定义选项配置（包含价格）
 ```http
 GET /items/{itemId}/modifiers
 ```
@@ -557,7 +557,7 @@ GET /items/{itemId}/modifiers
 ```
 
 **字段说明:**
-- `defaultPrice`: 修饰符选项本身的默认价格
+- `defaultPrice`: 自定义选项选项本身的默认价格
 - `itemPrice`: 该商品对该选项的商品级定价 (null = 未覆盖，使用 defaultPrice)
 - `finalPrice`: 最终价格 (优先级: itemPrice > defaultPrice)
 
@@ -571,7 +571,7 @@ GET /items/{itemId}/modifiers
 
 ---
 
-#### 🔗 为商品关联修饰符组
+#### 🔗 为商品关联自定义选项组
 ```http
 POST /items/{itemId}/modifier-groups
 Content-Type: application/json
@@ -585,18 +585,18 @@ Content-Type: application/json
 ```
 
 **字段说明:**
-- `modifierGroupId`: 修饰符组ID (必填)
+- `modifierGroupId`: 自定义选项组ID (必填)
 - `isRequired`: 该组是否必选 (可选, 默认: false)
 - `minSelections`: 最少选几个 (可选)
 - `maxSelections`: 最多选几个 (可选)
 
 **示例场景:**
-- 杯型修饰符: `isRequired: true, minSelections: 1, maxSelections: 1`
-- 加料修饰符: `isRequired: false, minSelections: 0, maxSelections: 3`
+- 杯型自定义选项: `isRequired: true, minSelections: 1, maxSelections: 1`
+- 加料自定义选项: `isRequired: false, minSelections: 0, maxSelections: 3`
 
 ---
 
-#### ✏️ 更新商品的修饰符组关联配置
+#### ✏️ 更新商品的自定义选项组关联配置
 ```http
 PUT /items/{itemId}/modifier-groups/{groupId}
 Content-Type: application/json
@@ -616,30 +616,30 @@ Content-Type: application/json
 - `displayOrder`: 显示顺序
 
 **说明:**
-- 这些是商品级别的选择规则，控制用户在该商品中如何选择修饰符
-- 同一商品中多个修饰符组可以通过 displayOrder 来控制显示顺序
+- 这些是商品级别的选择规则，控制用户在该商品中如何选择自定义选项
+- 同一商品中多个自定义选项组可以通过 displayOrder 来控制显示顺序
 
 **注意:** 至少需要提供一个字段用于更新
 
 ---
 
-#### ❌ 移除商品的修饰符组
+#### ❌ 移除商品的自定义选项组
 ```http
 DELETE /items/{itemId}/modifier-groups/{groupId}
 ```
 
 **说明:**
-- 删除该商品和修饰符组的关联
+- 删除该商品和自定义选项组的关联
 - **级联删除**该商品对该组所有选项的：
   - 配置信息 (ItemModifierOption) - 如 isDefault、isEnabled、displayOrder
   - 价格覆盖 (ItemModifierPrice) - 如商品级定价
 - 清空缓存，下次查询时重新加载
 
-**注意:** 这个操作会完全清除该修饰符组相关的所有商品级配置和价格
+**注意:** 这个操作会完全清除该自定义选项组相关的所有商品级配置和价格
 
 ---
 
-#### 💰 设置商品的修饰符价格
+#### 💰 设置商品的自定义选项价格
 ```http
 POST /items/{itemId}/modifier-prices
 Content-Type: application/json
@@ -665,18 +665,18 @@ Content-Type: application/json
 
 ---
 
-#### 🗑️ 删除商品的修饰符价格
+#### 🗑️ 删除商品的自定义选项价格
 ```http
 DELETE /items/{itemId}/modifier-prices/{optionId}
 ```
 
 **说明:**
 - 删除该商品对该选项的商品级定价
-- 之后该选项会使用修饰符的 `defaultPrice`
+- 之后该选项会使用自定义选项的 `defaultPrice`
 
 ---
 
-#### 🔧 为商品配置修饰符选项 ⭐ NEW
+#### 🔧 为商品配置自定义选项选项 ⭐ NEW
 ```http
 POST /items/{itemId}/modifier-options
 Content-Type: application/json
@@ -707,26 +707,26 @@ Content-Type: application/json
 
 **重要:**
 - 🎯 这才是定义"默认选项"的正确位置！
-- 同一个修饰符组内，最多一个选项可以 `isDefault: true`
+- 同一个自定义选项组内，最多一个选项可以 `isDefault: true`
 - 通过 `isEnabled: false` 可以在特定商品中隐藏某些选项
 - `displayOrder` 用来调整选项的显示顺序
 
 ---
 
-#### 🗑️ 删除商品的修饰符选项配置
+#### 🗑️ 删除商品的自定义选项选项配置
 ```http
 DELETE /items/{itemId}/modifier-options/{optionId}
 ```
 
 ---
 
-### 套餐修饰符说明 (Combo)
+### 套餐自定义选项说明 (Combo)
 
-**⚠️ 重要提示：Combo 不需要自己的修饰符配置！**
+**⚠️ 重要提示：Combo 不需要自己的自定义选项配置！**
 
 #### 原理：
-- ComboItem 通过关联 Item 来动态继承该 Item 的修饰符
-- 每个 ComboItem 会自动获得其 Item 的所有修饰符配置
+- ComboItem 通过关联 Item 来动态继承该 Item 的自定义选项
+- 每个 ComboItem 会自动获得其 Item 的所有自定义选项配置
 
 #### 前端业务流程：
 
@@ -738,7 +738,7 @@ DELETE /items/{itemId}/modifier-options/{optionId}
    {
      "itemId": "tea-001",
      "item": { "name": "奶茶", ... },
-     "inheritedModifiers": [  // ← 继承的修饰符
+     "inheritedModifiers": [  // ← 继承的自定义选项
        {
          "groupName": "杯型",
          "options": [...]
@@ -746,7 +746,7 @@ DELETE /items/{itemId}/modifier-options/{optionId}
      ]
    }
 
-3. 为每个 ComboItem 渲染其继承的修饰符
+3. 为每个 ComboItem 渲染其继承的自定义选项
    (使用与单品相同的逻辑)
 
 4. 订单提交时包含:
@@ -769,15 +769,15 @@ DELETE /items/{itemId}/modifier-options/{optionId}
 
 ### 🎯 核心设计理念
 
-**简化架构**：每个修饰符组合对应一个独立的配方
-- 用户先选择商品和修饰符组合
+**简化架构**：每个自定义选项组合对应一个独立的配方
+- 用户先选择商品和自定义选项组合
 - 系统自动生成所有可能的组合列表
 - 用户为每个组合创建一个配方（包含唯一的printCode和步骤）
-- 订单下单时，根据选中的修饰符选项精确匹配到对应的配方
+- 订单下单时，根据选中的自定义选项选项精确匹配到对应的配方
 
 ---
 
-### 🔄 生成修饰符组合列表
+### 🔄 生成自定义选项组合列表
 ```http
 POST /items/{itemId}/recipes/generate-combinations
 Content-Type: application/json
@@ -871,7 +871,7 @@ Content-Type: application/json
 **字段说明：**
 - `printCode`: **必填** - 订单打印代码（如：LICE、MHOT）
 - `displayCodeString`: 可选 - 显示代码（如：L-ICE、M-HOT）
-- `conditions`: **必填** - 修饰符条件数组，每个组最多一个
+- `conditions`: **必填** - 自定义选项条件数组，每个组最多一个
 - `steps`: 可选 - 配方步骤数组
 
 ---
@@ -1176,7 +1176,7 @@ Content-Type: application/json
 
 **说明：**
 - 用户下单时调用此接口
-- 根据选中的修饰符选项精确匹配配方
+- 根据选中的自定义选项选项精确匹配配方
 - 返回的 `printCode` 用于POS打印
 
 ---
@@ -1314,7 +1314,7 @@ Content-Type: application/json
 ### 渠道定价（Source Pricing）
 系统使用 **"来源定价"（Source Pricing）** 来实现多渠道差异化定价：
 - **sourceCode** = 渠道标识（如 `"meituan"`、`"eleme"`、`"dianping"` 等）
-- 支持对 **商品、套餐、修饰符** 三个维度进行渠道价格覆盖
+- 支持对 **商品、套餐、自定义选项** 三个维度进行渠道价格覆盖
 - 前端计算最终价格，后端专注于数据存储
 
 ---
@@ -1367,7 +1367,7 @@ CREATE TABLE source_combo_prices (
 
 ---
 
-#### 3️⃣ 修饰符渠道价格表 (`source_modifier_prices`) ⭐ 核心
+#### 3️⃣ 自定义选项渠道价格表 (`source_modifier_prices`) ⭐ 核心
 
 ```sql
 CREATE TABLE source_modifier_prices (
@@ -1375,7 +1375,7 @@ CREATE TABLE source_modifier_prices (
   tenant_id           VARCHAR(36) NOT NULL,
   source_code         VARCHAR(100) NOT NULL,      -- 渠道代码
   item_id             VARCHAR(36) NOT NULL,       -- 商品ID（精确到商品）
-  modifier_option_id  VARCHAR(36) NOT NULL,       -- 修饰符选项ID
+  modifier_option_id  VARCHAR(36) NOT NULL,       -- 自定义选项选项ID
   price               DECIMAL(10,2) NOT NULL,     -- 渠道价格
   created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1386,7 +1386,7 @@ CREATE TABLE source_modifier_prices (
 );
 ```
 
-**用途**: 在特定渠道和商品上，覆盖修饰符选项的价格（优先级最高）
+**用途**: 在特定渠道和商品上，覆盖自定义选项选项的价格（优先级最高）
 
 ---
 
@@ -1399,13 +1399,13 @@ CREATE TABLE source_modifier_prices (
 商品基础价格 (items.base_price)
 ```
 
-#### 修饰符价格计算（三级优先级）⭐
+#### 自定义选项价格计算（三级优先级）⭐
 ```
-1️⃣ 渠道修饰符价格 (source_modifier_prices)        [最高优先级]
+1️⃣ 渠道自定义选项价格 (source_modifier_prices)        [最高优先级]
    ↓ 不存在则使用
-2️⃣ 商品级修饰符价格 (item_modifier_prices)         [中等优先级]
+2️⃣ 商品级自定义选项价格 (item_modifier_prices)         [中等优先级]
    ↓ 不存在则使用
-3️⃣ 修饰符默认价格 (modifier_options.default_price) [最低优先级]
+3️⃣ 自定义选项默认价格 (modifier_options.default_price) [最低优先级]
 ```
 
 **价格计算伪代码**:
@@ -1663,7 +1663,7 @@ DELETE /source-combo-prices/source/meituan
 
 ---
 
-## 7.4 修饰符渠道价格 API
+## 7.4 自定义选项渠道价格 API
 
 ### 💵 计算商品最终价格
 ```http
@@ -1713,7 +1713,7 @@ Content-Type: application/json
 **priceSource 字段说明:**
 - `"source"`: 使用渠道覆盖价格（`source_modifier_prices`）
 - `"item"`: 使用商品级定价（`item_modifier_prices`）
-- `"default"`: 使用修饰符默认价格（`modifier_options.default_price`）
+- `"default"`: 使用自定义选项默认价格（`modifier_options.default_price`）
 
 ---
 
@@ -1792,7 +1792,7 @@ POST /source-prices/batch
 # 原基础价格: 18.00，美团渠道覆盖为: 20.00
 ```
 
-**Step 2: 设置修饰符渠道价格**
+**Step 2: 设置自定义选项渠道价格**
 ```bash
 POST /source-prices/modifiers
 {
@@ -1846,7 +1846,7 @@ POST /pricing/calculate
 
 ---
 
-### 设置渠道的修饰符价格
+### 设置渠道的自定义选项价格
 ```http
 POST /source-prices/modifiers
 Content-Type: application/json
@@ -1884,7 +1884,7 @@ Authorization: Bearer {token}
 
 ---
 
-### 查询渠道的修饰符价格
+### 查询渠道的自定义选项价格
 ```http
 POST /source-prices/modifiers/query
 Content-Type: application/json
@@ -1896,7 +1896,7 @@ Content-Type: application/json
 }
 ```
 
-#### 🗑️ 删除渠道修饰符价格
+#### 🗑️ 删除渠道自定义选项价格
 ```http
 DELETE /source-prices/modifiers/{sourceCode}/{itemId}/{optionId}
 
@@ -1907,9 +1907,9 @@ DELETE /source-prices/modifiers/by-source/{sourceCode}  # 删除整个渠道
 
 ## 🚀 完整业务流程示例
 
-### 场景：创建"奶茶"商品的修饰符体系
+### 场景：创建"奶茶"商品的自定义选项体系
 
-#### 第 1 步：创建修饰符组
+#### 第 1 步：创建自定义选项组
 ```bash
 POST /modifier-groups
 {
@@ -1920,7 +1920,7 @@ POST /modifier-groups
 # 返回: group-001
 ```
 
-#### 第 2 步：为修饰符组添加选项
+#### 第 2 步：为自定义选项组添加选项
 ```bash
 POST /modifier-groups/group-001/options
 {
@@ -1939,7 +1939,7 @@ POST /modifier-groups/group-001/options
 # 返回: option-002
 ```
 
-#### 第 3 步：为商品关联修饰符组
+#### 第 3 步：为商品关联自定义选项组
 ```bash
 POST /items/item-001/modifier-groups
 {
@@ -2023,15 +2023,15 @@ GET /items/item-001/modifiers
 
 **为什么 `name` 字段不能修改？**
 
-1. **系统唯一标识符** - `name` 是修饰符组和选项的内部唯一标识符（同租户内）
-2. **引用完整性** - 其他系统模块可能通过 `name` 来引用这些修饰符
+1. **系统唯一标识符** - `name` 是自定义选项组和选项的内部唯一标识符（同租户内）
+2. **引用完整性** - 其他系统模块可能通过 `name` 来引用这些自定义选项
 3. **API 稳定性** - 如果允许修改 `name`，会导致依赖于旧 `name` 的集成出现问题
 4. **审计追溯** - `name` 作为不变的标识符，便于系统审计和日志追踪
 
 **修改策略：**
 - 如果需要改变显示名称 → 修改 `displayName` 字段
 - 如果需要改变描述信息 → 修改 `description` 字段
-- 如果需要改变类型 → 修改 `groupType` 字段（针对修饰符组）
+- 如果需要改变类型 → 修改 `groupType` 字段（针对自定义选项组）
 - 如果需要彻底重新命名 → 删除旧的，创建新的（保持 name 唯一性）
 
 **前端应用：**
@@ -2101,8 +2101,8 @@ curl -X GET "http://localhost:3001/api/item-manage/v1/modifier-groups/diagnose" 
 ```
 
 #### 3️⃣ 检查清单
-- [ ] 修饰符组的 `is_active` 为 `true`
-- [ ] 修饰符选项的 `is_active` 为 `true`
+- [ ] 自定义选项组的 `is_active` 为 `true`
+- [ ] 自定义选项选项的 `is_active` 为 `true`
 - [ ] 清除缓存后重新查询：`?nocache=1`
 - [ ] 检查诊断端点输出
 - [ ] 查看应用日志中的调试信息
@@ -2111,7 +2111,7 @@ curl -X GET "http://localhost:3001/api/item-manage/v1/modifier-groups/diagnose" 
 
 ## 🧪 测试 cURL 命令
 
-### 创建修饰符组
+### 创建自定义选项组
 ```bash
 curl -X POST http://localhost:3001/api/item-manage/v1/modifier-groups \
   -H "Authorization: Bearer YOUR_TOKEN" \
@@ -2124,7 +2124,7 @@ curl -X POST http://localhost:3001/api/item-manage/v1/modifier-groups \
   }'
 ```
 
-### 添加修饰符选项
+### 添加自定义选项选项
 ```bash
 curl -X POST http://localhost:3001/api/item-manage/v1/modifier-groups/group-001/options \
   -H "Authorization: Bearer YOUR_TOKEN" \
@@ -2137,13 +2137,13 @@ curl -X POST http://localhost:3001/api/item-manage/v1/modifier-groups/group-001/
   }'
 ```
 
-### 删除修饰符选项
+### 删除自定义选项选项
 ```bash
 curl -X DELETE http://localhost:3001/api/item-manage/v1/modifier-groups/group-001/options/opt-001 \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-### 删除修饰符组
+### 删除自定义选项组
 ```bash
 curl -X DELETE http://localhost:3001/api/item-manage/v1/modifier-groups/group-001 \
   -H "Authorization: Bearer YOUR_TOKEN"
@@ -2282,7 +2282,7 @@ curl -X POST http://localhost:3001/api/item-manage/v1/step-types \
 
 ### 渠道价格
 ```bash
-# 设置渠道修饰符价格
+# 设置渠道自定义选项价格
 curl -X POST http://localhost:3001/api/item-manage/v1/source-prices/modifiers \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
@@ -2302,23 +2302,23 @@ curl -X POST http://localhost:3001/api/item-manage/v1/source-prices/modifiers \
 
 ## ⚡ 前端集成检查清单
 
-### 修饰符组管理
-- [ ] 创建修饰符组时，不定义 `selectionRequired`/`minSelections`/`maxSelections`
+### 自定义选项组管理
+- [ ] 创建自定义选项组时，不定义 `selectionRequired`/`minSelections`/`maxSelections`
 - [ ] **编辑模式下，禁用 `name` 字段** - name 是系统唯一标识符，创建后不可修改
 - [ ] 编辑时只允许修改：displayName、description、groupType、isActive
 
-### 修饰符选项管理
-- [ ] 添加修饰符选项时，不定义 `isDefault`
+### 自定义选项选项管理
+- [ ] 添加自定义选项选项时，不定义 `isDefault`
 - [ ] **编辑模式下，禁用 `name` 字段** - name 是系统唯一标识符，创建后不可修改
 - [ ] 编辑时只允许修改：displayName、defaultPrice、cost、displayOrder、isActive
 
-### 商品修饰符配置
-- [ ] 关联商品和修饰符组时，定义选择规则 (`isRequired`, `min/maxSelections`)
+### 商品自定义选项配置
+- [ ] 关联商品和自定义选项组时，定义选择规则 (`isRequired`, `min/maxSelections`)
 - [ ] 配置选项行为时，定义 `isDefault`/`isEnabled`/`displayOrder`
-- [ ] 获取商品修饰符时，检查 `itemOptions` 数组来获取配置
+- [ ] 获取商品自定义选项时，检查 `itemOptions` 数组来获取配置
 
 ### 其他
-- [ ] Combo 中不创建自己的修饰符，直接使用 Item 的修饰符
+- [ ] Combo 中不创建自己的自定义选项，直接使用 Item 的自定义选项
 - [ ] 价格计算时，使用 `sourceCode` 参数来获得正确的渠道价格
 - [ ] 错误处理时，检查返回的 `error` 字段
 
@@ -2395,7 +2395,7 @@ location /api/item-manage/ {
 
 ### v2.2.0 (2025-10-30)
 - ✅ 新增简化配方系统（Plan A设计）
-- ✅ 每个修饰符组合对应独立配方
+- ✅ 每个自定义选项组合对应独立配方
 - ✅ RecipeModifierCondition关联表存储条件
 - ✅ SQL精确匹配配方功能
 - ✅ 删除了复杂的RecipeModifierVariant和RecipeStepOverride

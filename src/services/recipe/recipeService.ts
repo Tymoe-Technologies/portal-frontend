@@ -12,9 +12,6 @@ import type {
   MatchRecipeResponse,
   StepType,
   CreateStepTypeRequest,
-  CodeSuggestionRequest,
-  CodeSuggestionResponse,
-  EquipmentSymbol,
   ApiResponse
 } from './types'
 
@@ -26,34 +23,10 @@ const API_BASE = (import.meta.env.VITE_ITEM_MANAGE_BASE as string | undefined) ?
 const RECIPE_API_BASE = `${API_BASE}/recipes`
 const STEP_TYPE_API_BASE = `${API_BASE}/step-types`
 
-// ==================== 步骤类型辅助功能 ====================
-
-/**
- * 获取代码建议 (v2.2)
- */
-export const getCodeSuggestions = async (data: CodeSuggestionRequest): Promise<CodeSuggestionResponse> => {
-  const response = await httpService.post<ApiResponse<CodeSuggestionResponse>>(`${STEP_TYPE_API_BASE}/suggest`, data)
-  if (!response.data.success || !response.data.data) {
-    throw new Error(response.data.error?.message || '获取代码建议失败')
-  }
-  return response.data.data
-}
-
-/**
- * 获取设备符号列表 (v2.2)
- */
-export const getEquipmentSymbols = async (): Promise<{ symbols: EquipmentSymbol[] }> => {
-  const response = await httpService.get<ApiResponse<{ symbols: EquipmentSymbol[] }>>(`${STEP_TYPE_API_BASE}/equipment/symbols`)
-  if (!response.data.success || !response.data.data) {
-    throw new Error(response.data.error?.message || '获取设备符号列表失败')
-  }
-  return response.data.data
-}
-
 // ==================== 配方管理 (v2.2) ====================
 
 /**
- * 生成修饰符组合列表 (v2.2 新增)
+ * 生成自定义选项组合列表 (v2.2 新增)
  */
 export const generateCombinations = async (itemId: string, data: GenerateCombinationsRequest): Promise<GenerateCombinationsResponse> => {
   const response = await httpService.post<ApiResponse<GenerateCombinationsResponse>>(

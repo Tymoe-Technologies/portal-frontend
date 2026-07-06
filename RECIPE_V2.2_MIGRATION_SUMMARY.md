@@ -4,7 +4,7 @@
 2025-10-30
 
 ## 🎯 迁移目标
-将前端配方管理系统从旧的属性（Attribute）系统迁移到新的简化修饰符（Modifier v2.2）系统。
+将前端配方管理系统从旧的属性（Attribute）系统迁移到新的简化自定义选项（Modifier v2.2）系统。
 
 ---
 
@@ -18,8 +18,8 @@
 - 属性系统（Attribute）用于配方匹配
 
 #### 新架构（v2.2）
-- 基于 `modifierConditions`（修饰符条件数组）
-- 每个修饰符组合对应一个独立配方
+- 基于 `modifierConditions`（自定义选项条件数组）
+- 每个自定义选项组合对应一个独立配方
 - 简化的步骤定义：只需 `stepTypeId`、`displayOrder`、`instructions`
 - `printCode` 和 `displayCodeString` 成为核心字段
 
@@ -27,13 +27,13 @@
 
 | 端点 | 方法 | 用途 |
 |------|------|------|
-| `/items/{itemId}/recipes/generate-combinations` | POST | 生成所有可能的修饰符组合列表 |
+| `/items/{itemId}/recipes/generate-combinations` | POST | 生成所有可能的自定义选项组合列表 |
 | `/items/{itemId}/recipes` | GET | 获取商品的所有配方 |
 | `/recipes` | POST | 创建配方（使用 conditions 数组） |
 | `/recipes/{recipeId}` | PUT | 更新配方基本信息 |
 | `/recipes/{recipeId}/steps` | PUT | 更新配方步骤 |
 | `/recipes/{recipeId}/copy` | POST | 复制配方到其他组合 |
-| `/recipes/match` | POST | 根据选中的修饰符匹配配方 |
+| `/recipes/match` | POST | 根据选中的自定义选项匹配配方 |
 
 ### 3. 类型定义更新
 
@@ -75,20 +75,20 @@ interface RecipeStep {
 
 1. **`src/pages/RecipeGuide/RecipeManagementByModifiers.tsx`**
    - 替代旧的 `RecipeManagementByAttribute.tsx`
-   - 使用修饰符（Modifier）而不是属性（Attribute）
-   - 加载商品的修饰符配置
+   - 使用自定义选项（Modifier）而不是属性（Attribute）
+   - 加载商品的自定义选项配置
 
 2. **`src/pages/RecipeGuide/RecipeByModifierManager.tsx`**
    - 替代旧的 `RecipeByAttributeManager.tsx`
    - 调用新的 `/generate-combinations` API
-   - 展示修饰符组合表格
+   - 展示自定义选项组合表格
    - 支持批量复制配方到未配置的组合
 
 3. **`src/pages/RecipeGuide/RecipeFormModalV2.tsx`**
    - 新的配方表单组件
    - 使用 `printCode` 和 `displayCodeString` 作为核心字段
    - 简化的步骤编辑（移除了复杂的材料引用和 printCode 生成）
-   - 支持修饰符条件展示
+   - 支持自定义选项条件展示
 
 ### 更新文件
 
@@ -125,9 +125,9 @@ interface RecipeStep {
 3. 创建配方时，手动指定属性条件
 4. 使用变体（Variant）和覆盖（Override）处理不同组合
 
-### 新流程（修饰符系统 v2.2）
-1. 商品关联修饰符组（ModifierGroup）
-2. ✨ **自动生成**所有可能的修饰符组合列表
+### 新流程（自定义选项系统 v2.2）
+1. 商品关联自定义选项组（ModifierGroup）
+2. ✨ **自动生成**所有可能的自定义选项组合列表
 3. 为每个组合创建独立的配方（包含 printCode）
 4. 简化的步骤定义，无需复杂的覆盖逻辑
 5. 支持快速复制配方到其他未配置的组合
@@ -141,7 +141,7 @@ interface RecipeStep {
 - 每个配方独立、清晰、易于理解
 
 ### 2. **自动化组合生成**
-- 系统自动生成所有可能的修饰符组合
+- 系统自动生成所有可能的自定义选项组合
 - 前端展示清晰的表格，显示哪些组合已配置/未配置
 
 ### 3. **更好的用户体验**
@@ -158,14 +158,14 @@ interface RecipeStep {
 
 ## 🔧 技术实现要点
 
-### 1. 获取商品修饰符
+### 1. 获取商品自定义选项
 ```typescript
-// 使用 getItemModifiers 获取商品关联的修饰符组
+// 使用 getItemModifiers 获取商品关联的自定义选项组
 const modifiers = await getItemModifiers(itemId)
-// 过滤 groupType === 'property' 的修饰符组
+// 过滤 groupType === 'property' 的自定义选项组
 ```
 
-### 2. 生成修饰符组合
+### 2. 生成自定义选项组合
 ```typescript
 const response = await generateCombinations(itemId, {
   modifierGroupIds: ['group-001', 'group-002']
@@ -221,7 +221,7 @@ for (const combo of targetCombinations) {
 ### 建议迁移步骤
 1. 在测试环境验证新系统
 2. 导出旧配方数据（如需保留）
-3. 为商品配置修饰符组
+3. 为商品配置自定义选项组
 4. 使用新界面重新创建配方
 5. 测试配方匹配功能
 
@@ -230,15 +230,15 @@ for (const combo of targetCombinations) {
 ## 🧪 测试要点
 
 ### 功能测试
-- [ ] 生成修饰符组合列表
+- [ ] 生成自定义选项组合列表
 - [ ] 创建配方（包含条件和步骤）
 - [ ] 编辑配方（更新基本信息和步骤）
 - [ ] 删除配方
 - [ ] 批量复制配方到未配置的组合
-- [ ] 配方匹配（根据选中的修饰符）
+- [ ] 配方匹配（根据选中的自定义选项）
 
 ### 边界情况
-- [ ] 商品没有修饰符时的提示
+- [ ] 商品没有自定义选项时的提示
 - [ ] 没有未配置组合时的批量复制提示
 - [ ] printCode 重复验证
 - [ ] 步骤为空时的处理
@@ -267,14 +267,14 @@ for (const combo of targetCombinations) {
 ## 🔗 相关文档
 
 - [API 文档 v2.2](./src/pages/MenuCenter/ModifierGroupApi/api.md)
-- [修饰符系统设计](./MODIFIER_V2_INTEGRATION.md)
+- [自定义选项系统设计](./MODIFIER_V2_INTEGRATION.md)
 - [配方系统前端指南](./RECIPE_STEPS_FRONTEND_GUIDE.md)
 
 ---
 
 ## ✨ 总结
 
-此次迁移成功将配方系统从复杂的属性+变体模式简化为基于修饰符组合的独立配方模式。主要优势包括：
+此次迁移成功将配方系统从复杂的属性+变体模式简化为基于自定义选项组合的独立配方模式。主要优势包括：
 
 1. **更简单**：移除了 Variant 和 Override 的复杂层级
 2. **更直观**：表格化展示所有组合的配置状态

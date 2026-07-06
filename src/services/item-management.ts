@@ -8,13 +8,17 @@ export interface Item {
   tenantId: string
   categoryId?: string
   name: string
+  name_i18n?: Record<string, string>
   description?: string
+  description_i18n?: Record<string, string>
   customFields?: any // jsonb
   basePrice: number
   cost?: number
   aiTags?: any // jsonb
   imageUrl?: string // Cloudinary 图片 URL
   isActive: boolean
+  scope?: 'BRAND' | 'STORE_EXCLUSIVE'
+  visible_stores?: { store_id: string }[]
   createdAt?: string
   updatedAt?: string
 }
@@ -23,7 +27,10 @@ export interface Category {
   id: string
   tenantId: string
   name: string
+  nameI18n?: Record<string, string>
   parentId?: string
+  storeId?: string | null  // null=品牌级，有值=门店私有
+  isSystem?: boolean       // 系统预设分类，不可删除/停用
   createdAt?: string
   // 后端返回的关联数据
   _count?: { items: number }
@@ -67,18 +74,16 @@ export interface ItemAddon {
 }
 
 // ==================== Modifier v2.0 架构 ====================
-// 统一的修饰符系统，替代旧的 Attribute 和 Addon
+// 统一的自定义选项系统，替代旧的 Attribute 和 Addon
 
 /**
- * 修饰符组类型
+ * 自定义选项组类型
  * - 'property': 属性类型（如杯型、冰度、糖度）- 商品本身的可选配置
  * - 'addon': 加料类型（如珍珠、椰果、布丁）- 可选的额外配料
  * - 'custom': 自定义类型 - 其他自定义分类
  */
-export type ModifierGroupType = 'property' | 'addon' | 'custom'
-
 /**
- * 修饰符组
+ * 自定义选项组
  * 选择规则（最小/最大选择数、是否必选）在商品关联时定义，见 ItemModifierGroup
  */
 export interface ModifierGroup {
@@ -86,24 +91,29 @@ export interface ModifierGroup {
   tenantId: string
   name: string
   displayName: string
-  groupType: ModifierGroupType
+  displayNameI18n?: Record<string, string>
   description?: string
   displayOrder: number
   isActive: boolean
+  storeId?: string | null  // null=品牌级，有值=门店私有
   createdAt?: string
   updatedAt?: string
   options?: ModifierOption[]
 }
 
 /**
- * 修饰符选项
+ * 自定义选项选项
  */
 export interface ModifierOption {
   id: string
   modifierGroupId: string
   name: string
   displayName: string
-  code?: string              // 选项代码，用于打印
+  displayNameI18n?: Record<string, string>
+  code?: string              // 最终打印代码（base+用量组合，无空格），供标签/配方使用
+  printBaseCode?: string     // 打印代码的基础部分（编辑用，如 "LICE"）
+  defaultQuantity?: number   // 打印配置：默认用量（整数）
+  printInstruction?: string  // 打印配置：用量说明（如 "50%", "30g"），编辑用
   defaultPrice: number | string
   cost?: number | null
   displayOrder?: number
@@ -114,19 +124,19 @@ export interface ModifierOption {
   createdAt?: string
   updatedAt?: string
   group?: ModifierGroup
-  // 商品关联的选项配置（仅在获取商品修饰符时返回）
+  // 商品关联的选项配置（仅在获取商品自定义选项时返回）
   itemOptions?: Array<{
     isDefault: boolean
     isEnabled: boolean
     displayOrder: number
   }>
-  // 商品级价格覆盖（仅在获取商品修饰符时返回）
+  // 商品级价格覆盖（仅在获取商品自定义选项时返回）
   itemPrice?: number | null  // null表示未设置商品级价格
   finalPrice?: number        // 最终价格（已处理优先级）
 }
 
 /**
- * 商品修饰符组关联
+ * 商品自定义选项组关联
  */
 export interface ItemModifierGroup {
   id: string
@@ -141,7 +151,7 @@ export interface ItemModifierGroup {
 }
 
 /**
- * 商品修饰符价格
+ * 商品自定义选项价格
  */
 export interface ItemModifierPrice {
   id: string
@@ -154,27 +164,29 @@ export interface ItemModifierPrice {
 }
 
 /**
- * 创建修饰符组请求
+ * 创建自定义选项组请求
  */
 export interface CreateModifierGroupPayload {
   name?: string  // 可选，如果不提供则后端自动生成
   displayName: string
-  groupType: ModifierGroupType
   description?: string
   isActive?: boolean
+  isLocal?: boolean  // true=创建门店私有选项组
 }
 
 /**
- * 更新修饰符组请求
+ * 更新自定义选项组请求
  */
 export interface UpdateModifierGroupPayload extends Partial<CreateModifierGroupPayload> {}
 
 /**
- * 创建修饰符选项请求
+ * 创建自定义选项选项请求
  */
 export interface CreateModifierOptionPayload {
   name?: string  // 可选，如果不提供则后端自动生成
   displayName: string
+  displayNameI18n?: Record<string, string>
+  display_name_i18n?: Record<string, string>
   code?: string  // 选项代码，用于打印
   defaultPrice?: number
   cost?: number
@@ -182,12 +194,12 @@ export interface CreateModifierOptionPayload {
 }
 
 /**
- * 更新修饰符选项请求
+ * 更新自定义选项选项请求
  */
 export interface UpdateModifierOptionPayload extends Partial<CreateModifierOptionPayload> {}
 
 /**
- * 商品关联修饰符组请求
+ * 商品关联自定义选项组请求
  */
 export interface AddModifierGroupToItemPayload {
   modifierGroupId: string
@@ -198,7 +210,7 @@ export interface AddModifierGroupToItemPayload {
 }
 
 /**
- * 设置商品修饰符价格请求
+ * 设置商品自定义选项价格请求
  */
 export interface SetItemModifierPricesPayload {
   prices: Array<{
@@ -208,7 +220,7 @@ export interface SetItemModifierPricesPayload {
 }
 
 /**
- * 配置商品修饰符选项请求（设置选项在特定商品中的行为）
+ * 配置商品自定义选项选项请求（设置选项在特定商品中的行为）
  */
 export interface ConfigureItemModifierOptionsPayload {
   options: Array<{
@@ -299,14 +311,24 @@ export interface SimpleTaxRate {
  */
 export interface ItemTaxClass {
   itemId: string
-  itemName: string
+  itemName?: string
   taxClassId?: string
   taxClassName?: string
-  taxClassType: 'DEFAULT' | 'TENANT_CUSTOM'
+  taxClassType?: 'DEFAULT' | 'TENANT_CUSTOM'
+  source?: 'TENANT_CUSTOM'
   effectiveTaxRates?: Array<{
     taxType: string
     rate: number
     name: string
+  }>
+  // 支持多个税率
+  taxes?: Array<{
+    id: string
+    name: string
+    taxType: string
+    rate: number
+    displayOrder?: number
+    isCompound?: boolean
   }>
 }
 
@@ -333,10 +355,17 @@ export interface TaxCalculationResult {
 }
 
 /**
- * 分配税类请求
+ * 分配单个税类请求
  */
 export interface AssignTaxClassPayload {
   taxClassId: string
+}
+
+/**
+ * 分配多个税类请求（支持商品关联多个税率）
+ */
+export interface AssignMultipleTaxClassPayload {
+  taxClassIds: string[]
 }
 
 /**
@@ -435,7 +464,33 @@ const MOCK_TAX_RATES: Record<string, TaxRate[]> = {
 }
 
 
-// Combo 组合商品相关接口
+// ==================== Combo 增强功能接口 ====================
+
+/**
+ * 套餐商品分组
+ */
+export interface ComboItemGroup {
+  id: string
+  name: string
+  selectionType: 'single' | 'multiple'
+  minSelections: number
+  maxSelections: number
+  sortOrder: number
+}
+
+/**
+ * 套餐时段限制规则
+ */
+export interface ComboAvailabilityRules {
+  enabled: boolean
+  timeRange?: {
+    start: string  // "HH:mm" 格式
+    end: string
+  }
+  daysOfWeek?: number[]  // 0-6, 0=周日
+}
+
+// ==================== Combo 组合商品相关接口 ====================
 export interface Combo {
   id: string
   tenantId: string
@@ -448,6 +503,11 @@ export interface Combo {
   isActive: boolean
   createdAt?: string
   updatedAt?: string
+  // 新增字段
+  imageUrl?: string
+  itemGroups?: ComboItemGroup[]
+  availabilityRules?: ComboAvailabilityRules
+  // 关联
   category?: Category
   comboItems?: ComboItem[]
 }
@@ -460,6 +520,9 @@ export interface ComboItem {
   isRequired: boolean
   sortOrder: number
   createdAt?: string
+  // 新增字段
+  groupId?: string  // 所属分组ID
+  additionalPrice?: number  // 额外费用（单位：分）
   attributeSelections?: Record<string, string> // { attributeTypeId: optionId }
   addonSelections?: Array<{ addonId: string; quantity: number }>
   item?: Item & { attributes?: ItemAttribute[]; itemAddons?: ItemAddon[] }
@@ -473,6 +536,10 @@ export interface CreateComboPayload {
   discount?: number
   discountType?: 'fixed' | 'percentage'
   isActive?: boolean
+  // 新增字段
+  imageUrl?: string
+  itemGroups?: ComboItemGroup[]
+  availabilityRules?: ComboAvailabilityRules
   comboItems?: CreateComboItemPayload[]
 }
 
@@ -483,6 +550,9 @@ export interface CreateComboItemPayload {
   quantity?: number
   isRequired?: boolean
   sortOrder?: number
+  // 新增字段
+  groupId?: string
+  additionalPrice?: number  // 额外费用（单位：分）
   attributeSelections?: Record<string, string>
   addonSelections?: Array<{ addonId: string; quantity: number }>
 }
@@ -506,17 +576,20 @@ export interface CreateItemPayload {
   cost?: number
   isActive?: boolean
   customFields?: any
+  name_i18n?: Record<string, string>
+  description_i18n?: Record<string, string>
   // 注：属性现在通过 ModifierGroup 系统管理
   // 在创建商品后，通过 POST /items/{itemId}/modifier-groups 来关联
 }
 
 export interface UpdateItemPayload extends Partial<CreateItemPayload> {
-  // 更新时也不支持直接更新 attributes，使用专门的修饰符管理 API
+  // 更新时也不支持直接更新 attributes，使用专门的自定义选项管理 API
 }
 
 export interface CreateCategoryPayload {
   name: string
   parentId?: string
+  isLocal?: boolean  // true=创建门店私有分类，false/省略=品牌级（仅MAIN默认品牌级）
 }
 
 export interface UpdateCategoryPayload extends Partial<CreateCategoryPayload> {}
@@ -647,7 +720,7 @@ class ItemManagementService {
     // 转换字段名从 snake_case 到 camelCase，并确保数字字段是number类型
     const items = rawItems.map((item: any) => ({
       id: item.id,
-      tenantId: item.tenant_id || item.tenantId,
+      tenantId: item.brand_id || item.tenant_id || item.tenantId,
       categoryId: item.category_id || item.categoryId,
       name: item.name,
       description: item.description,
@@ -661,8 +734,13 @@ class ItemManagementService {
       aiTags: item.ai_tags || item.aiTags,
       imageUrl: item.image_url || item.imageUrl, // 图片 URL
       isActive: item.is_active ?? item.isActive ?? true,
+      scope: item.scope,
+      visible_stores: item.visible_stores,
       createdAt: item.created_at || item.createdAt,
       updatedAt: item.updated_at || item.updatedAt,
+      // 多语言字段
+      name_i18n: item.name_i18n ?? undefined,
+      description_i18n: item.description_i18n ?? undefined,
       // 保留关联数据
       categories: item.categories,
       item_modifier_groups: item.item_modifier_groups,
@@ -693,11 +771,12 @@ class ItemManagementService {
 
   async searchItems(query: string): Promise<Item[]> {
     console.log('🔍 [ITEM SERVICE DEBUG] Searching items:', query)
-    
-    const response = await httpService.get<Item[]>(`${API_BASE}/items/search/${encodeURIComponent(query)}`)
-    
-    console.log('🔍 [ITEM SERVICE DEBUG] Search results:', JSON.stringify(response.data, null, 2))
-    return response.data
+
+    // /items/search/:query 已不存在，改为使用 search 查询参数
+    const result = await this.getItems({ search: query, limit: 100 })
+
+    console.log('🔍 [ITEM SERVICE DEBUG] Search results:', result.data.length)
+    return result.data
   }
 
   async createItem(payload: CreateItemPayload): Promise<Item> {
@@ -721,6 +800,8 @@ class ItemManagementService {
     if (cleanPayload.categoryId !== undefined) backendPayload.categoryId = cleanPayload.categoryId
     if (cleanPayload.cost !== undefined) backendPayload.cost = toMinorUnit(Number(cleanPayload.cost))
     if (cleanPayload.customFields !== undefined) backendPayload.customFields = cleanPayload.customFields
+    if (cleanPayload.name_i18n !== undefined) backendPayload.name_i18n = cleanPayload.name_i18n
+    if (cleanPayload.description_i18n !== undefined) backendPayload.description_i18n = cleanPayload.description_i18n
 
     console.log('✅ [ITEM SERVICE] Final payload (will be sent to server):', JSON.stringify(backendPayload, null, 2))
     console.log('🌐 [ITEM SERVICE] Target URL:', `${API_BASE}/items`)
@@ -760,6 +841,10 @@ class ItemManagementService {
     if (cleanPayload.cost !== undefined) backendPayload.cost = toMinorUnit(Number(cleanPayload.cost))
     if (cleanPayload.isActive !== undefined) backendPayload.isActive = Boolean(cleanPayload.isActive)
     if (cleanPayload.customFields !== undefined) backendPayload.customFields = cleanPayload.customFields
+    if (cleanPayload.scope !== undefined) backendPayload.scope = cleanPayload.scope
+    if (cleanPayload.visibleStoreIds !== undefined) backendPayload.visibleStoreIds = cleanPayload.visibleStoreIds
+    if (cleanPayload.name_i18n !== undefined) backendPayload.name_i18n = cleanPayload.name_i18n
+    if (cleanPayload.description_i18n !== undefined) backendPayload.description_i18n = cleanPayload.description_i18n
 
     console.log('✅ [ITEM SERVICE DEBUG] Converted to backend payload:', JSON.stringify(backendPayload, null, 2))
 
@@ -801,7 +886,7 @@ class ItemManagementService {
     if (Array.isArray(response.data)) {
       rawCategories = response.data
     } else if (response.data && typeof response.data === 'object') {
-      // 如果API返回的是对象格式，检查是否有categories字段
+      // 新后端返回 { categories: [...] }，兼容旧格式
       const data = response.data as any
       if (Array.isArray(data.categories)) {
         rawCategories = data.categories
@@ -813,14 +898,15 @@ class ItemManagementService {
     // 转换字段名从 snake_case 到 camelCase
     const categories: Category[] = rawCategories.map((cat: any) => ({
       id: cat.id,
-      tenantId: cat.tenant_id || cat.tenantId,
+      tenantId: cat.brand_id || cat.tenant_id || cat.tenantId,
       name: cat.name,
       parentId: cat.parent_id || cat.parentId,
+      storeId: cat.store_id !== undefined ? cat.store_id : undefined,
       createdAt: cat.created_at || cat.createdAt,
       // 保留子分类和商品数量
       _count: cat._count,
-      children: cat.other_categories || cat.children,
-      parent: cat.categories || cat.parent
+      children: cat.children || cat.other_categories,
+      parent: cat.parent || cat.categories
     }))
 
     console.log('📁 [ITEM SERVICE DEBUG] Processed categories:', categories.length)
@@ -828,29 +914,28 @@ class ItemManagementService {
   }
 
   async getCategoryTree(): Promise<Category[]> {
-    console.log('🌳 [ITEM SERVICE DEBUG] Getting category tree...')
+    console.log('🌳 [ITEM SERVICE DEBUG] Getting category tree (via getCategories?includeChildren=true)...')
 
-    const response = await httpService.get<any[]>(`${API_BASE}/categories/tree`)
+    // /categories/tree 已不存在，改为使用 includeChildren 参数
+    const response = await httpService.get<any>(`${API_BASE}/categories?includeChildren=true`)
 
-    console.log('🌳 [ITEM SERVICE DEBUG] Category tree:', JSON.stringify(response.data, null, 2))
+    const rawCategories = Array.isArray(response.data)
+      ? response.data
+      : (response.data?.categories || [])
 
     // 递归转换分类树的字段名
     const transformCategory = (cat: any): Category => ({
       id: cat.id,
-      tenantId: cat.tenant_id || cat.tenantId,
+      tenantId: cat.brand_id || cat.tenant_id || cat.tenantId,
       name: cat.name,
       parentId: cat.parent_id || cat.parentId,
       createdAt: cat.created_at || cat.createdAt,
       _count: cat._count,
-      children: (cat.other_categories || cat.children)?.map(transformCategory),
-      parent: cat.categories || cat.parent
+      children: cat.children?.map(transformCategory),
+      parent: cat.parent
     })
 
-    const categories = Array.isArray(response.data)
-      ? response.data.map(transformCategory)
-      : []
-
-    return categories
+    return rawCategories.map(transformCategory)
   }
 
   async createCategory(payload: CreateCategoryPayload): Promise<Category> {
@@ -896,8 +981,7 @@ class ItemManagementService {
     console.log('🏷️ [ITEM SERVICE DEBUG] Getting attribute types (via Modifier API)...')
 
     try {
-      // 使用 Modifier API 获取 groupType === 'property' 的修饰符组
-      const groups = await this.getModifierGroups({ groupType: 'property', isActive: true })
+      const groups = await this.getModifierGroups({ isActive: true })
 
       // 将 ModifierGroup 适配为 ItemAttributeType
       const attributeTypes = groups.map(group => ({
@@ -929,7 +1013,6 @@ class ItemManagementService {
       const modifierPayload: CreateModifierGroupPayload = {
         name: payload.name,
         displayName: payload.displayName,
-        groupType: 'property',
         isActive: true
       }
 
@@ -956,8 +1039,7 @@ class ItemManagementService {
     console.log('✏️ [ITEM SERVICE DEBUG] Updating attribute type (via Modifier API):', id, JSON.stringify(payload, null, 2))
 
     try {
-      // 获取现有的 ModifierGroup
-      const groups = await this.getModifierGroups({ groupType: 'property' })
+      const groups = await this.getModifierGroups()
       const group = groups.find(g => g.id === id)
 
       if (!group) {
@@ -1004,8 +1086,7 @@ class ItemManagementService {
     console.log('🏷️ [ITEM SERVICE DEBUG] Getting attribute options for type (via Modifier API):', typeId)
 
     try {
-      // 获取 ModifierGroup 及其 options
-      const groups = await this.getModifierGroups({ groupType: 'property' })
+      const groups = await this.getModifierGroups()
       const group = groups.find(g => g.id === typeId)
 
       if (!group || !group.options) {
@@ -1094,17 +1175,12 @@ class ItemManagementService {
   }
 
   // ==================== 商品属性关联管理 (已迁移到 Modifier v2.0) ====================
-  // ItemAttribute 现在通过 ItemModifierGroup (groupType='property') 实现
-
   async getItemAttributes(itemId: string): Promise<ItemAttribute[]> {
     console.log('🏷️ [ITEM SERVICE DEBUG] Getting item attributes for item (via Modifier API):', itemId)
 
     try {
-      // 使用 Modifier API 获取商品的修饰符关联
       const itemModifiers = await this.getItemModifiers(itemId)
-
-      // 过滤出 groupType === 'property' 的修饰符
-      const attributeModifiers = itemModifiers.filter(im => im.group?.groupType === 'property')
+      const attributeModifiers = itemModifiers
 
       // 将 ItemModifierGroup 适配为 ItemAttribute
       const attributes = attributeModifiers.map(im => ({
@@ -1379,11 +1455,15 @@ class ItemManagementService {
     console.log('🚀 [CREATE COMBO] ==========================================')
     console.log('📥 Original payload from UI:', JSON.stringify(payload, null, 2))
 
+    const discountType = payload.discountType || 'fixed'
     const validatedPayload = {
       ...payload,
       basePrice: toMinorUnit(Number(payload.basePrice)), // 元 → 分
-      discount: payload.discount ? toMinorUnit(Number(payload.discount)) : 0, // 元 → 分
-      discountType: payload.discountType || 'fixed',
+      // 百分比折扣直接使用数值，固定金额折扣需要转换为分
+      discount: payload.discount
+        ? (discountType === 'percentage' ? Number(payload.discount) : toMinorUnit(Number(payload.discount)))
+        : 0,
+      discountType: discountType,
       isActive: payload.isActive !== undefined ? Boolean(payload.isActive) : true
     }
 
@@ -1409,7 +1489,11 @@ class ItemManagementService {
       validatedPayload.basePrice = toMinorUnit(Number(payload.basePrice))
     }
     if (payload.discount !== undefined) {
-      validatedPayload.discount = toMinorUnit(Number(payload.discount))
+      // 百分比折扣直接使用数值，固定金额折扣需要转换为分
+      const discountType = payload.discountType || validatedPayload.discountType || 'fixed'
+      validatedPayload.discount = discountType === 'percentage'
+        ? Number(payload.discount)
+        : toMinorUnit(Number(payload.discount))
     }
     if (payload.isActive !== undefined) {
       validatedPayload.isActive = Boolean(payload.isActive)
@@ -1434,48 +1518,96 @@ class ItemManagementService {
   // ==================== ComboItem管理 ====================
 
   async getComboItems(comboId: string): Promise<ComboItem[]> {
-    console.log('🎁 [COMBO SERVICE DEBUG] Getting combo items for:', comboId)
-    
-    const response = await httpService.get<ComboItem[]>(`${API_BASE}/combos/${comboId}/items`)
-    
-    console.log('🎁 [COMBO SERVICE DEBUG] Combo items:', JSON.stringify(response.data, null, 2))
-    return response.data
+    // 套餐商品已整合到套餐详情中（combo.comboItems），此端点已废弃
+    console.warn('[COMBO SERVICE] getComboItems 已废弃，请使用 getCombo 获取包含 comboItems 的完整套餐')
+    const combo = await this.getCombo(comboId)
+    return combo.comboItems || []
   }
 
   async addComboItem(comboId: string, payload: CreateComboItemPayload): Promise<ComboItem> {
-    console.log('➕ [COMBO SERVICE DEBUG] Adding item to combo:', comboId, JSON.stringify(payload, null, 2))
-    
-    const response = await httpService.post<ComboItem>(`${API_BASE}/combos/${comboId}/items`, payload)
-    
-    console.log('➕ [COMBO SERVICE DEBUG] Added combo item:', JSON.stringify(response.data, null, 2))
-    return response.data
+    // 套餐商品管理已整合到套餐更新中（updateCombo），此端点已废弃
+    console.warn('[COMBO SERVICE] addComboItem 已废弃，请使用 updateCombo 更新 comboItems')
+    throw new Error('addComboItem 已废弃，请通过 updateCombo 管理套餐商品')
   }
 
   async updateComboItem(comboId: string, itemId: string, payload: UpdateComboItemPayload): Promise<ComboItem> {
-    console.log('✏️ [COMBO SERVICE DEBUG] Updating combo item:', comboId, itemId, JSON.stringify(payload, null, 2))
-    
-    const response = await httpService.put<ComboItem>(`${API_BASE}/combos/${comboId}/items/${itemId}`, payload)
-    
-    console.log('✏️ [COMBO SERVICE DEBUG] Updated combo item:', JSON.stringify(response.data, null, 2))
-    return response.data
+    console.warn('[COMBO SERVICE] updateComboItem 已废弃，请使用 updateCombo 更新 comboItems')
+    throw new Error('updateComboItem 已废弃，请通过 updateCombo 管理套餐商品')
   }
 
   async removeComboItem(comboId: string, itemId: string): Promise<void> {
-    console.log('🗑️ [COMBO SERVICE DEBUG] Removing item from combo:', comboId, itemId)
+    console.warn('[COMBO SERVICE] removeComboItem 已废弃，请使用 updateCombo 更新 comboItems')
+    throw new Error('removeComboItem 已废弃，请通过 updateCombo 管理套餐商品')
+  }
 
-    await httpService.delete(`${API_BASE}/combos/${comboId}/items/${itemId}`)
+  /**
+   * 上传套餐图片
+   */
+  async uploadComboImage(comboId: string, file: File): Promise<{ combo: Combo; image: { url: string; publicId: string } }> {
+    console.log('📸 [COMBO SERVICE] Uploading image for combo:', comboId)
 
-    console.log('🗑️ [COMBO SERVICE DEBUG] Combo item removed successfully')
+    const formData = new FormData()
+    formData.append('image', file)
+
+    const response = await httpService.post<{ combo: any; image: { url: string; publicId: string } }>(
+      `${API_BASE}/combos/${comboId}/image`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      }
+    )
+
+    console.log('📸 [COMBO SERVICE] Image uploaded successfully:', response.data.image.url)
+    return response.data
+  }
+
+  /**
+   * 删除套餐图片
+   */
+  async deleteComboImage(comboId: string): Promise<{ combo: Combo }> {
+    console.log('🗑️ [COMBO SERVICE] Deleting image for combo:', comboId)
+
+    const response = await httpService.delete<{ combo: any }>(
+      `${API_BASE}/combos/${comboId}/image`
+    )
+
+    console.log('🗑️ [COMBO SERVICE] Image deleted successfully')
+    return response.data
+  }
+
+  /**
+   * 检查套餐是否当前可用
+   */
+  isComboCurrentlyAvailable(combo: Combo): boolean {
+    const rules = combo.availabilityRules
+    if (!rules || !rules.enabled) return true
+
+    const now = new Date()
+    const currentDay = now.getDay()
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+
+    // 检查星期限制
+    if (rules.daysOfWeek?.length && !rules.daysOfWeek.includes(currentDay)) {
+      return false
+    }
+
+    // 检查时间范围
+    if (rules.timeRange) {
+      if (currentTime < rules.timeRange.start || currentTime > rules.timeRange.end) {
+        return false
+      }
+    }
+
+    return true
   }
 
   // ==================== Modifier v2.0 管理 ====================
 
   /**
-   * 获取修饰符组列表
+   * 获取自定义选项组列表
    */
-  async getModifierGroups(params?: { groupType?: ModifierGroupType; isActive?: boolean; nocache?: number }): Promise<ModifierGroup[]> {
+  async getModifierGroups(params?: { isActive?: boolean; nocache?: number }): Promise<ModifierGroup[]> {
     const queryParams = new URLSearchParams()
-    if (params?.groupType) queryParams.append('groupType', params.groupType)
     if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString())
     if (params?.nocache !== undefined) queryParams.append('nocache', params.nocache.toString())
 
@@ -1485,21 +1617,25 @@ class ItemManagementService {
     // 转换后端的下划线字段为前端的驼峰字段
     const groups = (response.data.groups || []).map((group: any) => ({
       id: group.id,
-      tenantId: group.tenant_id,
+      tenantId: group.brand_id || group.tenant_id,
       name: group.name,
       displayName: group.display_name,
-      groupType: group.group_type,
+      displayNameI18n: group.display_name_i18n ?? undefined,
+
       description: group.description,
       displayOrder: group.display_order,
       isActive: group.is_active,
+      storeId: group.store_id !== undefined ? group.store_id : undefined,
       createdAt: group.created_at,
       updatedAt: group.updated_at,
-      options: (group.modifier_options || []).map((option: any) => ({
+      // 新后端关联字段为 options（旧字段为 modifier_options）
+      options: (group.options || group.modifier_options || []).map((option: any) => ({
         id: option.id,
         modifierGroupId: option.modifier_group_id,
         name: option.name,
         displayName: option.display_name,
-        // 价格从分转换为元
+        displayNameI18n: option.display_name_i18n ?? undefined,
+        code: option.code,
         defaultPrice: option.default_price !== null && option.default_price !== undefined
           ? fromMinorUnit(Number(option.default_price))
           : 0,
@@ -1520,22 +1656,24 @@ class ItemManagementService {
   }
 
   /**
-   * 创建修饰符组
+   * 创建自定义选项组
    */
   async createModifierGroup(payload: CreateModifierGroupPayload): Promise<ModifierGroup> {
-    const response = await httpService.post<{ group: any }>(`${API_BASE}/modifier-groups`, payload)
-    const group = response.data.group
-    
+    // 新后端直接返回 group 对象，不再包装在 { group: {...} }
+    const response = await httpService.post<any>(`${API_BASE}/modifier-groups`, payload)
+    const group = response.data.group ?? response.data
+
     // 转换后端的下划线字段为前端的驼峰字段
     return {
       id: group.id,
-      tenantId: group.tenant_id,
+      tenantId: group.brand_id || group.tenant_id,
       name: group.name,
       displayName: group.display_name,
-      groupType: group.group_type,
+
       description: group.description,
       displayOrder: group.display_order,
       isActive: group.is_active,
+      storeId: group.store_id !== undefined ? group.store_id : undefined,
       createdAt: group.created_at,
       updatedAt: group.updated_at,
       options: []
@@ -1543,7 +1681,7 @@ class ItemManagementService {
   }
 
   /**
-   * 创建修饰符选项
+   * 创建自定义选项选项
    */
   async createModifierOption(groupId: string, payload: CreateModifierOptionPayload): Promise<ModifierOption> {
     console.log('[MODIFIER] ➕ Create option request:', JSON.stringify({ groupId, payload }, null, 2))
@@ -1555,8 +1693,9 @@ class ItemManagementService {
       cost: payload.cost ? toMinorUnit(Number(payload.cost)) : undefined // 元 → 分
     }
 
-    const response = await httpService.post<{ option: any }>(`${API_BASE}/modifier-groups/${groupId}/options`, convertedPayload)
-    const option = response.data.option
+    // 新后端直接返回 option 对象，不再包装在 { option: {...} }
+    const response = await httpService.post<any>(`${API_BASE}/modifier-groups/${groupId}/options`, convertedPayload)
+    const option = response.data.option ?? response.data
 
     console.log('[MODIFIER] ➕ Create option response:', JSON.stringify(option, null, 2))
 
@@ -1566,6 +1705,7 @@ class ItemManagementService {
       modifierGroupId: option.modifier_group_id,
       name: option.name,
       displayName: option.display_name,
+      code: option.code,
       defaultPrice: option.default_price !== null && option.default_price !== undefined
         ? fromMinorUnit(Number(option.default_price))
         : 0,
@@ -1583,7 +1723,7 @@ class ItemManagementService {
   }
 
   /**
-   * 更新修饰符选项
+   * 更新自定义选项选项
    */
   async updateModifierOption(groupId: string, optionId: string, payload: Partial<CreateModifierOptionPayload>): Promise<ModifierOption> {
     // 价格转换（元 → 分）
@@ -1595,8 +1735,9 @@ class ItemManagementService {
       convertedPayload.cost = toMinorUnit(Number(payload.cost)) // 元 → 分
     }
 
-    const response = await httpService.put<{ option: any }>(`${API_BASE}/modifier-groups/${groupId}/options/${optionId}`, convertedPayload)
-    const option = response.data.option
+    // 新后端直接返回 option 对象，不再包装在 { option: {...} }
+    const response = await httpService.put<any>(`${API_BASE}/modifier-groups/${groupId}/options/${optionId}`, convertedPayload)
+    const option = response.data.option ?? response.data
 
     // 转换后端的下划线字段为前端的驼峰字段，价格从分转换为元
     return {
@@ -1604,6 +1745,7 @@ class ItemManagementService {
       modifierGroupId: option.modifier_group_id,
       name: option.name,
       displayName: option.display_name,
+      code: option.code,
       defaultPrice: option.default_price !== null && option.default_price !== undefined
         ? fromMinorUnit(Number(option.default_price))
         : 0,
@@ -1621,7 +1763,49 @@ class ItemManagementService {
   }
 
   /**
-   * 删除修饰符选项
+   * 获取所有自定义选项的打印配置（平坦数组）
+   * GET /print-configs
+   */
+  async getAllPrintConfigs(): Promise<Array<{
+    id: string;
+    modifierOptionId: string;
+    printCode: string;
+    defaultQuantity: number;
+    instruction: string | null;
+    isActive: boolean;
+  }>> {
+    const response = await httpService.get<any>(`${API_BASE}/print-configs`)
+    const raw: any[] = response.data.configs ?? response.data ?? []
+    // 将后端下划线字段转换为驼峰
+    return raw.map((c: any) => ({
+      id: c.id,
+      modifierOptionId: c.modifier_option_id,
+      printCode: c.print_code,
+      defaultQuantity: c.default_quantity ?? 1,
+      instruction: c.instruction ?? null,
+      isActive: c.is_active ?? true
+    }))
+  }
+
+  /**
+   * 保存选项打印配置（打印代码 + 用量 + 说明）
+   * PUT /modifier-groups/:groupId/options/:optionId/print-config
+   */
+  async updatePrintConfig(groupId: string, optionId: string, payload: {
+    printCode?: string;  // 空字符串表示清除
+    defaultQuantity?: number;
+    instruction?: string;
+  }): Promise<any> {
+    // 打印配置现在通过 /print-configs/:modifierOptionId 管理
+    const response = await httpService.put<any>(
+      `${API_BASE}/print-configs/${optionId}`,
+      payload
+    )
+    return response.data.config ?? response.data
+  }
+
+  /**
+   * 删除自定义选项选项
    * 注意：根据 API 文档，后端可能还未实现此端点
    * 如果返回 404，说明后端还未支持此功能
    */
@@ -1631,37 +1815,40 @@ class ItemManagementService {
     } catch (error: any) {
       // 如果返回 404，说明后端还未实现此端点
       if (error?.response?.status === 404) {
-        throw new Error('后端 API 还未实现删除修饰符选项功能，请稍后再试')
+        throw new Error('后端 API 还未实现删除自定义选项选项功能，请稍后再试')
       }
       throw error
     }
   }
 
   /**
-   * 更新修饰符组
+   * 更新自定义选项组
    */
   async updateModifierGroup(groupId: string, payload: UpdateModifierGroupPayload): Promise<ModifierGroup> {
-    const response = await httpService.put<{ group: any }>(`${API_BASE}/modifier-groups/${groupId}`, payload)
-    const group = response.data.group
+    // 新后端直接返回 group 对象，不再包装在 { group: {...} }
+    const response = await httpService.put<any>(`${API_BASE}/modifier-groups/${groupId}`, payload)
+    const group = response.data.group ?? response.data
 
-    // 转换后端的下划线字段为前端的驼峰字段，价格从分转换为元
+    // 转换后端的下划线字段为前端的驼峰字段
     return {
       id: group.id,
-      tenantId: group.tenant_id,
+      tenantId: group.brand_id || group.tenant_id,
       name: group.name,
       displayName: group.display_name,
-      groupType: group.group_type,
+      displayNameI18n: group.display_name_i18n ?? undefined,
       description: group.description,
       displayOrder: group.display_order,
       isActive: group.is_active,
       createdAt: group.created_at,
       updatedAt: group.updated_at,
-      options: (group.modifier_options || []).map((option: any) => ({
+      // 新后端关联字段为 options（旧字段为 modifier_options）
+      options: (group.options || group.modifier_options || []).map((option: any) => ({
         id: option.id,
         modifierGroupId: option.modifier_group_id,
         name: option.name,
         displayName: option.display_name,
-        // 价格从分转换为元
+        displayNameI18n: option.display_name_i18n ?? undefined,
+        code: option.code,
         defaultPrice: option.default_price !== null && option.default_price !== undefined
           ? fromMinorUnit(Number(option.default_price))
           : 0,
@@ -1680,7 +1867,7 @@ class ItemManagementService {
   }
 
   /**
-   * 删除修饰符组
+   * 删除自定义选项组
    * 注意：根据 API 文档，后端可能还未实现此端点
    * 如果返回 404，说明后端还未支持此功能
    */
@@ -1690,92 +1877,95 @@ class ItemManagementService {
     } catch (error: any) {
       // 如果返回 404，说明后端还未实现此端点
       if (error?.response?.status === 404) {
-        throw new Error('后端 API 还未实现删除修饰符组功能，请稍后再试')
+        throw new Error('后端 API 还未实现删除自定义选项组功能，请稍后再试')
       }
       throw error
     }
   }
 
   /**
-   * 获取商品的修饰符配置
+   * 获取商品的自定义选项配置
    */
   async getItemModifiers(itemId: string): Promise<ItemModifierGroup[]> {
     const response = await httpService.get<{ groups: any[] }>(`${API_BASE}/items/${itemId}/modifiers`)
-    
+
     // 转换后端的下划线字段为前端的驼峰字段
-    const groups = (response.data.groups || []).map((relation: any) => ({
-      id: relation.id,
-      itemId: relation.item_id,
-      modifierGroupId: relation.modifier_group_id,
-      isRequired: relation.is_required,
-      minSelections: relation.min_selections,
-      maxSelections: relation.max_selections,
-      sortOrder: relation.sort_order || relation.display_order,
-      createdAt: relation.created_at,
-      // 转换嵌套的 group 数据
-      group: relation.group || relation.modifier_groups ? {
-        id: (relation.group || relation.modifier_groups).id,
-        tenantId: (relation.group || relation.modifier_groups).tenant_id,
-        name: (relation.group || relation.modifier_groups).name,
-        displayName: (relation.group || relation.modifier_groups).display_name,
-        groupType: (relation.group || relation.modifier_groups).group_type,
-        description: (relation.group || relation.modifier_groups).description,
-        displayOrder: (relation.group || relation.modifier_groups).display_order,
-        isActive: (relation.group || relation.modifier_groups).is_active,
-        createdAt: (relation.group || relation.modifier_groups).created_at,
-        updatedAt: (relation.group || relation.modifier_groups).updated_at,
-        // 转换嵌套的 options 数据
-        options: ((relation.group || relation.modifier_groups).modifier_options || []).map((option: any) => {
-          const defaultPriceCents = option.default_price
-          const itemPriceCents = option.item_modifier_prices?.[0]?.price
-          return {
-            id: option.id,
-            modifierGroupId: option.modifier_group_id,
-            name: option.name,
-            displayName: option.display_name,
-            // 价格从分转换为元
-            defaultPrice: defaultPriceCents !== null && defaultPriceCents !== undefined
-              ? fromMinorUnit(Number(defaultPriceCents))
-              : 0,
-            cost: option.cost !== null && option.cost !== undefined
-              ? fromMinorUnit(Number(option.cost))
-              : undefined,
-            displayOrder: option.display_order,
-            isActive: option.is_active,
-            isDefault: option.is_default,
-            trackInventory: option.track_inventory,
-            currentStock: option.current_stock,
-            createdAt: option.created_at,
-            updatedAt: option.updated_at,
-            // 转换商品级选项配置（item_modifier_options）
-            itemOptions: (option.item_modifier_options || []).map((itemOpt: any) => ({
-              isDefault: itemOpt.is_default,
-              isEnabled: itemOpt.is_enabled,
-              displayOrder: itemOpt.display_order
-            })),
-            // 价格从分转换为元
-            itemPrice: itemPriceCents !== null && itemPriceCents !== undefined
-              ? fromMinorUnit(Number(itemPriceCents))
-              : null,
-            finalPrice: itemPriceCents !== null && itemPriceCents !== undefined
-              ? fromMinorUnit(Number(itemPriceCents))
-              : (defaultPriceCents !== null && defaultPriceCents !== undefined ? fromMinorUnit(Number(defaultPriceCents)) : 0)
-          }
-        })
-      } : undefined
-    }))
-    
+    // 新后端返回 { groups: [...] }，每个 relation 包含 modifier_group（不是 group）
+    const groups = (response.data.groups || []).map((relation: any) => {
+      const rawGroup = relation.modifier_group || relation.group || relation.modifier_groups
+      return {
+        id: relation.id,
+        itemId: relation.item_id,
+        modifierGroupId: relation.modifier_group_id,
+        isRequired: relation.is_required,
+        minSelections: relation.min_selections,
+        maxSelections: relation.max_selections,
+        sortOrder: relation.display_order || relation.sort_order,
+        createdAt: relation.created_at,
+        group: rawGroup ? {
+          id: rawGroup.id,
+          tenantId: rawGroup.brand_id || rawGroup.tenant_id,
+          name: rawGroup.name,
+          displayName: rawGroup.display_name,
+
+          description: rawGroup.description,
+          displayOrder: rawGroup.display_order,
+          isActive: rawGroup.is_active,
+          createdAt: rawGroup.created_at,
+          updatedAt: rawGroup.updated_at,
+          // 新后端关联字段为 options（旧字段为 modifier_options）
+          options: (rawGroup.options || rawGroup.modifier_options || []).map((option: any) => {
+            const defaultPriceCents = option.default_price
+            const itemPriceCents = option.item_modifier_prices?.[0]?.price
+            return {
+              id: option.id,
+              modifierGroupId: option.modifier_group_id,
+              name: option.name,
+              displayName: option.display_name,
+              defaultPrice: defaultPriceCents !== null && defaultPriceCents !== undefined
+                ? fromMinorUnit(Number(defaultPriceCents))
+                : 0,
+              cost: option.cost !== null && option.cost !== undefined
+                ? fromMinorUnit(Number(option.cost))
+                : undefined,
+              displayOrder: option.display_order,
+              isActive: option.is_active,
+              isDefault: option.is_default,
+              trackInventory: option.track_inventory,
+              currentStock: option.current_stock,
+              createdAt: option.created_at,
+              updatedAt: option.updated_at,
+              itemOptions: (option.item_modifier_options || []).map((itemOpt: any) => ({
+                isDefault: itemOpt.is_default,
+                isEnabled: itemOpt.is_enabled,
+                displayOrder: itemOpt.display_order
+              })),
+              itemPrice: itemPriceCents !== null && itemPriceCents !== undefined
+                ? fromMinorUnit(Number(itemPriceCents))
+                : null,
+              finalPrice: itemPriceCents !== null && itemPriceCents !== undefined
+                ? fromMinorUnit(Number(itemPriceCents))
+                : (defaultPriceCents !== null && defaultPriceCents !== undefined ? fromMinorUnit(Number(defaultPriceCents)) : 0)
+            }
+          })
+        } : undefined
+      }
+    })
+
     return groups
   }
 
   /**
-   * 为商品关联修饰符组
+   * 为商品关联自定义选项组
    */
   async addModifierGroupToItem(itemId: string, payload: AddModifierGroupToItemPayload): Promise<ItemModifierGroup> {
-    const response = await httpService.post<{ relation: any }>(`${API_BASE}/items/${itemId}/modifier-groups`, payload)
-    const relation = response.data.relation
-    
-    // 转换后端的下划线字段为前端的驼峰字段
+    // 新后端直接返回 relation 对象，不再包装在 { relation: {...} }
+    const response = await httpService.post<any>(`${API_BASE}/items/${itemId}/modifier-groups`, payload)
+    const relation = response.data.relation ?? response.data
+
+    // 新后端关联字段为 modifier_group（旧字段为 group 或 modifier_groups）
+    const rawGroup = relation.modifier_group || relation.group || relation.modifier_groups
+
     return {
       id: relation.id,
       itemId: relation.item_id,
@@ -1783,20 +1973,20 @@ class ItemManagementService {
       isRequired: relation.is_required,
       minSelections: relation.min_selections,
       maxSelections: relation.max_selections,
-      sortOrder: relation.sort_order || relation.display_order,
+      sortOrder: relation.display_order || relation.sort_order,
       createdAt: relation.created_at,
-      group: relation.group || relation.modifier_groups ? {
-        id: (relation.group || relation.modifier_groups).id,
-        tenantId: (relation.group || relation.modifier_groups).tenant_id,
-        name: (relation.group || relation.modifier_groups).name,
-        displayName: (relation.group || relation.modifier_groups).display_name,
-        groupType: (relation.group || relation.modifier_groups).group_type,
-        description: (relation.group || relation.modifier_groups).description,
-        displayOrder: (relation.group || relation.modifier_groups).display_order,
-        isActive: (relation.group || relation.modifier_groups).is_active,
-        createdAt: (relation.group || relation.modifier_groups).created_at,
-        updatedAt: (relation.group || relation.modifier_groups).updated_at,
-        options: ((relation.group || relation.modifier_groups).modifier_options || []).map((option: any) => {
+      group: rawGroup ? {
+        id: rawGroup.id,
+        tenantId: rawGroup.brand_id || rawGroup.tenant_id,
+        name: rawGroup.name,
+        displayName: rawGroup.display_name,
+        description: rawGroup.description,
+        displayOrder: rawGroup.display_order,
+        isActive: rawGroup.is_active,
+        createdAt: rawGroup.created_at,
+        updatedAt: rawGroup.updated_at,
+        // 新后端关联字段为 options（旧字段为 modifier_options）
+        options: (rawGroup.options || rawGroup.modifier_options || []).map((option: any) => {
           const defaultPriceCents = option.default_price
           const itemPriceCents = option.item_modifier_prices?.[0]?.price
           return {
@@ -1804,7 +1994,6 @@ class ItemManagementService {
             modifierGroupId: option.modifier_group_id,
             name: option.name,
             displayName: option.display_name,
-            // 价格从分转换为元
             defaultPrice: defaultPriceCents !== null && defaultPriceCents !== undefined
               ? fromMinorUnit(Number(defaultPriceCents))
               : 0,
@@ -1818,13 +2007,11 @@ class ItemManagementService {
             currentStock: option.current_stock,
             createdAt: option.created_at,
             updatedAt: option.updated_at,
-            // 转换商品级选项配置
             itemOptions: (option.item_modifier_options || []).map((itemOpt: any) => ({
               isDefault: itemOpt.is_default,
               isEnabled: itemOpt.is_enabled,
               displayOrder: itemOpt.display_order
             })),
-            // 价格从分转换为元
             itemPrice: itemPriceCents !== null && itemPriceCents !== undefined
               ? fromMinorUnit(Number(itemPriceCents))
               : null,
@@ -1838,14 +2025,14 @@ class ItemManagementService {
   }
 
   /**
-   * 移除商品的修饰符组
+   * 移除商品的自定义选项组
    */
   async removeModifierGroupFromItem(itemId: string, groupId: string): Promise<void> {
     await httpService.delete(`${API_BASE}/items/${itemId}/modifier-groups/${groupId}`)
   }
 
   /**
-   * 设置商品的修饰符价格
+   * 设置商品的自定义选项价格
    */
   async setItemModifierPrices(itemId: string, payload: SetItemModifierPricesPayload): Promise<void> {
     // 转换价格: 元 → 分
@@ -1859,24 +2046,26 @@ class ItemManagementService {
   }
 
   /**
-   * 删除商品的修饰符价格
+   * 删除商品的自定义选项价格（已废弃，使用 setItemModifierPrices 批量更新）
    */
   async removeItemModifierPrice(itemId: string, optionId: string): Promise<void> {
-    await httpService.delete(`${API_BASE}/items/${itemId}/modifier-prices/${optionId}`)
+    // 此端点已不存在，使用 setItemModifierPrices 覆盖即可
+    console.warn('[MODIFIER] removeItemModifierPrice 已废弃，请使用 setItemModifierPrices 重新设置价格')
   }
 
   /**
-   * 配置商品修饰符选项（设置选项在特定商品中的行为）
+   * 配置商品自定义选项选项（已废弃）
    */
   async configureItemModifierOptions(itemId: string, payload: ConfigureItemModifierOptionsPayload): Promise<void> {
     await httpService.post(`${API_BASE}/items/${itemId}/modifier-options`, payload)
   }
 
   /**
-   * 删除商品的修饰符选项配置
+   * 删除商品的自定义选项选项配置（已废弃）
    */
   async removeItemModifierOption(itemId: string, optionId: string): Promise<void> {
-    await httpService.delete(`${API_BASE}/items/${itemId}/modifier-options/${optionId}`)
+    // 此端点已不存在
+    console.warn('[MODIFIER] removeItemModifierOption 已废弃')
   }
 
   // ==================== 商品图片管理 ====================
@@ -1914,7 +2103,7 @@ class ItemManagementService {
     return {
       item: {
         id: item.id,
-        tenantId: item.tenant_id || item.tenantId,
+        tenantId: item.brand_id || item.tenant_id || item.tenantId,
         categoryId: item.category_id || item.categoryId,
         name: item.name,
         description: item.description,
@@ -1953,7 +2142,7 @@ class ItemManagementService {
     return {
       item: {
         id: item.id,
-        tenantId: item.tenant_id || item.tenantId,
+        tenantId: item.brand_id || item.tenant_id || item.tenantId,
         categoryId: item.category_id || item.categoryId,
         name: item.name,
         description: item.description,
@@ -1973,39 +2162,63 @@ class ItemManagementService {
     }
   }
 
-  // ==================== 税务相关方法 ====================
+  // ==================== 税务相关方法（已更新为新架构）====================
+  // 新架构：
+  //   GET  /taxes/catalog         - 获取品牌税率列表
+  //   POST /taxes/catalog         - 创建品牌税率
+  //   PUT  /taxes/catalog/:id     - 更新品牌税率
+  //   DELETE /taxes/catalog/:id   - 删除品牌税率
+  //   GET  /taxes/items/:itemId   - 获取商品关联的税率
+  //   POST /taxes/items/:itemId/assign - 批量绑定税率到商品
+  //   DELETE /taxes/items/:itemId/:taxRateId - 移除商品税率关联
 
   /**
-   * 获取某地区的所有税率
+   * 获取品牌税率列表（新架构）
    */
-  async getTaxRates(regionCode: string): Promise<TaxRate[]> {
+  async getTaxRates(regionCode?: string): Promise<TaxRate[]> {
     try {
-      const response = await httpService.get<{ data: { rates: TaxRate[] } }>(
-        `${API_BASE}/taxes/tax-rates?region=${regionCode}`
-      )
-      return response.data?.data?.rates || []
+      const url = regionCode
+        ? `${API_BASE}/taxes/catalog?regionCode=${regionCode}`
+        : `${API_BASE}/taxes/catalog`
+      const response = await httpService.get<{ rates: any[] }>(url)
+      return (response.data?.rates || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        taxType: r.type || r.taxType,
+        rate: r.rate,
+        foodExempt: false,
+        effectiveDate: r.created_at,
+        isOverridden: false,
+        source: 'SYSTEM_DEFAULT' as const
+      }))
     } catch (error: any) {
       if (error?.response?.status === 404) {
-        console.warn('[ITEM SERVICE] tax-rates API 未实现，返回本地 mock 数据')
-        return MOCK_TAX_RATES[regionCode] || []
+        console.warn('[ITEM SERVICE] 税率 API 未实现，返回本地 mock 数据')
+        return MOCK_TAX_RATES[regionCode || ''] || []
       }
       throw error
     }
   }
 
   /**
-   * 获取某地区的所有税类（简化版）
-   * 后端返回的是简化格式：{ id, name, rate, regionCode, createdAt }
+   * 获取品牌税率列表（简化格式）
    */
-  async getTaxClasses(regionCode: string): Promise<SimpleTaxRate[]> {
+  async getTaxClasses(regionCode?: string): Promise<SimpleTaxRate[]> {
     try {
-      const response = await httpService.get<{ data: { taxClasses: SimpleTaxRate[] } }>(
-        `${API_BASE}/taxes/tax-classes?region=${regionCode}`
-      )
-      return response.data?.data?.taxClasses || []
+      const url = regionCode
+        ? `${API_BASE}/taxes/catalog?regionCode=${regionCode}`
+        : `${API_BASE}/taxes/catalog`
+      const response = await httpService.get<{ rates: any[] }>(url)
+      return (response.data?.rates || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        rate: r.rate,
+        regionCode: r.region_code || regionCode || '',
+        createdAt: r.created_at
+      }))
     } catch (error: any) {
       if (error?.response?.status === 404) {
-        console.warn('[ITEM SERVICE] tax-classes API 未实现，返回空数组')
+        console.warn('[ITEM SERVICE] 税类 API 未实现，返回空数组')
         return []
       }
       throw error
@@ -2013,141 +2226,315 @@ class ItemManagementService {
   }
 
   /**
-   * 获取商品的税类信息
+   * 获取商品关联的税率
    */
   async getItemTaxClass(itemId: string): Promise<ItemTaxClass> {
-    const response = await httpService.get<{ data: ItemTaxClass }>(
-      `${API_BASE}/taxes/items/${itemId}/tax-class`
+    const response = await httpService.get<{ itemId: string; taxRates: any[] }>(
+      `${API_BASE}/taxes/items/${itemId}`
     )
-    return response.data?.data as ItemTaxClass
+    const data = response.data
+    return {
+      itemId: data.itemId || itemId,
+      taxes: (data.taxRates || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        taxType: r.type || r.taxType,
+        rate: r.rate
+      }))
+    } as ItemTaxClass
   }
 
   /**
-   * 为商品分配系统预设税类
+   * 为商品绑定税率（新接口，支持多个）
    */
   async assignItemTaxClass(itemId: string, payload: AssignTaxClassPayload): Promise<void> {
-    await httpService.post(`${API_BASE}/taxes/items/${itemId}/assign-tax-class`, payload)
+    // 新接口为批量绑定：POST /taxes/items/:itemId/assign { taxRateIds: [...] }
+    await httpService.post(`${API_BASE}/taxes/items/${itemId}/assign`, {
+      taxRateIds: [payload.taxClassId]
+    })
   }
 
   /**
-   * 为商品分配租户自定义税类
+   * 为商品分配租户自定义税类（已合并到 assignItemTaxClass）
    */
   async assignItemTenantTaxClass(itemId: string, payload: AssignTaxClassPayload): Promise<void> {
-    await httpService.post(`${API_BASE}/taxes/items/${itemId}/assign-tenant-tax-class`, payload)
+    await this.assignItemTaxClass(itemId, payload)
   }
 
   /**
-   * 计算单个商品的税后价格
+   * 为商品添加单个税类
+   */
+  async addItemTaxClass(itemId: string, payload: AssignTaxClassPayload): Promise<void> {
+    await this.assignItemTaxClass(itemId, payload)
+  }
+
+  /**
+   * 为商品批量添加多个税类
+   */
+  async addMultipleItemTaxClasses(itemId: string, payload: AssignMultipleTaxClassPayload): Promise<void> {
+    await httpService.post(`${API_BASE}/taxes/items/${itemId}/assign`, {
+      taxRateIds: payload.taxClassIds
+    })
+  }
+
+  /**
+   * 计算单个商品的税后价格（已简化，前端自行计算）
    */
   async calculateItemTax(itemId: string, region: string): Promise<TaxCalculationResult> {
-    const response = await httpService.post<{ data: TaxCalculationResult }>(
-      `${API_BASE}/taxes/items/${itemId}/calculate-tax`,
-      { region }
-    )
-    return response.data?.data as TaxCalculationResult
+    console.warn('[TAX] calculateItemTax 已废弃，请在前端基于税率自行计算')
+    return { itemId, itemName: '', basePrice: 0, basePriceDisplay: '0', taxes: [], totalTax: 0, totalTaxDisplay: '0', finalPrice: 0, finalPriceDisplay: '0', region }
   }
 
   /**
-   * 批量计算商品的税后价格
+   * 批量计算商品的税后价格（已废弃）
    */
-  async calculateBatchItemTax(
-    itemIds: string[],
-    region: string
-  ): Promise<TaxCalculationResult[]> {
-    const response = await httpService.post<{ data: { results: TaxCalculationResult[] } }>(
-      `${API_BASE}/taxes/items/calculate-batch-tax`,
-      {
-        items: itemIds.map(id => ({ itemId: id })),
-        region
-      }
-    )
-    return response.data?.data?.results || []
+  async calculateBatchItemTax(itemIds: string[], region: string): Promise<TaxCalculationResult[]> {
+    console.warn('[TAX] calculateBatchItemTax 已废弃，请在前端基于税率自行计算')
+    return []
   }
 
   /**
-   * 创建或更新税率覆盖
+   * 创建或更新税率覆盖（已废弃）
    */
   async createTaxRateOverride(payload: TaxRateOverridePayload): Promise<void> {
-    await httpService.post(`${API_BASE}/taxes/tax-rates-override`, payload)
+    console.warn('[TAX] createTaxRateOverride 已废弃')
   }
 
   /**
-   * 创建租户自定义税类
+   * 创建品牌税率（替代原 createTenantTaxClass）
    */
   async createTenantTaxClass(payload: CreateTenantTaxClassPayload): Promise<SimpleTaxRate> {
-    const response = await httpService.post<{ data: SimpleTaxRate }>(
-      `${API_BASE}/taxes/tenant-tax-classes`,
-      payload
+    const response = await httpService.post<any>(
+      `${API_BASE}/taxes/catalog`,
+      {
+        name: payload.name,
+        rate: payload.rates?.[0]?.rate ?? 0,
+        type: payload.rates?.[0]?.taxType,
+        regionCode: payload.regionCode
+      }
     )
-    return response.data?.data as SimpleTaxRate
+    const r = response.data
+    return {
+      id: r.id,
+      name: r.name,
+      rate: r.rate,
+      regionCode: r.region_code || payload.regionCode,
+      createdAt: r.created_at
+    } as SimpleTaxRate
   }
 
   /**
-   * 删除税种
+   * 删除品牌税率
    */
   async deleteTaxRate(taxRateId: string): Promise<void> {
-    await httpService.delete(`${API_BASE}/taxes/tax-rates/${taxRateId}`)
+    await httpService.delete(`${API_BASE}/taxes/catalog/${taxRateId}`)
   }
 
   /**
-   * 更新税种
+   * 更新品牌税率
    */
   async updateTaxRate(taxRateId: string, payload: { name?: string; rate?: number }): Promise<SimpleTaxRate> {
-    const response = await httpService.put<{ data: SimpleTaxRate }>(
-      `${API_BASE}/taxes/tax-rates/${taxRateId}`,
+    const response = await httpService.put<any>(
+      `${API_BASE}/taxes/catalog/${taxRateId}`,
       payload
     )
-    return response.data?.data as SimpleTaxRate
+    const r = response.data
+    return {
+      id: r.id,
+      name: r.name,
+      rate: r.rate,
+      regionCode: r.region_code,
+      createdAt: r.created_at
+    } as SimpleTaxRate
   }
 
+  // ==================== 门店税率（每个门店独立管理）====================
+
   /**
-   * 批量为商品分配系统预设税类
+   * 获取门店可用商品列表（含门店价格覆盖和本地商品）
    */
-  async batchAssignItemTaxClass(itemIds: string[], taxClassId: string): Promise<{ total: number; succeeded: number; failed: number; failedItems: Array<{ itemId: string; error: string }> }> {
-    const response = await httpService.post<{ data: { total: number; succeeded: number; failed: number; failedItems: Array<{ itemId: string; error: string }> } }>(
-      `${API_BASE}/taxes/items/batch-assign-tax-class`,
-      { itemIds, taxClassId }
+  async getStoreAvailableItems(): Promise<Array<{ id: string; name: string; basePrice: number; isActive: boolean; isLocal: boolean }>> {
+    const response = await httpService.get<Array<{ id: string; name: string; basePrice: number; isActive: boolean; isLocal: boolean }>>(
+      `${API_BASE}/taxes/store/items`
     )
-    return response.data?.data as { total: number; succeeded: number; failed: number; failedItems: Array<{ itemId: string; error: string }> }
+    return Array.isArray(response.data) ? response.data : []
   }
 
   /**
-   * 批量为商品分配租户自定义税类
+   * 获取门店税率列表
    */
-  async batchAssignItemTenantTaxClass(itemIds: string[], tenantTaxClassId: string): Promise<{ total: number; succeeded: number; failed: number; failedItems: Array<{ itemId: string; error: string }> }> {
-    const response = await httpService.post<{ data: { total: number; succeeded: number; failed: number; failedItems: Array<{ itemId: string; error: string }> } }>(
-      `${API_BASE}/taxes/items/batch-assign-tenant-tax-class`,
-      { itemIds, tenantTaxClassId }
+  async getStoreTaxRates(regionCode?: string): Promise<SimpleTaxRate[]> {
+    const url = regionCode
+      ? `${API_BASE}/taxes/store?regionCode=${regionCode}`
+      : `${API_BASE}/taxes/store`
+    const response = await httpService.get<{ rates: any[] }>(url)
+    return (response.data?.rates || []).map((r: any) => ({
+      id: r.id, name: r.name, rate: parseFloat(r.rate), regionCode: r.region_code, createdAt: r.created_at
+    })) as SimpleTaxRate[]
+  }
+
+  /**
+   * 创建门店税率
+   */
+  async createStoreTaxRate(payload: { name: string; rate: number; regionCode?: string }): Promise<SimpleTaxRate> {
+    const response = await httpService.post<any>(`${API_BASE}/taxes/store`, {
+      name: payload.name,
+      rate: payload.rate,
+      regionCode: payload.regionCode
+    })
+    const r = response.data
+    return { id: r.id, name: r.name, rate: parseFloat(r.rate), regionCode: r.region_code, createdAt: r.created_at } as SimpleTaxRate
+  }
+
+  /**
+   * 更新门店税率
+   */
+  async updateStoreTaxRate(taxRateId: string, payload: { name?: string; rate?: number }): Promise<SimpleTaxRate> {
+    const response = await httpService.put<any>(`${API_BASE}/taxes/store/${taxRateId}`, payload)
+    const r = response.data
+    return { id: r.id, name: r.name, rate: parseFloat(r.rate), regionCode: r.region_code, createdAt: r.created_at } as SimpleTaxRate
+  }
+
+  /**
+   * 删除门店税率
+   */
+  async deleteStoreTaxRate(taxRateId: string): Promise<void> {
+    await httpService.delete(`${API_BASE}/taxes/store/${taxRateId}`)
+  }
+
+  /**
+   * 获取门店税率关联的商品列表
+   */
+  async getStoreTaxRateItems(taxRateId: string): Promise<Array<{ id: string; name: string; basePrice: number; isActive: boolean }>> {
+    const response = await httpService.get<Array<{ id: string; name: string; basePrice: number; isActive: boolean }>>(
+      `${API_BASE}/taxes/store/tax-rates/${taxRateId}/items`
     )
-    return response.data?.data as { total: number; succeeded: number; failed: number; failedItems: Array<{ itemId: string; error: string }> }
+    return Array.isArray(response.data) ? response.data : []
   }
 
   /**
-   * 获取税种关联的商品列表
+   * 批量分配门店商品税率
    */
-  async getTaxRateItems(taxRateId: string): Promise<Array<{ id: string; name: string; basePrice: number; isActive: boolean }>> {
-    const response = await httpService.get<{ data: { items: Array<{ id: string; name: string; basePrice: number; isActive: boolean }> } }>(
-      `${API_BASE}/taxes/tax-rates/${taxRateId}/items`
+  async batchAssignStoreItemTaxRate(itemIds: string[], taxRateId: string): Promise<{ total: number; succeeded: number; failed: number }> {
+    const response = await httpService.post<{ total: number; succeeded: number; failed: number }>(
+      `${API_BASE}/taxes/store/items/batch-assign`,
+      { itemIds, taxRateId }
     )
-    return response.data?.data?.items || []
+    return response.data
   }
 
   /**
-   * 移除商品的税种关联
+   * 批量移除门店商品税率
    */
-  async removeItemTaxClass(itemId: string): Promise<void> {
-    await httpService.delete(`${API_BASE}/taxes/items/${itemId}/tax-class`)
-  }
-
-  /**
-   * 批量移除商品的税种关联
-   */
-  async batchRemoveItemTaxClass(itemIds: string[]): Promise<{ total: number; removed: number }> {
-    const response = await httpService.post<{ data: { total: number; removed: number } }>(
-      `${API_BASE}/taxes/items/batch-remove-tax-class`,
+  async batchRemoveStoreItemTaxRate(itemIds: string[]): Promise<{ total: number; removed: number }> {
+    const response = await httpService.post<{ total: number; removed: number }>(
+      `${API_BASE}/taxes/store/items/batch-remove`,
       { itemIds }
     )
-    return response.data?.data as { total: number; removed: number }
+    return response.data
+  }
+
+  /**
+   * 批量为商品绑定税率
+   */
+  async batchAssignItemTaxClass(itemIds: string[], taxClassId: string): Promise<{ total: number; succeeded: number; failed: number; failedItems: Array<{ itemId: string; error: string }> }> {
+    // 新接口逐个分配
+    let succeeded = 0
+    const failedItems: Array<{ itemId: string; error: string }> = []
+    for (const itemId of itemIds) {
+      try {
+        await httpService.post(`${API_BASE}/taxes/items/${itemId}/assign`, { taxRateIds: [taxClassId] })
+        succeeded++
+      } catch (e: any) {
+        failedItems.push({ itemId, error: e.message })
+      }
+    }
+    return { total: itemIds.length, succeeded, failed: failedItems.length, failedItems }
+  }
+
+  /**
+   * 批量为商品分配租户自定义税类（已合并到 batchAssignItemTaxClass）
+   */
+  async batchAssignItemTenantTaxClass(itemIds: string[], tenantTaxClassId: string): Promise<{ total: number; succeeded: number; failed: number; failedItems: Array<{ itemId: string; error: string }> }> {
+    // 直接内联，避免解构时 this 丢失的问题
+    let succeeded = 0
+    const failedItems: Array<{ itemId: string; error: string }> = []
+    for (const itemId of itemIds) {
+      try {
+        await httpService.post(`${API_BASE}/taxes/items/${itemId}/assign`, { taxRateIds: [tenantTaxClassId] })
+        succeeded++
+      } catch (e: any) {
+        failedItems.push({ itemId, error: e.message })
+      }
+    }
+    return { total: itemIds.length, succeeded, failed: failedItems.length, failedItems }
+  }
+
+  /**
+   * 获取税率关联的商品列表
+   */
+  async getTaxRateItems(taxRateId: string): Promise<Array<{ id: string; name: string; basePrice: number; isActive: boolean }>> {
+    const response = await httpService.get<Array<{ id: string; name: string; basePrice: number; isActive: boolean }>>(
+      `${API_BASE}/taxes/tax-rates/${taxRateId}/items`
+    )
+    return Array.isArray(response.data) ? response.data : []
+  }
+
+  /**
+   * 移除商品的税率关联
+   */
+  async removeItemTaxClass(itemId: string, taxRateId?: string): Promise<void> {
+    if (taxRateId) {
+      await httpService.delete(`${API_BASE}/taxes/items/${itemId}/${taxRateId}`)
+    } else {
+      console.warn('[TAX] removeItemTaxClass: 需要提供 taxRateId')
+    }
+  }
+
+  /**
+   * 批量移除商品的税率关联
+   */
+  async batchRemoveItemTaxClass(itemIds: string[]): Promise<{ total: number; removed: number }> {
+    const response = await httpService.post<{ total: number; removed: number }>(
+      `${API_BASE}/taxes/items/batch-remove`,
+      { itemIds }
+    )
+    return response.data
+  }
+
+  // ==================== 自定义选项税种 ====================
+
+  /**
+   * 获取税种关联的自定义选项列表
+   */
+  async getTaxRateModifierOptions(taxRateId: string): Promise<Array<{
+    id: string; name: string; displayName: string; defaultPrice: number;
+    isActive: boolean; groupId: string; groupDisplayName: string
+  }>> {
+    const response = await httpService.get<any[]>(`${API_BASE}/taxes/tax-rates/${taxRateId}/modifier-options`)
+    return Array.isArray(response.data) ? response.data : []
+  }
+
+  /**
+   * 批量为自定义选项分配税种
+   */
+  async batchAssignModifierOptionTaxRate(optionIds: string[], taxRateId: string): Promise<{ total: number; succeeded: number; failed: number }> {
+    const response = await httpService.post<{ total: number; succeeded: number; failed: number }>(
+      `${API_BASE}/taxes/modifier-options/batch-assign`,
+      { optionIds, taxRateId }
+    )
+    return response.data
+  }
+
+  /**
+   * 批量移除自定义选项的税种关联
+   */
+  async batchRemoveModifierOptionTaxRate(optionIds: string[]): Promise<{ total: number; removed: number }> {
+    const response = await httpService.post<{ total: number; removed: number }>(
+      `${API_BASE}/taxes/modifier-options/batch-remove`,
+      { optionIds }
+    )
+    return response.data
   }
 }
 
@@ -2221,6 +2608,8 @@ export const {
   getItemTaxClass,
   assignItemTaxClass,
   assignItemTenantTaxClass,
+  addItemTaxClass,
+  addMultipleItemTaxClasses,
   batchAssignItemTaxClass,
   batchAssignItemTenantTaxClass,
   calculateItemTax,
@@ -2231,5 +2620,17 @@ export const {
   updateTaxRate,
   getTaxRateItems,
   removeItemTaxClass,
-  batchRemoveItemTaxClass
+  batchRemoveItemTaxClass,
+  getTaxRateModifierOptions,
+  batchAssignModifierOptionTaxRate,
+  batchRemoveModifierOptionTaxRate,
+  // 门店税率（每店独立管理）
+  getStoreAvailableItems,
+  getStoreTaxRates,
+  createStoreTaxRate,
+  updateStoreTaxRate,
+  deleteStoreTaxRate,
+  getStoreTaxRateItems,
+  batchAssignStoreItemTaxRate,
+  batchRemoveStoreItemTaxRate
 } = itemManagementService

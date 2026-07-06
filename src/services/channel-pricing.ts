@@ -82,25 +82,9 @@ export const getChannelPriceProfile = async (
   tenantId: string,
   orderSourceConfigId: string
 ): Promise<SourcePriceProfile | null> => {
-  try {
-    const response = await httpService.get<any>(
-      `${API_BASE}/source-profiles`,
-      {
-        params: {
-          tenantId,
-          orderSourceConfigId
-        }
-      }
-    )
-
-    if (response.data?.data?.profile) {
-      return response.data.data.profile
-    }
-    return null
-  } catch (error) {
-    console.error('Failed to get channel price profile:', error)
-    throw error
-  }
+  // /source-profiles 端点已废弃（v2.0 删除了 source_price_profiles 表）
+  console.warn('[CHANNEL PRICING] getChannelPriceProfile: source-profiles 端点已废弃')
+  return null
 }
 
 /**
@@ -110,7 +94,7 @@ export const getChannelPriceProfile = async (
 export const queryChannelPrices = async (
   sourceCode: string,
   itemIds?: string[]
-): Promise<{ sourceCode: string; prices: Array<{ itemId: string; price: number }> } | null> => {
+): Promise<{ sourceCode: string; prices: Array<{ id?: string; itemId: string; price: number }> } | null> => {
   try {
     const response = await httpService.post<any>(
       `${API_BASE}/source-prices/query`,
@@ -120,23 +104,20 @@ export const queryChannelPrices = async (
       }
     )
 
-    console.log('查询商品价格响应:', response.data)
-
-    // 新 API 返回格式：{ sourceCode, prices: [{ itemId, price }, ...] }
-    if (response.data?.data) {
-      return response.data.data
+    // 后端返回 priceCents（分），统一转为前端通用的分单位 price 字段
+    const raw = response.data?.data ?? response.data ?? null
+    if (!raw?.prices) return null
+    return {
+      sourceCode: raw.sourceCode,
+      prices: raw.prices.map((p: any) => ({
+        id: p.id,
+        itemId: p.itemId,
+        price: p.priceCents ?? p.price  // priceCents 是分，直接用
+      }))
     }
-
-    if (response.data?.prices) {
-      return response.data
-    }
-
-    return null
   } catch (error) {
     console.error('Failed to query channel prices:', error)
-    if ((error as any)?.response?.status === 404) {
-      return null
-    }
+    if ((error as any)?.response?.status === 404) return null
     throw error
   }
 }
@@ -195,22 +176,19 @@ export const queryComboprices = async (
       }
     )
 
-    console.log('查询套餐价格响应:', response.data)
-
-    if (response.data?.data) {
-      return response.data.data
+    const raw = response.data?.data ?? response.data ?? null
+    if (!raw?.prices) return null
+    return {
+      sourceCode: raw.sourceCode,
+      prices: raw.prices.map((p: any) => ({
+        id: p.id,
+        comboId: p.comboId,
+        price: p.priceCents ?? p.price
+      }))
     }
-
-    if (response.data?.prices) {
-      return response.data
-    }
-
-    return null
   } catch (error) {
     console.error('Failed to query combo prices:', error)
-    if ((error as any)?.response?.status === 404) {
-      return null
-    }
+    if ((error as any)?.response?.status === 404) return null
     throw error
   }
 }
@@ -248,18 +226,11 @@ export const deleteChannelPrice = async (priceId: string): Promise<void> => {
 }
 
 /**
- * 批量删除渠道价格配置
+ * 批量删除渠道价格配置（已废弃）
+ * @note /source-prices/batch-delete 端点已废弃，请使用 DELETE /source-prices/:sourceCode/:itemId
  */
 export const deleteChannelPrices = async (priceIds: string[]): Promise<void> => {
-  try {
-    await httpService.post(
-      `${API_BASE}/source-prices/batch-delete`,
-      { priceIds }
-    )
-  } catch (error) {
-    console.error('Failed to delete channel prices:', error)
-    throw error
-  }
+  console.warn('[CHANNEL PRICING] deleteChannelPrices: batch-delete 端点已废弃，无法执行')
 }
 
 // 创建或更新价目档案的请求类型
@@ -298,14 +269,16 @@ export const batchSaveAllPrices = async (data: {
   combos?: Array<{ sourceCode: string; comboId: string; price: number }>
 }): Promise<void> => {
   try {
-    console.log('批量保存所有价格:', data)
-    const response = await httpService.post(
-      `${API_BASE}/source-prices/batch`,
-      data
-    )
-    console.log('保存响应:', response.data)
-  } catch (error) {
-    console.error('Failed to batch save all prices:', error)
+    // 后端 upsertBatch 接收元单位，前端统一用分单位，这里做转换
+    const payload: typeof data = {}
+    if (data.items?.length)  payload.items  = data.items.map(p => ({ ...p, price: p.price / 100 }))
+    if (data.addons?.length) payload.addons = data.addons.map(p => ({ ...p, price: p.price / 100 }))
+    if (data.combos?.length) payload.combos = data.combos.map(p => ({ ...p, price: p.price / 100 }))
+    console.log('[batchSaveAllPrices] 发送请求:', JSON.stringify(payload, null, 2))
+    const response = await httpService.post(`${API_BASE}/source-prices/batch`, payload)
+    console.log('[batchSaveAllPrices] 响应:', response.status, response.data)
+  } catch (error: any) {
+    console.error('[batchSaveAllPrices] 失败:', error?.response?.status, error?.response?.data, error?.message)
     throw error
   }
 }
@@ -383,85 +356,58 @@ export interface QueryCustomOptionPricesResponse {
 
 /**
  * 查询自定义选项渠道价格
- * @param sourceCode 渠道代码
- * @param itemId 商品ID（可选，用于查询特定商品的自定义选项价格）
+ * @param sourceCode 渠道代码（新架构中对应 channelCode）
+ * @param itemId 商品ID（可选）
+ * @note /source-prices/modifiers/query 已废弃，新架构使用 store-menu API
  */
 export const queryCustomOptionSourcePrices = async (
   sourceCode: string,
   itemId?: string
 ): Promise<QueryCustomOptionPricesResponse | null> => {
-  try {
-    const response = await httpService.post<any>(
-      `${API_BASE}/source-prices/modifiers/query`,
-      {
-        sourceCode,
-        ...(itemId && { itemId })
-      }
-    )
-
-    console.log('查询自定义选项价格响应:', response.data)
-
-    if (response.data?.data) {
-      return response.data.data
-    }
-
-    if (response.data?.prices) {
-      return response.data
-    }
-
-    return null
-  } catch (error) {
-    console.error('Failed to query custom option prices:', error)
-    if ((error as any)?.response?.status === 404) {
-      return null
-    }
-    throw error
-  }
+  // /source-prices/modifiers/query 端点已不存在，返回空数据
+  console.warn('[CHANNEL PRICING] queryCustomOptionSourcePrices: 此端点已废弃，请使用 store-menu API')
+  return null
 }
 
 /**
- * 查询修饰符渠道价格（向后兼容别名）
+ * 查询自定义选项渠道价格（向后兼容别名）
  * @deprecated 请使用 queryCustomOptionSourcePrices
  */
 export const queryModifierSourcePrices = queryCustomOptionSourcePrices
 
 /**
  * 批量设置自定义选项渠道价格
- * @param sourceCode 渠道代码
+ * @param sourceCode 渠道代码（新架构中对应 channelCode）
  * @param prices 自定义选项价格列表
+ * @note /source-prices/modifiers 已废弃，新架构使用 store-menu/items/:itemId/channel-modifier-prices
  */
 export const batchSaveCustomOptionSourcePrices = async (
   sourceCode: string,
   prices: Array<{
     itemId: string
-    customOptionId: string      // 自定义选项ID（后端仍使用 modifierOptionId 字段）
+    customOptionId: string
     price: number
   }>
 ): Promise<void> => {
-  try {
-    console.log('批量保存自定义选项价格:', { sourceCode, prices })
-    // 转换为后端期望的格式
-    const backendPrices = prices.map(p => ({
-      itemId: p.itemId,
-      modifierOptionId: p.customOptionId,  // 后端字段名仍为 modifierOptionId
-      price: p.price
-    }))
-    const response = await httpService.post(
-      `${API_BASE}/source-prices/modifiers`,
-      {
-        sourceCode,
-        prices: backendPrices
-      }
+  // 按 itemId 分组，逐个调用新端点
+  const byItem = prices.reduce((acc, p) => {
+    if (!acc[p.itemId]) acc[p.itemId] = []
+    acc[p.itemId].push({ channelCode: sourceCode, modifierOptionId: p.customOptionId, price: p.price })
+    return acc
+  }, {} as Record<string, Array<{ channelCode: string; modifierOptionId: string; price: number }>>)
+
+  await Promise.all(
+    Object.entries(byItem).map(([itemId, itemPrices]) =>
+      httpService.put(
+        `${API_BASE}/store-menu/items/${itemId}/channel-modifier-prices`,
+        { prices: itemPrices }
+      )
     )
-    console.log('保存自定义选项价格响应:', response.data)
-  } catch (error) {
-    console.error('Failed to batch save custom option prices:', error)
-    throw error
-  }
+  )
 }
 
 /**
- * 批量设置修饰符渠道价格（向后兼容别名）
+ * 批量设置自定义选项渠道价格（向后兼容别名）
  * @deprecated 请使用 batchSaveCustomOptionSourcePrices
  */
 export const batchSaveModifierSourcePrices = batchSaveCustomOptionSourcePrices
@@ -477,18 +423,16 @@ export const deleteCustomOptionSourcePrice = async (
   itemId: string,
   optionId: string
 ): Promise<void> => {
-  try {
-    await httpService.delete(
-      `${API_BASE}/source-prices/modifiers/${sourceCode}/${itemId}/${optionId}`
-    )
-  } catch (error) {
-    console.error('Failed to delete custom option price:', error)
-    throw error
-  }
+  // /source-prices/modifiers 端点已废弃，新架构通过设置价格为0来"删除"
+  console.warn('[CHANNEL PRICING] deleteCustomOptionSourcePrice: 此端点已废弃，请重新保存价格为0以覆盖')
+  await httpService.put(
+    `${API_BASE}/store-menu/items/${itemId}/channel-modifier-prices`,
+    { prices: [{ channelCode: sourceCode, modifierOptionId: optionId, price: 0 }] }
+  )
 }
 
 /**
- * 删除单个修饰符的渠道价格（向后兼容别名）
+ * 删除单个自定义选项的渠道价格（向后兼容别名）
  * @deprecated 请使用 deleteCustomOptionSourcePrice
  */
 export const deleteModifierSourcePrice = deleteCustomOptionSourcePrice
@@ -545,9 +489,18 @@ export const calculatePrice = async (params: {
     }
 
     // 转换响应为前端格式
+    // 后端返回 unitPriceCents/subtotalCents（分），前端接口使用 unitPrice/subtotal（也是分）
+    const modifiers = result.modifiers || result.customOptions || []
     return {
       ...result,
-      customOptions: result.modifiers || result.customOptions  // 兼容处理
+      customOptions: modifiers.map((mod: any) => ({
+        optionId: mod.optionId,
+        optionName: mod.optionName,
+        unitPrice: mod.unitPriceCents ?? mod.unitPrice,   // 统一用分为单位
+        quantity: mod.quantity,
+        subtotal: mod.subtotalCents ?? mod.subtotal,      // 统一用分为单位
+        priceSource: mod.priceSource
+      }))
     }
   } catch (error) {
     console.error('Failed to calculate price:', error)

@@ -12,7 +12,7 @@ import AuthBackground from '../../components/AuthBackground'
 import { Btn, AlertBox } from '@/components/ui-kit'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PWD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/
+const PWD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/
 
 type RegistrationStep = 'register' | 'verify'
 

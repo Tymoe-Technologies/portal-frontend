@@ -3,7 +3,22 @@ import { httpService } from './http'
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'https://tymoe.com/api/auth-service/v1'
 
 export type AccountType = 'OWNER' | 'MANAGER' | 'STAFF'
-export type ProductType = 'beauty' | 'fb'
+export type ProductType =
+  | 'beauty_salon'
+  | 'hair_salon'
+  | 'spa'
+  | 'restaurant'
+  | 'fast_food'
+  | 'cafe'
+  | 'beverage'
+  | 'home_studio'
+  | 'fitness'
+  | 'yoga_studio'
+  | 'retail'
+  | 'chinese_restaurant'
+  | 'clinic'
+  | 'liquor_store'
+  | 'other'
 export type AccountStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETED'
 
 export interface Account {
@@ -12,8 +27,11 @@ export interface Account {
   orgName?: string
   accountType: AccountType
   productType: ProductType
+  name?: string
   username?: string
-  employeeNumber: string
+  accountCode: string
+  email?: string
+  phone?: string
   pinCode?: string
   status: AccountStatus
   lastLoginAt?: string
@@ -25,11 +43,13 @@ export interface Account {
 export interface CreateAccountRequest {
   orgId: string
   accountType: AccountType
-  productType: ProductType
+  name: string
   username?: string
   password?: string
-  employeeNumber: string
+  accountCode: string
   pinCode: string
+  email?: string
+  phone?: string
 }
 
 export interface UpdateAccountRequest {

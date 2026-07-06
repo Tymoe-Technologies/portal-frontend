@@ -1,29 +1,20 @@
 import React, { useState, useEffect } from 'react'
-import {
-  Card,
-  Select,
-  Table,
-  Button,
-  Space,
-  Tag,
-  message,
-  Modal,
-  InputNumber,
-  Form,
-  Typography,
-  Empty,
-  Spin,
-  Tooltip
-} from 'antd'
-import {
-  DollarOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  InfoCircleOutlined,
-  SaveOutlined
-} from '@ant-design/icons'
+import { DollarSign, Pencil, Trash2, Info, Save } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { ColumnsType } from 'antd/es/table'
+import {
+  SectionCard,
+  SelectInput,
+  Table,
+  Btn,
+  Badge,
+  Modal,
+  Field,
+  EmptyState,
+  Spinner,
+  ConfirmDialog,
+  toast,
+  type Column
+} from '@/components/ui-kit'
 import { getCurrencySymbol } from '../../config/currencyConfig'
 import {
   queryModifierSourcePrices,
@@ -32,9 +23,6 @@ import {
   type ModifierPriceData
 } from '../../services/channel-pricing'
 import { itemManagementService } from '../../services/item-management'
-
-const { Option } = Select
-const { Text, Title } = Typography
 
 interface ModifierPricingTabProps {
   sourceCode: string
@@ -51,7 +39,7 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
   sourceCode,
   sourceName
 }) => {
-  const { t } = useTranslation()
+  const { t: _t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [items, setItems] = useState<any[]>([])
@@ -59,14 +47,16 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
   const [modifierPrices, setModifierPrices] = useState<ModifierPriceRow[]>([])
   const [editModalVisible, setEditModalVisible] = useState(false)
   const [editingPrice, setEditingPrice] = useState<ModifierPriceRow | null>(null)
-  const [form] = Form.useForm()
+  const [editValue, setEditValue] = useState<string>('')
+  const [editError, setEditError] = useState<string | undefined>()
+  const [deletingRow, setDeletingRow] = useState<ModifierPriceRow | null>(null)
 
   // 加载商品列表
   useEffect(() => {
     loadItems()
   }, [])
 
-  // 当选择商品时，加载该商品的修饰符价格
+  // 当选择商品时，加载该商品的自定义选项价格
   useEffect(() => {
     if (selectedItemId && sourceCode) {
       loadModifierPrices()
@@ -79,8 +69,7 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
       const response = await itemManagementService.getItems({ limit: 1000 })
       setItems(response.data || [])
     } catch (error) {
-      message.error('加载商品列表失败')
-      console.error(error)
+      toast.error('加载商品列表失败')
     } finally {
       setLoading(false)
     }
@@ -101,8 +90,7 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
         setModifierPrices([])
       }
     } catch (error) {
-      message.error('加载修饰符价格失败')
-      console.error(error)
+      toast.error('加载自定义选项价格失败')
       setModifierPrices([])
     } finally {
       setLoading(false)
@@ -111,48 +99,42 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
 
   const handleEditPrice = (record: ModifierPriceRow) => {
     setEditingPrice(record)
-    form.setFieldsValue({
-      sourcePrice: record.sourcePrice ?? record.finalPrice
-    })
+    setEditValue(String(record.sourcePrice ?? record.finalPrice ?? ''))
+    setEditError(undefined)
     setEditModalVisible(true)
   }
 
   const handleModalOk = () => {
-    form.validateFields().then(values => {
-      if (editingPrice) {
-        const newPrice = values.sourcePrice
+    if (!editingPrice) return
+    const newPrice = Number(editValue)
+    if (editValue === '' || Number.isNaN(newPrice)) {
+      setEditError('请输入渠道价格')
+      return
+    }
+    if (newPrice < 0) {
+      setEditError('价格不能为负数')
+      return
+    }
 
-        // 更新本地数据
-        setModifierPrices(prev => prev.map(item => {
-          if (item.key === editingPrice.key) {
-            return {
-              ...item,
-              newSourcePrice: newPrice,
-              modified: true
-            }
-          }
-          return item
-        }))
+    setModifierPrices(prev => prev.map(item =>
+      item.key === editingPrice.key
+        ? { ...item, newSourcePrice: newPrice, modified: true }
+        : item
+    ))
 
-        setEditModalVisible(false)
-        setEditingPrice(null)
-        form.resetFields()
-      }
-    })
+    setEditModalVisible(false)
+    setEditingPrice(null)
   }
 
-  const handleDeletePrice = async (record: ModifierPriceRow) => {
+  const handleDeletePrice = async () => {
+    if (!deletingRow) return
     try {
-      await deleteModifierSourcePrice(
-        sourceCode,
-        record.itemId,
-        record.modifierOptionId
-      )
-      message.success('删除成功')
+      await deleteModifierSourcePrice(sourceCode, deletingRow.itemId, deletingRow.modifierOptionId)
+      toast.success('删除成功')
+      setDeletingRow(null)
       loadModifierPrices()
     } catch (error) {
-      message.error('删除失败')
-      console.error(error)
+      toast.error('删除失败')
     }
   }
 
@@ -160,13 +142,12 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
     const modifiedPrices = modifierPrices.filter(p => p.modified && p.newSourcePrice !== undefined)
 
     if (modifiedPrices.length === 0) {
-      message.info('没有修改需要保存')
+      toast.info('没有修改需要保存')
       return
     }
 
     try {
       setSaving(true)
-
       const prices = modifiedPrices.map(p => ({
         itemId: p.itemId,
         modifierOptionId: p.modifierOptionId,
@@ -174,147 +155,91 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
       }))
 
       await batchSaveModifierSourcePrices(sourceCode, prices)
-      message.success(`成功保存 ${prices.length} 个修饰符价格`)
-
-      // 重新加载数据
+      toast.success(`成功保存 ${prices.length} 个自定义选项价格`)
       await loadModifierPrices()
     } catch (error) {
-      message.error('保存失败')
-      console.error(error)
+      toast.error('保存失败')
     } finally {
       setSaving(false)
     }
   }
 
-  const getPriceSourceColor = (source: string) => {
-    switch (source) {
-      case 'source':
-        return 'green'
-      case 'item':
-        return 'orange'
-      case 'default':
-        return 'default'
-      default:
-        return 'default'
+  const priceSourceBadge = (source: string) => {
+    const map: Record<string, { variant: 'green' | 'gold' | 'default'; text: string }> = {
+      source: { variant: 'green', text: '渠道定价' },
+      item: { variant: 'gold', text: '商品定价' },
+      default: { variant: 'default', text: '默认价格' }
     }
+    const cfg = map[source] || { variant: 'default' as const, text: source }
+    return <Badge variant={cfg.variant}>{cfg.text}</Badge>
   }
 
-  const getPriceSourceText = (source: string) => {
-    switch (source) {
-      case 'source':
-        return '渠道定价'
-      case 'item':
-        return '商品定价'
-      case 'default':
-        return '默认价格'
-      default:
-        return source
-    }
-  }
-
-  const columns: ColumnsType<ModifierPriceRow> = [
+  const columns: Column<ModifierPriceRow>[] = [
     {
-      title: '修饰符组',
-      dataIndex: 'groupName',
       key: 'groupName',
+      title: '自定义选项组',
       width: 150,
-      render: (text) => <Text strong>{text || '-'}</Text>
+      render: (r) => <span className="font-medium text-slate-700">{r.groupName || '-'}</span>
     },
     {
-      title: '选项名称',
-      dataIndex: 'optionName',
       key: 'optionName',
+      title: '选项名称',
       width: 150,
-      render: (text) => <Text>{text || '-'}</Text>
+      render: (r) => <span className="text-slate-700">{r.optionName || '-'}</span>
     },
     {
-      title: (
-        <Space>
-          价格优先级
-          <Tooltip title="价格计算优先级：渠道价格 > 商品级价格 > 默认价格">
-            <InfoCircleOutlined />
-          </Tooltip>
-        </Space>
-      ),
       key: 'prices',
+      title: (
+        <span className="inline-flex items-center gap-1">
+          价格优先级
+          <span title="价格计算优先级：渠道价格 > 商品级价格 > 默认价格"><Info size={13} className="text-slate-400" /></span>
+        </span>
+      ),
       width: 300,
-      render: (_, record) => (
-        <Space direction="vertical" size={2}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            默认: ¥{record.defaultPrice?.toFixed(2) || '0.00'}
-          </Text>
+      render: (record) => (
+        <div className="flex flex-col gap-0.5 text-xs">
+          <span className="text-slate-400">默认: {record.defaultPrice?.toFixed(2) || '0.00'}</span>
           {record.itemPrice !== undefined && record.itemPrice !== null && (
-            <Text type="warning" style={{ fontSize: 12 }}>
-              商品级: ¥{record.itemPrice.toFixed(2)}
-            </Text>
+            <span className="text-amber-600">商品级: {record.itemPrice.toFixed(2)}</span>
           )}
           {(record.sourcePrice !== undefined && record.sourcePrice !== null) || record.modified ? (
-            <Text type="success" style={{ fontSize: 12 }}>
-              渠道价: ¥{(record.newSourcePrice ?? record.sourcePrice ?? 0).toFixed(2)}
-              {record.modified && <Tag color="orange" style={{ marginLeft: 8 }}>已修改</Tag>}
-            </Text>
+            <span className="text-green-600">
+              渠道价: {(record.newSourcePrice ?? record.sourcePrice ?? 0).toFixed(2)}
+              {record.modified && <span className="ml-2"><Badge variant="gold">已修改</Badge></span>}
+            </span>
           ) : (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              渠道价: 未设置
-            </Text>
+            <span className="text-slate-400">渠道价: 未设置</span>
           )}
-        </Space>
+        </div>
       )
     },
     {
-      title: '最终价格',
-      dataIndex: 'finalPrice',
       key: 'finalPrice',
+      title: '最终价格',
       width: 120,
-      render: (price, record) => {
+      render: (record) => {
         const displayPrice = record.modified && record.newSourcePrice !== undefined
           ? record.newSourcePrice
-          : price
+          : record.finalPrice
         return (
-          <Space>
-            <Text strong style={{ fontSize: 16 }}>
-              ¥{displayPrice?.toFixed(2) || '0.00'}
-            </Text>
-            <Tag color={getPriceSourceColor(record.priceSource)}>
-              {getPriceSourceText(record.priceSource)}
-            </Tag>
-          </Space>
+          <div className="flex items-center gap-2">
+            <span className="text-base font-semibold text-slate-800">{displayPrice?.toFixed(2) || '0.00'}</span>
+            {priceSourceBadge(record.priceSource)}
+          </div>
         )
       }
     },
     {
-      title: '操作',
       key: 'actions',
-      fixed: 'right',
+      title: '操作',
       width: 150,
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEditPrice(record)}
-          >
-            设置渠道价
-          </Button>
+      render: (record) => (
+        <div className="flex items-center gap-1">
+          <Btn variant="link" size="sm" icon={<Pencil size={14} />} onClick={() => handleEditPrice(record)}>设置渠道价</Btn>
           {record.sourcePrice !== undefined && record.sourcePrice !== null && (
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => {
-                Modal.confirm({
-                  title: '确认删除',
-                  content: '确定要删除此修饰符的渠道价格吗？',
-                  onOk: () => handleDeletePrice(record)
-                })
-              }}
-            >
-              删除
-            </Button>
+            <Btn variant="ghost" size="sm" icon={<Trash2 size={14} className="text-red-500" />} onClick={() => setDeletingRow(record)} />
           )}
-        </Space>
+        </div>
       )
     }
   ]
@@ -323,137 +248,110 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
 
   return (
     <div>
-      <Card
+      <SectionCard
         title={
-          <Space>
-            <DollarOutlined />
-            <Title level={4} style={{ margin: 0 }}>
-              修饰符渠道定价
-            </Title>
-            <Tag color="blue">{sourceName}</Tag>
-          </Space>
+          <span className="inline-flex items-center gap-2">
+            <DollarSign size={18} className="text-slate-500" />
+            <span className="text-lg font-semibold text-slate-800">自定义选项渠道定价</span>
+            <Badge variant="blue">{sourceName}</Badge>
+          </span>
         }
-        extra={
-          modifiedCount > 0 && (
-            <Button
-              type="primary"
-              icon={<SaveOutlined />}
-              loading={saving}
-              onClick={handleSaveAll}
-            >
+        action={
+          modifiedCount > 0 ? (
+            <Btn variant="primary" icon={<Save size={16} />} loading={saving} onClick={handleSaveAll}>
               保存所有修改 ({modifiedCount})
-            </Button>
-          )
+            </Btn>
+          ) : undefined
         }
       >
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
+        <div className="space-y-6">
           {/* 商品选择 */}
-          <Card size="small" title="选择商品">
-            <Select
-              showSearch
-              style={{ width: '100%' }}
-              placeholder="请选择商品以查看其修饰符价格"
-              value={selectedItemId || undefined}
+          <SectionCard title="选择商品">
+            <SelectInput
+              placeholder="请选择商品以查看其自定义选项价格"
+              value={selectedItemId}
               onChange={setSelectedItemId}
-              filterOption={(input, option) =>
-                (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
-              }
-              loading={loading}
-            >
-              {items.map(item => (
-                <Option key={item.id} value={item.id}>
-                  {item.name} (¥{item.basePrice})
-                </Option>
-              ))}
-            </Select>
-          </Card>
+              options={items.map(item => ({ value: item.id, label: `${item.name} (${item.basePrice})` }))}
+            />
+          </SectionCard>
 
-          {/* 修饰符价格表格 */}
+          {/* 自定义选项价格表格 */}
           {selectedItemId ? (
             loading ? (
-              <div style={{ textAlign: 'center', padding: 40 }}>
-                <Spin tip="加载中..." />
-              </div>
+              <div className="py-10 text-center"><Spinner /></div>
             ) : modifierPrices.length > 0 ? (
-              <Table
-                columns={columns}
-                dataSource={modifierPrices}
-                pagination={false}
-                size="small"
-                scroll={{ x: 'max-content' }}
-              />
+              <Table columns={columns} data={modifierPrices} rowKey={(r) => r.key} />
             ) : (
-              <Empty description="该商品没有关联的修饰符" />
+              <EmptyState title="该商品没有关联的自定义选项" />
             )
           ) : (
-            <Empty description="请先选择一个商品" />
+            <EmptyState title="请先选择一个商品" />
           )}
-        </Space>
-      </Card>
+        </div>
+      </SectionCard>
 
       {/* 编辑价格模态框 */}
       <Modal
-        title="设置修饰符渠道价格"
         open={editModalVisible}
-        onOk={handleModalOk}
-        onCancel={() => {
-          setEditModalVisible(false)
-          setEditingPrice(null)
-          form.resetFields()
-        }}
-        okText="确定"
-        cancelText="取消"
+        onOpenChange={(o) => { if (!o) { setEditModalVisible(false); setEditingPrice(null) } }}
+        title="设置自定义选项渠道价格"
+        footer={
+          <>
+            <Btn variant="secondary" onClick={() => { setEditModalVisible(false); setEditingPrice(null) }}>取消</Btn>
+            <Btn variant="primary" onClick={handleModalOk}>确定</Btn>
+          </>
+        }
       >
         {editingPrice && (
-          <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <div className="space-y-4">
             <div>
-              <Text type="secondary">修饰符组：</Text>
-              <Text strong>{editingPrice.groupName}</Text>
+              <span className="text-slate-400">自定义选项组：</span>
+              <span className="font-medium text-slate-700">{editingPrice.groupName}</span>
             </div>
             <div>
-              <Text type="secondary">选项名称：</Text>
-              <Text strong>{editingPrice.optionName}</Text>
+              <span className="text-slate-400">选项名称：</span>
+              <span className="font-medium text-slate-700">{editingPrice.optionName}</span>
             </div>
 
-            <div style={{ padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-              <Space direction="vertical" size={4}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  默认价格: ¥{editingPrice.defaultPrice?.toFixed(2) || '0.00'}
-                </Text>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <div className="flex flex-col gap-1 text-xs">
+                <span className="text-slate-400">默认价格: {editingPrice.defaultPrice?.toFixed(2) || '0.00'}</span>
                 {editingPrice.itemPrice !== undefined && editingPrice.itemPrice !== null && (
-                  <Text type="warning" style={{ fontSize: 12 }}>
-                    商品级价格: ¥{editingPrice.itemPrice.toFixed(2)}
-                  </Text>
+                  <span className="text-amber-600">商品级价格: {editingPrice.itemPrice.toFixed(2)}</span>
                 )}
                 {editingPrice.sourcePrice !== undefined && editingPrice.sourcePrice !== null && (
-                  <Text type="success" style={{ fontSize: 12 }}>
-                    当前渠道价: ¥{editingPrice.sourcePrice.toFixed(2)}
-                  </Text>
+                  <span className="text-green-600">当前渠道价: {editingPrice.sourcePrice.toFixed(2)}</span>
                 )}
-              </Space>
+              </div>
             </div>
 
-            <Form form={form} layout="vertical">
-              <Form.Item
-                label="新的渠道价格"
-                name="sourcePrice"
-                rules={[
-                  { required: true, message: '请输入渠道价格' },
-                  { type: 'number', min: 0, message: '价格不能为负数' }
-                ]}
-              >
-                <InputNumber
-                  style={{ width: '100%' }}
-                  placeholder="请输入价格"
-                  prefix={getCurrencySymbol()}
-                  precision={2}
+            <Field label="新的渠道价格" required error={editError}>
+              <div className="flex items-center rounded-lg border border-slate-200 bg-white px-3 focus-within:outline-2 focus-within:outline-slate-900">
+                <span className="text-sm text-slate-400">{getCurrencySymbol()}</span>
+                <input
+                  type="number"
+                  step={0.01}
                   min={0}
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  placeholder="请输入价格"
+                  className="w-full bg-transparent py-2 pl-2 text-sm text-slate-700 focus:outline-none"
                 />
-              </Form.Item>
-            </Form>
-          </Space>
+              </div>
+            </Field>
+          </div>
         )}
       </Modal>
+
+      {/* 删除确认 */}
+      <ConfirmDialog
+        open={!!deletingRow}
+        onOpenChange={(o) => { if (!o) setDeletingRow(null) }}
+        title="确认删除"
+        description="确定要删除此自定义选项的渠道价格吗？"
+        danger
+        onConfirm={handleDeletePrice}
+      />
     </div>
   )
 }

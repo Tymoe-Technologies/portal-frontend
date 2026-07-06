@@ -1,36 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  Button, 
-  Card, 
-  Table, 
-  Space, 
-  Typography, 
-  Tag, 
-  Modal, 
-  Form, 
-  Input, 
-  Select, 
-  message,
-  Tooltip,
-  Alert,
-  Empty,
-  Popconfirm
-} from 'antd'
-import { 
-  PlusOutlined, 
-  EditOutlined, 
-  DeleteOutlined, 
-  SearchOutlined,
-  ReloadOutlined,
-  UserOutlined,
-  CrownOutlined,
-  TeamOutlined,
-  InfoCircleOutlined
-} from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
+import { Plus, Pencil, Trash2, Search, RefreshCw, User, Crown, Users } from 'lucide-react'
 import { useAuthContext } from '../../auth/AuthProvider'
-import { 
+import {
   getAccounts,
   createAccount,
   updateAccount,
@@ -43,672 +15,476 @@ import {
   type UpdateAccountRequest
 } from '../../services/account'
 import { getOrganizations, type Organization } from '../../services/auth'
-
-const { Title, Text } = Typography
-const { Option } = Select
+import {
+  SectionCard, Table, Btn, Badge, Modal, Field, TextInput, SelectInput,
+  AlertBox, EmptyState, ConfirmDialog, toast, type Column
+} from '@/components/ui-kit'
 
 interface AccountFormData {
   orgId: string
-  accountType: AccountType
-  productType: ProductType
-  username?: string
-  password?: string
-  employeeNumber: string
-  pinCode: string
+  accountType: AccountType | ''
+  name: string
+  email?: string
+  phone?: string
+}
+
+// 生成工号：SC + 6位随机数字
+function generateStaffCode(): string {
+  return 'SC' + Math.floor(100000 + Math.random() * 900000).toString()
+}
+
+// 生成4位PIN码
+function generatePinCode(): string {
+  return Math.floor(1000 + Math.random() * 9000).toString()
+}
+
+// 生成强密码：大小写字母+数字，12位
+function generatePassword(): string {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+  const lower = 'abcdefghjkmnpqrstuvwxyz'
+  const digits = '23456789'
+  const all = upper + lower + digits
+  let pwd = upper[Math.floor(Math.random() * upper.length)]
+    + lower[Math.floor(Math.random() * lower.length)]
+    + digits[Math.floor(Math.random() * digits.length)]
+  for (let i = 3; i < 12; i++) {
+    pwd += all[Math.floor(Math.random() * all.length)]
+  }
+  return pwd.split('').sort(() => Math.random() - 0.5).join('')
+}
+
+// 根据姓名生成登录名：首字母 + 6位随机数字
+function generateUsername(name: string): string {
+  const prefix = name.trim().slice(0, 2).toLowerCase().replace(/[^a-z]/g, '') || 'u'
+  return prefix + Math.floor(100000 + Math.random() * 900000).toString()
 }
 
 const AccountManagement: React.FC = () => {
   const { t } = useTranslation()
   const { isAuthenticated } = useAuthContext()
-  const [form] = Form.useForm<AccountFormData>()
 
-  // 状态管理
   const [loading, setLoading] = useState(false)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [filteredAccounts, setFilteredAccounts] = useState<Account[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
-  
-  // 模态框状态
+
   const [modalVisible, setModalVisible] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
-  
-  // 搜索和筛选状态
+
+  // 受控表单
+  const [form, setForm] = useState<AccountFormData>({ orgId: '', accountType: '', name: '', email: '', phone: '' })
+  const [errors, setErrors] = useState<Partial<Record<keyof AccountFormData, string>>>({})
+  const setF = (patch: Partial<AccountFormData>) => setForm(prev => ({ ...prev, ...patch }))
+
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedOrgId, setSelectedOrgId] = useState<string>(localStorage.getItem('organization_id') || '')
   const [accountTypeFilter, setAccountTypeFilter] = useState<AccountType | ''>('')
   const [statusFilter, setStatusFilter] = useState<AccountStatus | ''>('')
 
-  // 初始化数据
+  // 删除确认
+  const [deletingAccount, setDeletingAccount] = useState<Account | null>(null)
+
   useEffect(() => {
     if (isAuthenticated) {
       loadOrganizations()
-      // 如果已有选中的组织，立即加载账号
       const currentOrgId = localStorage.getItem('organization_id')
-      if (currentOrgId) {
-        setSelectedOrgId(currentOrgId)
-      }
+      if (currentOrgId) setSelectedOrgId(currentOrgId)
     }
   }, [isAuthenticated])
 
-  // 当选择组织时加载账号
   useEffect(() => {
-    if (selectedOrgId) {
-      loadAccounts()
-    }
+    if (selectedOrgId) loadAccounts()
   }, [selectedOrgId])
 
-  // 筛选账号列表
   useEffect(() => {
     let filtered = accounts
-
-    // 按搜索关键词筛选
     if (searchQuery) {
       filtered = filtered.filter(account =>
-        account.employeeNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        account.username?.toLowerCase().includes(searchQuery.toLowerCase())
+        account.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        account.accountCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        account.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        account.email?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     }
-
-    // 按账号类型筛选
     if (accountTypeFilter) {
       filtered = filtered.filter(account => account.accountType === accountTypeFilter)
     }
-
-    // 按状态筛选
     if (statusFilter) {
       filtered = filtered.filter(account => account.status === statusFilter)
     }
-
     setFilteredAccounts(filtered)
   }, [accounts, searchQuery, accountTypeFilter, statusFilter])
 
-  // 监听组织切换事件
   useEffect(() => {
     const handleOrganizationChange = (event: CustomEvent) => {
-      console.log('🔄 [ACCOUNT MANAGEMENT] Organization changed, reloading data...', event.detail)
-      const newOrgId = event.detail.orgId
-      setSelectedOrgId(newOrgId)
+      setSelectedOrgId(event.detail.orgId)
     }
-
     window.addEventListener('organizationChanged', handleOrganizationChange as EventListener)
-    
-    return () => {
-      window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener)
-    }
+    return () => window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener)
   }, [])
 
-  // 加载组织列表
   const loadOrganizations = async () => {
     try {
       setLoading(true)
-      const organizations = await getOrganizations({})
-      setOrganizations(organizations || [])
-      
-      // 如果只有一个组织，自动选择
-      if (organizations && organizations.length === 1) {
-        setSelectedOrgId(organizations[0].id)
-      }
-    } catch (error: any) {
-      console.error('Failed to load organizations:', error)
-      message.error(t('pages.accounts.loadFailed'))
+      const orgs = await getOrganizations({})
+      setOrganizations(orgs || [])
+      if (orgs && orgs.length === 1) setSelectedOrgId(orgs[0].id)
+    } catch {
+      toast.error(t('pages.accounts.loadFailed'))
     } finally {
       setLoading(false)
     }
   }
 
-  // 加载账号列表
   const loadAccounts = async () => {
     if (!selectedOrgId) return
-
     try {
       setLoading(true)
       const response = await getAccounts({ orgId: selectedOrgId })
       setAccounts(response.data || [])
-      // 静默加载，不显示成功消息
-    } catch (error: any) {
-      console.error('Failed to load accounts:', error)
-      message.error(t('pages.accounts.loadFailed'))
+    } catch {
+      toast.error(t('pages.accounts.loadFailed'))
     } finally {
       setLoading(false)
     }
   }
 
-  // 打开创建/编辑模态框
   const openModal = (account?: Account) => {
     setEditingAccount(account || null)
+    setErrors({})
     if (account) {
-      form.setFieldsValue({
+      setForm({
         orgId: account.orgId,
         accountType: account.accountType,
-        productType: account.productType,
-        username: account.username,
-        employeeNumber: account.employeeNumber
+        name: account.name,
+        email: account.email || '',
+        phone: account.phone || '',
       })
     } else {
-      form.resetFields()
-      if (selectedOrgId) {
-        form.setFieldValue('orgId', selectedOrgId)
-      }
+      setForm({ orgId: selectedOrgId || '', accountType: '', name: '', email: '', phone: '' })
     }
     setModalVisible(true)
   }
 
-  // 关闭模态框
   const closeModal = () => {
     setModalVisible(false)
     setEditingAccount(null)
-    form.resetFields()
+    setErrors({})
   }
 
-  // 处理表单提交
+  const validate = (): boolean => {
+    const next: Partial<Record<keyof AccountFormData, string>> = {}
+    if (!form.orgId) next.orgId = t('pages.accounts.selectOrgRequired')
+    if (!form.accountType) next.accountType = t('pages.accounts.accountTypeRequired')
+    if (!form.name?.trim()) next.name = t('pages.accounts.nameRequired')
+    const emailRequired = form.accountType === 'OWNER' || form.accountType === 'MANAGER'
+    if (emailRequired && !form.email?.trim()) {
+      next.email = t('pages.accounts.emailRequired')
+    } else if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      next.email = t('pages.accounts.emailInvalid')
+    }
+    setErrors(next)
+    return Object.keys(next).length === 0
+  }
+
   const handleSubmit = async () => {
+    if (!validate()) return
     try {
-      const values = await form.validateFields()
       setLoading(true)
 
       if (editingAccount) {
-        // 更新账号
         const updateData: UpdateAccountRequest = {
-          username: values.username,
+          username: editingAccount.username,
           status: editingAccount.status
         }
         await updateAccount(editingAccount.id, updateData)
-        message.success(t('pages.accounts.updateSuccess'))
+        toast.success(t('pages.accounts.updateSuccess'))
       } else {
-        // 创建账号
+        const needsLogin = form.accountType === 'OWNER' || form.accountType === 'MANAGER'
         const createData: CreateAccountRequest = {
-          orgId: values.orgId,
-          accountType: values.accountType,
-          productType: values.productType,
-          username: values.username,
-          password: values.password,
-          employeeNumber: values.employeeNumber,
-          pinCode: values.pinCode
+          orgId: form.orgId,
+          accountType: form.accountType as AccountType,
+          name: form.name,
+          // OWNER/MANAGER 需要登录名+密码，STAFF只需PIN
+          username: needsLogin ? generateUsername(form.name) : undefined,
+          password: needsLogin ? generatePassword() : undefined,
+          accountCode: generateStaffCode(),
+          pinCode: generatePinCode(),
+          email: form.email,
+          phone: form.phone,
         }
-        const response = await createAccount(createData)
-        message.success(t('pages.accounts.createSuccess'))
-        
-        // 显示PIN码警告
-        if (response.warning) {
-          Modal.warning({
-            title: t('pages.accounts.pinCodeWarning'),
-            content: (
-              <div>
-                <p>{response.warning}</p>
-                <p><strong>PIN: {response.data.pinCode}</strong></p>
-              </div>
-            )
-          })
-        }
+        await createAccount(createData)
+        toast.success(
+          form.email
+            ? t('pages.accounts.createSuccessWithEmail', { email: form.email })
+            : t('pages.accounts.createSuccess')
+        )
       }
 
       closeModal()
       loadAccounts()
     } catch (error: any) {
-      console.error('Failed to save account:', error)
       const errorMsg = error.message || (editingAccount ? t('pages.accounts.updateFailed') : t('pages.accounts.createFailed'))
-      message.error(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
   }
 
-  // 处理删除
-  const handleDelete = async (account: Account) => {
+  const handleDelete = async () => {
+    if (!deletingAccount) return
     try {
       setLoading(true)
-      const response = await deleteAccount(account.id)
-      
+      const response = await deleteAccount(deletingAccount.id)
       if (response.deletedCount && response.deletedCount > 1) {
-        message.success(t('pages.accounts.deletedCount', { count: response.deletedCount }))
+        toast.success(t('pages.accounts.deletedCount', { count: response.deletedCount }))
       } else {
-        message.success(t('pages.accounts.deleteSuccess'))
+        toast.success(t('pages.accounts.deleteSuccess'))
       }
-      
+      setDeletingAccount(null)
       loadAccounts()
     } catch (error: any) {
-      console.error('Failed to delete account:', error)
-      message.error(error.message || t('pages.accounts.deleteFailed'))
+      toast.error(error.message || t('pages.accounts.deleteFailed'))
     } finally {
       setLoading(false)
     }
   }
 
-  // 获取账号类型图标
   const getAccountTypeIcon = (type: AccountType) => {
     switch (type) {
-      case 'OWNER':
-        return <CrownOutlined />
-      case 'MANAGER':
-        return <TeamOutlined />
-      case 'STAFF':
-        return <UserOutlined />
-      default:
-        return <UserOutlined />
+      case 'OWNER': return <Crown size={12} />
+      case 'MANAGER': return <Users size={12} />
+      default: return <User size={12} />
     }
   }
 
-  // 获取账号类型标签颜色
-  const getAccountTypeColor = (type: AccountType) => {
+  const getAccountTypeVariant = (type: AccountType): 'gold' | 'blue' | 'green' => {
     switch (type) {
-      case 'OWNER':
-        return 'gold'
-      case 'MANAGER':
-        return 'blue'
-      case 'STAFF':
-        return 'green'
-      default:
-        return 'default'
+      case 'OWNER': return 'gold'
+      case 'MANAGER': return 'blue'
+      default: return 'green'
     }
   }
 
-  // 获取状态标签颜色
-  const getStatusColor = (status: AccountStatus) => {
+  const getStatusVariant = (status: AccountStatus): 'green' | 'gold' | 'red' => {
     switch (status) {
-      case 'ACTIVE':
-        return 'success'
-      case 'SUSPENDED':
-        return 'warning'
-      case 'DELETED':
-        return 'error'
-      default:
-        return 'default'
+      case 'ACTIVE': return 'green'
+      case 'SUSPENDED': return 'gold'
+      default: return 'red'
     }
   }
 
-  // 表格列定义
-  const columns: ColumnsType<Account> = [
+  const columns: Column<Account>[] = [
+    { key: 'name', title: t('pages.accounts.name'), width: 120, render: (r) => r.name || '-' },
+    { key: 'accountCode', title: t('pages.accounts.accountCode'), width: 130, render: (r) => r.accountCode },
+    { key: 'username', title: t('pages.accounts.username'), width: 140, render: (r) => r.username || '-' },
     {
-      title: t('pages.accounts.employeeNumber'),
-      dataIndex: 'employeeNumber',
-      key: 'employeeNumber',
-      width: 150
-    },
-    {
-      title: t('pages.accounts.username'),
-      dataIndex: 'username',
-      key: 'username',
-      width: 150,
-      render: (username: string) => username || '-'
-    },
-    {
-      title: t('pages.accounts.accountType'),
-      dataIndex: 'accountType',
       key: 'accountType',
-      width: 120,
-      render: (type: AccountType) => (
-        <Tag icon={getAccountTypeIcon(type)} color={getAccountTypeColor(type)}>
-          {t(`pages.accounts.type${type.charAt(0) + type.slice(1).toLowerCase()}`)}
-        </Tag>
+      title: t('pages.accounts.accountType'),
+      width: 110,
+      render: (r) => (
+        <Badge variant={getAccountTypeVariant(r.accountType)} icon={getAccountTypeIcon(r.accountType)}>
+          {t(`pages.accounts.type${r.accountType.charAt(0) + r.accountType.slice(1).toLowerCase()}`)}
+        </Badge>
       )
     },
     {
-      title: t('pages.accounts.productType'),
-      dataIndex: 'productType',
       key: 'productType',
-      width: 120,
-      render: (type: ProductType) => (
-        <Tag>{t(`pages.accounts.product${type.charAt(0).toUpperCase() + type.slice(1)}`)}</Tag>
-      )
-    },
-    {
-      title: t('pages.accounts.status'),
-      dataIndex: 'status',
-      key: 'status',
+      title: t('pages.accounts.productType'),
       width: 100,
-      render: (status: AccountStatus) => (
-        <Tag color={getStatusColor(status)}>
-          {t(`pages.accounts.status${status.charAt(0) + status.slice(1).toLowerCase()}`)}
-        </Tag>
+      render: (r) => <Badge variant="default">{t(`pages.accounts.product_${r.productType as ProductType}`, r.productType)}</Badge>
+    },
+    { key: 'email', title: t('pages.accounts.email'), width: 180, render: (r) => r.email || '-' },
+    { key: 'phone', title: t('pages.accounts.phone'), width: 140, render: (r) => r.phone || '-' },
+    {
+      key: 'status',
+      title: t('pages.accounts.status'),
+      width: 90,
+      render: (r) => (
+        <Badge variant={getStatusVariant(r.status)}>
+          {t(`pages.accounts.status${r.status.charAt(0) + r.status.slice(1).toLowerCase()}`)}
+        </Badge>
       )
     },
     {
-      title: t('pages.accounts.lastLoginAt'),
-      dataIndex: 'lastLoginAt',
       key: 'lastLoginAt',
-      width: 180,
-      render: (date: string) => date ? new Date(date).toLocaleString() : '-'
+      title: t('pages.accounts.lastLoginAt'),
+      width: 170,
+      render: (r) => r.lastLoginAt ? new Date(r.lastLoginAt).toLocaleString() : '-'
     },
     {
-      title: t('pages.accounts.createdAt'),
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (date: string) => new Date(date).toLocaleString()
-    },
-    {
-      title: t('pages.accounts.actions'),
       key: 'actions',
-      fixed: 'right',
-      width: 150,
-      render: (_: any, record: Account) => (
-        <Space size="small">
-          <Tooltip title={t('pages.accounts.edit')}>
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => openModal(record)}
-            />
-          </Tooltip>
-          <Popconfirm
-            title={t('pages.accounts.deleteConfirm')}
-            description={
-              record.accountType === 'OWNER' 
-                ? t('pages.accounts.deleteCascadeWarning')
-                : t('pages.accounts.deleteWarning')
-            }
-            onConfirm={() => handleDelete(record)}
-            okText={t('pages.accounts.confirm')}
-            cancelText={t('pages.accounts.cancel')}
-          >
-            <Tooltip title={t('pages.accounts.delete')}>
-              <Button
-                type="link"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Tooltip>
-          </Popconfirm>
-        </Space>
+      title: t('pages.accounts.actions'),
+      width: 120,
+      render: (record) => (
+        <div className="flex items-center gap-1">
+          <Btn variant="ghost" size="sm" icon={<Pencil size={14} />} title={t('pages.accounts.edit')} onClick={() => openModal(record)} />
+          <Btn variant="ghost" size="sm" icon={<Trash2 size={14} className="text-red-500" />} title={t('pages.accounts.delete')} onClick={() => setDeletingAccount(record)} />
+        </div>
       )
     }
   ]
 
-  // 根据账号类型判断是否需要用户名和密码
-  const needsCredentials = (accountType?: AccountType) => {
-    return accountType === 'OWNER' || accountType === 'MANAGER'
-  }
+  const emailRequired = form.accountType === 'OWNER' || form.accountType === 'MANAGER'
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card>
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          {/* 标题和操作栏 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={2} style={{ margin: 0 }}>
-              {t('pages.accounts.title')}
-            </Title>
-            <Space>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={loadAccounts}
-                disabled={!selectedOrgId}
-              >
+    <div className="p-6">
+      <SectionCard>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="m-0 text-2xl font-semibold text-slate-800">{t('pages.accounts.title')}</h2>
+            <div className="flex items-center gap-2">
+              <Btn variant="secondary" icon={<RefreshCw size={16} />} onClick={loadAccounts} disabled={!selectedOrgId}>
                 {t('pages.accounts.refresh')}
-              </Button>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => openModal()}
-                disabled={!selectedOrgId}
-              >
+              </Btn>
+              <Btn variant="primary" icon={<Plus size={16} />} onClick={() => openModal()} disabled={!selectedOrgId}>
                 {t('pages.accounts.create')}
-              </Button>
-            </Space>
+              </Btn>
+            </div>
           </div>
 
-          {/* 权限说明 */}
-          <Alert
-            message={t('pages.accounts.permissionTitle')}
+          <AlertBox
+            type="info"
+            title={t('pages.accounts.permissionTitle')}
             description={
-              <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+              <ul className="mb-0 list-disc pl-5">
                 <li>{t('pages.accounts.permissionUser')}</li>
                 <li>{t('pages.accounts.permissionOwner')}</li>
                 <li>{t('pages.accounts.permissionManager')}</li>
                 <li>{t('pages.accounts.permissionStaff')}</li>
               </ul>
             }
-            type="info"
-            showIcon
           />
 
-          {/* 筛选栏 */}
-          <Space wrap>
-            <Select
-              style={{ width: 300 }}
-              placeholder={t('pages.accounts.selectOrgPlaceholder')}
-              value={selectedOrgId || undefined}
-              onChange={setSelectedOrgId}
-              allowClear
-            >
-              {organizations.map(org => (
-                <Option key={org.id} value={org.id}>
-                  {org.orgName}
-                </Option>
-              ))}
-            </Select>
-            <Input
-              placeholder={t('pages.accounts.search')}
-              prefix={<SearchOutlined />}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{ width: 250 }}
-              allowClear
-            />
-            <Select
-              style={{ width: 150 }}
-              placeholder={t('pages.accounts.accountType')}
-              value={accountTypeFilter || undefined}
-              onChange={setAccountTypeFilter}
-              allowClear
-            >
-              <Option value="OWNER">{t('pages.accounts.typeOwner')}</Option>
-              <Option value="MANAGER">{t('pages.accounts.typeManager')}</Option>
-              <Option value="STAFF">{t('pages.accounts.typeStaff')}</Option>
-            </Select>
-            <Select
-              style={{ width: 120 }}
-              placeholder={t('pages.accounts.status')}
-              value={statusFilter || undefined}
-              onChange={setStatusFilter}
-              allowClear
-            >
-              <Option value="ACTIVE">{t('pages.accounts.statusActive')}</Option>
-              <Option value="SUSPENDED">{t('pages.accounts.statusSuspended')}</Option>
-            </Select>
-          </Space>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-72">
+              <SelectInput
+                placeholder={t('pages.accounts.selectOrgPlaceholder')}
+                value={selectedOrgId}
+                onChange={setSelectedOrgId}
+                options={organizations.map(org => ({ value: org.id, label: org.orgName }))}
+              />
+            </div>
+            <div className="relative w-60">
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <TextInput placeholder={t('pages.accounts.search')} value={searchQuery} onChange={setSearchQuery} className="pl-9!" />
+            </div>
+            <div className="w-40">
+              <SelectInput
+                placeholder={t('pages.accounts.accountType')}
+                value={accountTypeFilter}
+                onChange={(v) => setAccountTypeFilter(v as AccountType | '')}
+                options={[
+                  { value: 'OWNER', label: t('pages.accounts.typeOwner') },
+                  { value: 'MANAGER', label: t('pages.accounts.typeManager') },
+                  { value: 'STAFF', label: t('pages.accounts.typeStaff') }
+                ]}
+              />
+            </div>
+            <div className="w-32">
+              <SelectInput
+                placeholder={t('pages.accounts.status')}
+                value={statusFilter}
+                onChange={(v) => setStatusFilter(v as AccountStatus | '')}
+                options={[
+                  { value: 'ACTIVE', label: t('pages.accounts.statusActive') },
+                  { value: 'SUSPENDED', label: t('pages.accounts.statusSuspended') }
+                ]}
+              />
+            </div>
+          </div>
 
-          {/* 表格 */}
           {!selectedOrgId ? (
-            <Empty
-              description={t('pages.accounts.selectOrgPlaceholder')}
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
+            <EmptyState title={t('pages.accounts.selectOrgPlaceholder')} />
           ) : (
             <Table
               columns={columns}
-              dataSource={filteredAccounts}
-              rowKey="id"
+              data={filteredAccounts}
+              rowKey={(r) => r.id}
               loading={loading}
-              scroll={{ x: 1200 }}
-              pagination={{
-                showSizeChanger: true,
-                showTotal: (total) => `${t('pages.accounts.loadSuccess', { count: total })}`
-              }}
-              locale={{
-                emptyText: (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description={
-                      searchQuery || accountTypeFilter || statusFilter
-                        ? t('pages.accounts.noResultsDescription')
-                        : t('pages.accounts.emptyDescription')
-                    }
-                  >
-                    {!searchQuery && !accountTypeFilter && !statusFilter && (
-                      <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
-                        {t('pages.accounts.emptyButton')}
-                      </Button>
-                    )}
-                  </Empty>
-                )
-              }}
-            />
-          )}
-        </Space>
-      </Card>
-
-      {/* 创建/编辑模态框 */}
-      <Modal
-        title={editingAccount ? t('pages.accounts.edit') : t('pages.accounts.create')}
-        open={modalVisible}
-        onOk={handleSubmit}
-        onCancel={closeModal}
-        confirmLoading={loading}
-        width={600}
-        okText={t('pages.accounts.save')}
-        cancelText={t('pages.accounts.cancel')}
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{
-            productType: 'beauty'
-          }}
-        >
-          <Form.Item
-            name="orgId"
-            label={t('pages.accounts.selectOrg')}
-            rules={[{ required: true, message: t('pages.accounts.selectOrgRequired') }]}
-          >
-            <Select
-              placeholder={t('pages.accounts.selectOrgPlaceholder')}
-              disabled={!!editingAccount}
-            >
-              {organizations.map(org => (
-                <Option key={org.id} value={org.id}>
-                  {org.orgName}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="accountType"
-            label={t('pages.accounts.selectAccountType')}
-            rules={[{ required: true, message: t('pages.accounts.accountTypeRequired') }]}
-          >
-            <Select
-              placeholder={t('pages.accounts.selectAccountTypePlaceholder')}
-              disabled={!!editingAccount}
-            >
-              <Option value="OWNER">{t('pages.accounts.typeOwner')}</Option>
-              <Option value="MANAGER">{t('pages.accounts.typeManager')}</Option>
-              <Option value="STAFF">{t('pages.accounts.typeStaff')}</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="productType"
-            label={t('pages.accounts.selectProductType')}
-            rules={[{ required: true, message: t('pages.accounts.productTypeRequired') }]}
-          >
-            <Select
-              placeholder={t('pages.accounts.selectProductTypePlaceholder')}
-              disabled={!!editingAccount}
-            >
-              <Option value="beauty">{t('pages.accounts.productBeauty')}</Option>
-              <Option value="fb">{t('pages.accounts.productFb')}</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            noStyle
-            shouldUpdate={(prevValues, currentValues) => 
-              prevValues.accountType !== currentValues.accountType
-            }
-          >
-            {({ getFieldValue }) => {
-              const accountType = getFieldValue('accountType')
-              const needsCreds = needsCredentials(accountType)
-              
-              return (
-                <>
-                  {needsCreds && (
-                    <>
-                      <Form.Item
-                        name="username"
-                        label={t('pages.accounts.username')}
-                        rules={[
-                          { required: true, message: t('pages.accounts.usernameRequired') },
-                          { min: 4, max: 50, message: t('pages.accounts.usernameLength') },
-                          { 
-                            pattern: /^[^@]+$/, 
-                            message: t('pages.accounts.usernameNoAt') 
-                          }
-                        ]}
-                        tooltip={t('pages.accounts.usernameTooltip')}
-                      >
-                        <Input 
-                          placeholder={t('pages.accounts.usernamePlaceholder')}
-                          disabled={!!editingAccount}
-                        />
-                      </Form.Item>
-
-                      {!editingAccount && (
-                        <Form.Item
-                          name="password"
-                          label={t('pages.accounts.passwordPlaceholder').split('（')[0]}
-                          rules={[
-                            { required: true, message: t('pages.accounts.passwordRequired') },
-                            { min: 8, message: t('pages.accounts.passwordMinLength') },
-                            { 
-                              pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, 
-                              message: t('pages.accounts.passwordPattern') 
-                            }
-                          ]}
-                          tooltip={t('pages.accounts.passwordTooltip')}
-                        >
-                          <Input.Password 
-                            placeholder={t('pages.accounts.passwordPlaceholder')}
-                          />
-                        </Form.Item>
-                      )}
-                    </>
-                  )}
-                </>
-              )
-            }}
-          </Form.Item>
-
-          <Form.Item
-            name="employeeNumber"
-            label={t('pages.accounts.employeeNumber')}
-            rules={[{ required: true, message: t('pages.accounts.employeeNumberRequired') }]}
-            tooltip={t('pages.accounts.employeeNumberTooltip')}
-          >
-            <Input 
-              placeholder={t('pages.accounts.employeeNumberPlaceholder')}
-              disabled={!!editingAccount}
-            />
-          </Form.Item>
-
-          {!editingAccount && (
-            <Form.Item
-              name="pinCode"
-              label={t('pages.accounts.pinCode')}
-              rules={[
-                { required: true, message: t('pages.accounts.pinCodeRequired') },
-                { len: 4, message: t('pages.accounts.pinCodeLength') },
-                { pattern: /^\d+$/, message: t('pages.accounts.pinCodePattern') }
-              ]}
-              tooltip={t('pages.accounts.pinCodeTooltip')}
-              extra={
-                <Text type="warning">
-                  <InfoCircleOutlined /> {t('pages.accounts.pinCodeWarning')}
-                </Text>
+              empty={
+                <EmptyState
+                  title={searchQuery || accountTypeFilter || statusFilter
+                    ? t('pages.accounts.noResultsDescription')
+                    : t('pages.accounts.emptyDescription')}
+                  action={!searchQuery && !accountTypeFilter && !statusFilter
+                    ? <Btn variant="primary" icon={<Plus size={16} />} onClick={() => openModal()}>{t('pages.accounts.emptyButton')}</Btn>
+                    : undefined}
+                />
               }
-            >
-              <Input 
-                placeholder={t('pages.accounts.pinCodePlaceholder')}
-                maxLength={4}
-              />
-            </Form.Item>
+            />
           )}
-        </Form>
+        </div>
+      </SectionCard>
+
+      <Modal
+        open={modalVisible}
+        onOpenChange={(o) => { if (!o) closeModal() }}
+        size="md"
+        title={editingAccount ? t('pages.accounts.edit') : t('pages.accounts.create')}
+        footer={
+          <>
+            <Btn variant="secondary" onClick={closeModal}>{t('pages.accounts.cancel')}</Btn>
+            <Btn variant="primary" loading={loading} onClick={handleSubmit}>{t('pages.accounts.save')}</Btn>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label={t('pages.accounts.selectOrg')} required error={errors.orgId}>
+            <SelectInput
+              placeholder={t('pages.accounts.selectOrgPlaceholder')}
+              value={form.orgId}
+              onChange={(v) => setF({ orgId: v })}
+              disabled={!!editingAccount}
+              options={organizations.map(org => ({ value: org.id, label: org.orgName }))}
+            />
+          </Field>
+
+          <Field label={t('pages.accounts.selectAccountType')} required error={errors.accountType}>
+            <SelectInput
+              placeholder={t('pages.accounts.selectAccountTypePlaceholder')}
+              value={form.accountType}
+              onChange={(v) => setF({ accountType: v as AccountType })}
+              disabled={!!editingAccount}
+              options={[
+                { value: 'OWNER', label: t('pages.accounts.typeOwner') },
+                { value: 'MANAGER', label: t('pages.accounts.typeManager') },
+                { value: 'STAFF', label: t('pages.accounts.typeStaff') }
+              ]}
+            />
+          </Field>
+
+          <Field label={t('pages.accounts.name')} required error={errors.name}>
+            <TextInput placeholder={t('pages.accounts.namePlaceholder')} value={form.name} onChange={(v) => setF({ name: v })} />
+          </Field>
+
+          <Field
+            label={t('pages.accounts.email')}
+            required={emailRequired}
+            error={errors.email}
+            hint={emailRequired ? t('pages.accounts.emailTooltipRequired') : t('pages.accounts.emailTooltip')}
+          >
+            <TextInput placeholder={t('pages.accounts.emailPlaceholder')} value={form.email || ''} onChange={(v) => setF({ email: v })} />
+          </Field>
+
+          <Field label={t('pages.accounts.phone')}>
+            <TextInput placeholder={t('pages.accounts.phonePlaceholder')} value={form.phone || ''} onChange={(v) => setF({ phone: v })} />
+          </Field>
+        </div>
       </Modal>
+
+      <ConfirmDialog
+        open={!!deletingAccount}
+        onOpenChange={(o) => { if (!o) setDeletingAccount(null) }}
+        title={t('pages.accounts.deleteConfirm')}
+        description={deletingAccount?.accountType === 'OWNER'
+          ? t('pages.accounts.deleteCascadeWarning')
+          : t('pages.accounts.deleteWarning')}
+        confirmText={t('pages.accounts.confirm')}
+        cancelText={t('pages.accounts.cancel')}
+        danger
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

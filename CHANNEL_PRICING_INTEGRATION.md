@@ -14,18 +14,18 @@
 
 #### 新增API接口
 ```typescript
-// 修饰符渠道定价 API (v2.3 新功能)
+// 自定义选项渠道定价 API (v2.3 新功能)
 - queryModifierSourcePrices(sourceCode, itemId?)
-  查询修饰符渠道价格
+  查询自定义选项渠道价格
 
 - batchSaveModifierSourcePrices(sourceCode, prices)
-  批量设置修饰符渠道价格
+  批量设置自定义选项渠道价格
 
 - deleteModifierSourcePrice(sourceCode, itemId, optionId)
-  删除单个修饰符的渠道价格
+  删除单个自定义选项的渠道价格
 
 - calculatePrice(params)
-  计算商品最终价格（含修饰符，含优先级）
+  计算商品最终价格（含自定义选项，含优先级）
 ```
 
 #### 新增类型定义
@@ -106,11 +106,11 @@ interface QueryModifierPricesResponse {
    }, [searchParams, channels])
    ```
 
-3. ✅ 集成修饰符定价Tab
+3. ✅ 集成自定义选项定价Tab
    ```typescript
    {
      key: 'modifiers',
-     label: '修饰符定价',
+     label: '自定义选项定价',
      children: <ModifierPricingTab
        sourceCode={selectedChannel.sourceType}
        sourceName={selectedChannel.sourceName}
@@ -120,7 +120,7 @@ interface QueryModifierPricesResponse {
 
 ---
 
-### 4. 修饰符定价Tab组件 (`ModifierPricingTab.tsx`) ⭐ 新文件
+### 4. 自定义选项定价Tab组件 (`ModifierPricingTab.tsx`) ⭐ 新文件
 
 #### 功能特性
 1. **商品选择下拉框**
@@ -146,18 +146,18 @@ interface QueryModifierPricesResponse {
    - 成功后刷新数据
 
 5. **删除功能**
-   - 删除单个修饰符的渠道价格
+   - 删除单个自定义选项的渠道价格
    - 删除后回退到更低优先级
 
 #### UI布局
 ```
 ┌────────────────────────────────────┐
-│ 修饰符渠道定价  [渠道名称]  [保存(n)]│
+│ 自定义选项渠道定价  [渠道名称]  [保存(n)]│
 ├────────────────────────────────────┤
 │ 选择商品: [下拉框]                  │
 ├────────────────────────────────────┤
 │ 表格:                               │
-│ | 修饰符组 | 选项 | 价格优先级 | 最终| 操作 |│
+│ | 自定义选项组 | 选项 | 价格优先级 | 最终| 操作 |│
 │ | 杯型     | 大杯 | 默认: ¥2.00    | ¥3.00 | 设置/删除 |│
 │ |          |      | 商品级: ¥2.50  | [渠道定价] |       |│
 │ |          |      | 渠道价: ¥3.00 ✓|      |       |│
@@ -190,15 +190,15 @@ managePricing: '管理定價'
 ### 1. 三层价格体系完整支持
 - ✅ 商品渠道价格（source_item_prices）
 - ✅ 套餐渠道价格（source_combo_prices）
-- ✅ 修饰符渠道价格（source_modifier_prices）⭐ 新增
+- ✅ 自定义选项渠道价格（source_modifier_prices）⭐ 新增
 
 ### 2. 价格优先级可视化
 ```
-优先级1: 渠道修饰符价格 [绿色标签]    ← 最高
+优先级1: 渠道自定义选项价格 [绿色标签]    ← 最高
    ↓
-优先级2: 商品级修饰符价格 [橙色标签]
+优先级2: 商品级自定义选项价格 [橙色标签]
    ↓
-优先级3: 修饰符默认价格 [灰色标签]    ← 最低
+优先级3: 自定义选项默认价格 [灰色标签]    ← 最低
 ```
 
 ### 3. 用户体验优化
@@ -212,7 +212,7 @@ managePricing: '管理定價'
 ## 📂 修改的文件清单
 
 ### 必须修改的文件（已完成）
-1. ✅ `/src/services/channel-pricing.ts` - 新增修饰符定价API
+1. ✅ `/src/services/channel-pricing.ts` - 新增自定义选项定价API
 2. ✅ `/src/pages/OrderConfig/ChannelManagement.tsx` - 添加快捷入口
 3. ✅ `/src/pages/OrderConfig/PricingManagement.tsx` - URL参数 + Tab集成
 4. ✅ `/src/i18n/locales/zh-CN.ts` - 中文翻译
@@ -220,7 +220,7 @@ managePricing: '管理定價'
 6. ✅ `/src/i18n/locales/zh-TW.ts` - 繁体翻译
 
 ### 新创建的文件
-7. ✅ `/src/pages/OrderConfig/ModifierPricingTab.tsx` - 修饰符定价Tab组件
+7. ✅ `/src/pages/OrderConfig/ModifierPricingTab.tsx` - 自定义选项定价Tab组件
 8. ✅ `/CHANNEL_PRICING_INTEGRATION.md` - 本文档
 
 ---
@@ -245,13 +245,13 @@ managePricing: '管理定價'
 自动加载该渠道的所有价格数据
 ```
 
-#### 3. 设置修饰符渠道价格
+#### 3. 设置自定义选项渠道价格
 ```
-定价管理页面 → 切换到"修饰符定价"Tab
+定价管理页面 → 切换到"自定义选项定价"Tab
    ↓
 选择一个商品（如：奶茶）
    ↓
-显示该商品的所有修饰符选项
+显示该商品的所有自定义选项选项
    ↓
 点击"设置渠道价"按钮
    ↓
@@ -271,11 +271,11 @@ managePricing: '管理定價'
 - [ ] 2. 点击按钮跳转到定价管理页面
 - [ ] 3. URL包含正确的 source 参数
 - [ ] 4. 自动选中对应的渠道
-- [ ] 5. 定价管理页面显示4个Tab（商品/加料/套餐/修饰符）
+- [ ] 5. 定价管理页面显示4个Tab（商品/加料/套餐/自定义选项）
 
-### 修饰符定价功能测试
+### 自定义选项定价功能测试
 - [ ] 6. 商品下拉框正常加载
-- [ ] 7. 选择商品后显示修饰符列表
+- [ ] 7. 选择商品后显示自定义选项列表
 - [ ] 8. 价格优先级正确显示（默认/商品级/渠道）
 - [ ] 9. 编辑价格模态框正常打开
 - [ ] 10. 输入价格后本地标记为"已修改"
@@ -300,7 +300,7 @@ CREATE TABLE source_modifier_prices (
   tenant_id           VARCHAR(36) NOT NULL,
   source_code         VARCHAR(100) NOT NULL,      -- 渠道代码
   item_id             VARCHAR(36) NOT NULL,       -- 商品ID
-  modifier_option_id  VARCHAR(36) NOT NULL,       -- 修饰符选项ID
+  modifier_option_id  VARCHAR(36) NOT NULL,       -- 自定义选项选项ID
   price               DECIMAL(10,2) NOT NULL,     -- 渠道价格
   created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -322,7 +322,7 @@ CREATE TABLE source_modifier_prices (
 - `POST /api/item-manage/v1/source-combo-prices/query` - 查询
 - `POST /api/item-manage/v1/source-combo-prices/batch` - 批量保存
 
-### 修饰符渠道价格 ⭐ 新增
+### 自定义选项渠道价格 ⭐ 新增
 - `POST /api/item-manage/v1/source-prices/modifiers/query` - 查询
 - `POST /api/item-manage/v1/source-prices/modifiers` - 批量保存
 - `DELETE /api/item-manage/v1/source-prices/modifiers/{sourceCode}/{itemId}/{optionId}` - 删除
@@ -338,8 +338,8 @@ CREATE TABLE source_modifier_prices (
 ```
 推荐流程:
 1. 设置商品基础价格（默认渠道）
-2. 设置修饰符默认价格
-3. 特殊商品设置商品级修饰符价格
+2. 设置自定义选项默认价格
+3. 特殊商品设置商品级自定义选项价格
 4. 特定渠道设置渠道覆盖价格
 ```
 
@@ -352,7 +352,7 @@ CREATE TABLE source_modifier_prices (
 
 ### 3. 数据一致性
 ```
-- 删除修饰符选项前，先清理渠道价格
+- 删除自定义选项选项前，先清理渠道价格
 - 删除商品前，清理所有渠道价格
 - 定期检查孤立的价格记录
 ```
@@ -374,7 +374,7 @@ CREATE TABLE source_modifier_prices (
 
 ### P0 (当前已完成)
 - ✅ 基础功能实现
-- ✅ 修饰符定价支持
+- ✅ 自定义选项定价支持
 - ✅ 价格优先级展示
 
 ### P1 (可选优化)
@@ -397,7 +397,7 @@ CREATE TABLE source_modifier_prices (
 - ✅ 服务层API适配
 - ✅ 渠道管理快捷入口
 - ✅ URL参数传递
-- ✅ 修饰符定价Tab
+- ✅ 自定义选项定价Tab
 - ✅ 价格优先级展示
 - ✅ 批量保存功能
 - ✅ 国际化支持
@@ -418,12 +418,12 @@ CREATE TABLE source_modifier_prices (
 
 本次整合成功实现了以下目标：
 
-1. **功能完整性**: 支持商品、套餐、修饰符三层定价
+1. **功能完整性**: 支持商品、套餐、自定义选项三层定价
 2. **用户体验**: 快捷入口 + 自动选中 + 实时预览
 3. **代码质量**: TypeScript类型完整 + 错误处理完善
 4. **可维护性**: 模块化设计 + 文档完善
 
-现在用户可以轻松地为不同渠道设置差异化定价，包括修饰符的精细化定价控制。
+现在用户可以轻松地为不同渠道设置差异化定价，包括自定义选项的精细化定价控制。
 
 ---
 

@@ -138,6 +138,12 @@ class HttpService {
       },
       (error: AxiosError) => {
         if (error.response?.status === 401) {
+          const url = error.config?.url || ''
+          // 登录/oauth 端点本身无 token，401 是「凭据错误」，不触发 clearAuth
+          if (url.includes('/identity/login') || url.includes('/oauth/token')) {
+            return Promise.reject(error)
+          }
+
           const errorData = error.response?.data as any
           const errorCode = errorData?.code || errorData?.error
 
@@ -503,7 +509,7 @@ class HttpService {
       
       return new Error(error.message || 'Network error')
     }
-    return new Error('Unknown error occurred')
+    return new Error('请求失败，请稍后重试')
   }
 }
 

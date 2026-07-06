@@ -13,7 +13,7 @@ import {
   Wallet, ChevronDown, ChevronRight, LogOut, User, Settings,
   Globe, CreditCard, Car, Printer, Calendar, Gift, FileText,
   Smartphone, Trash2, Sparkles, PanelLeftClose, PanelLeftOpen,
-  Check, ChevronsUpDown,
+  Check, ChevronsUpDown, BarChart2,
 } from 'lucide-react'
 import { ToastHost, toast } from '../components/ui-kit'
 
@@ -172,8 +172,8 @@ function NavGroup({ item, activeKey, collapsed, defaultOpen }: {
     <Collapsible.Root open={open} onOpenChange={setOpen} className="mt-4 first:mt-1">
       <Collapsible.Trigger className="group w-full flex items-center justify-between rounded-md px-3 py-1.5 cursor-pointer select-none hover:bg-slate-50 transition-colors">
         <span className={clsx(
-          'text-xs font-semibold uppercase tracking-wider transition-colors',
-          hasActiveChild ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600',
+          'text-sm font-semibold transition-colors',
+          hasActiveChild ? 'text-slate-900' : 'text-slate-500 group-hover:text-slate-700',
         )}>
           {item.label}
         </span>
@@ -288,6 +288,12 @@ const BaseLayout: React.FC = () => {
       to: '/dashboard',
       label: t('nav.dashboard'),
       icon: <LayoutDashboard className="w-[18px] h-[18px]" />,
+    },
+    {
+      key: '/reports',
+      to: '/reports',
+      label: t('nav.reports'),
+      icon: <BarChart2 className="w-[18px] h-[18px]" />,
     },
     {
       key: 'group-menu',

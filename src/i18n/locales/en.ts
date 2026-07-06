@@ -2,6 +2,7 @@ const en = {
   translation: {
     app: { title: 'Tymoe Platform' },
     common: {
+      or: 'or',
       back: 'Back',
       confirm: 'Confirm',
       cancel: 'Cancel',
@@ -33,6 +34,7 @@ const en = {
     },
     nav: {
       dashboard: 'Dashboard',
+      reports: 'Reports',
       features: 'Features',
       recipeGuide: 'Recipe Guide',
       // Group labels
@@ -48,7 +50,8 @@ const en = {
       // Orders & Delivery
       orderConfig: 'Order Configuration',
       onlineOrderConfig: 'Online Order Config',
-directDelivery: 'Direct Delivery',
+      channelManagement: 'Channel Management',
+      directDelivery: 'Direct Delivery',
       uberIntegration: 'Uber Integration',
       // Store Operations
       paymentSettings: 'Payment Settings',
@@ -63,6 +66,9 @@ directDelivery: 'Direct Delivery',
       // System
       subscription: 'Subscription',
       receiptTemplate: 'Receipt Templates',
+      profile: 'Profile',
+      settings: 'Settings',
+      logout: 'Log Out',
     },
     organization: {
       title: 'Organization Management',
@@ -227,6 +233,25 @@ directDelivery: 'Direct Delivery',
         sendButton: 'Send Reset Link',
         backToLogin: 'Back to Login',
         emailSent: 'Password reset email sent, please check your inbox'
+      },
+      brand: {
+        headline: "See what's possible with Tymoe",
+        subtitle: 'More tools and features built for growing businesses.',
+        cta: 'Tell me more after sign in',
+        phrases: [
+          'Manage multiple stores',
+          'Sync inventory in real time',
+          'Loyalty & member marketing',
+          'Online & in-store ordering',
+          'Smart recipe guides',
+          'Channel-based pricing',
+          'Automatic kitchen printing',
+          'Reports & analytics',
+          'Staff roles & permissions',
+          'Gift cards & stored value',
+          'Promotions & coupons',
+          'Delivery platform integrations'
+        ]
       }
     },
     pages: {

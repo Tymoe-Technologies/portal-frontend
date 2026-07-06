@@ -17,24 +17,34 @@ function addMinutes(time: string, minutes: number): string {
 // ─── Settings ────────────────────────────────────────────────────────
 
 export function mapSettings(
-  backend: BackendBookingSettings,
+  backend: BackendBookingSettings | null | undefined,
   orgName?: string
 ): BookingSettings {
+  if (!backend) {
+    return {
+      businessName: orgName ?? '',
+      openTime: '09:00',
+      closeTime: '21:00',
+      advanceBookingDays: 30,
+      minAdvanceHours: 1,
+      requireCustomerPhone: true,
+      requireCustomerEmail: false,
+      depositEnabled: false,
+    }
+  }
   return {
-    orgId: backend.organizationId,
+    orgId: backend.orgId,
     businessName: orgName ?? '',
     openTime: backend.openingTime,
     closeTime: backend.closingTime,
     advanceBookingDays: backend.advanceBookingDays,
-    slotDurationMinutes: backend.slotDuration,
-    requireStaffSelection: backend.requireStaffSelection,
-    allowWalkIn: backend.allowWalkIn,
-    autoConfirm: backend.autoConfirm,
-    maxPartySize: backend.maxPartySize,
-    allowAutoAssignment: backend.allowAutoAssignment,
-    resourceType: backend.resourceType,
-    depositRequired: backend.depositRequired,
+    minAdvanceHours: backend.minAdvanceHours,
+    requireCustomerPhone: backend.requireCustomerPhone,
+    requireCustomerEmail: backend.requireCustomerEmail,
+    depositEnabled: backend.depositEnabled,
     depositAmount: backend.depositAmount,
+    slotDurationMinutes: backend.slotDurationMinutes ?? 60,
+    tableConfig: backend.tableConfig,
   }
 }
 
@@ -44,16 +54,14 @@ export function mapSettingsToBackend(
   const out: Record<string, unknown> = {}
   if (frontend.openTime !== undefined) out.openingTime = frontend.openTime
   if (frontend.closeTime !== undefined) out.closingTime = frontend.closeTime
-  if (frontend.slotDurationMinutes !== undefined) out.slotDuration = frontend.slotDurationMinutes
   if (frontend.advanceBookingDays !== undefined) out.advanceBookingDays = frontend.advanceBookingDays
-  if (frontend.maxPartySize !== undefined) out.maxPartySize = frontend.maxPartySize
-  if (frontend.requireStaffSelection !== undefined) out.requireStaffSelection = frontend.requireStaffSelection
-  if (frontend.allowWalkIn !== undefined) out.allowWalkIn = frontend.allowWalkIn
-  if (frontend.autoConfirm !== undefined) out.autoConfirm = frontend.autoConfirm
-  if (frontend.allowAutoAssignment !== undefined) out.allowAutoAssignment = frontend.allowAutoAssignment
-  if (frontend.resourceType !== undefined) out.resourceType = frontend.resourceType
-  if (frontend.depositRequired !== undefined) out.depositRequired = frontend.depositRequired
+  if (frontend.minAdvanceHours !== undefined) out.minAdvanceHours = frontend.minAdvanceHours
+  if (frontend.slotDurationMinutes !== undefined) out.slotDurationMinutes = frontend.slotDurationMinutes
+  if (frontend.requireCustomerPhone !== undefined) out.requireCustomerPhone = frontend.requireCustomerPhone
+  if (frontend.requireCustomerEmail !== undefined) out.requireCustomerEmail = frontend.requireCustomerEmail
+  if (frontend.depositEnabled !== undefined) out.depositEnabled = frontend.depositEnabled
   if (frontend.depositAmount !== undefined) out.depositAmount = frontend.depositAmount
+  if (frontend.tableConfig !== undefined) out.tableConfig = frontend.tableConfig
   return out
 }
 
@@ -62,13 +70,18 @@ export function mapSettingsToBackend(
 export function mapResource(backend: BackendResource): BookableResource {
   return {
     id: backend.id,
-    orgId: backend.organizationId,
+    orgId: backend.orgId,
     name: backend.name,
-    type: backend.resourceType,
+    resourceType: backend.resourceType,
     description: backend.description,
-    capacity: backend.capacity,
-    isActive: backend.status === 'AVAILABLE',
-    metadata: backend.metadata ?? {},
+    imageUrl: backend.imageUrl,
+    config: backend.config as BookableResource['config'],
+    floorPlanId: backend.floorPlanId,
+    posX: backend.posX,
+    posY: backend.posY,
+    status: backend.status,
+    isActive: backend.isActive,
+    sortOrder: backend.sortOrder,
     createdAt: backend.createdAt,
     updatedAt: backend.updatedAt,
   }
@@ -79,11 +92,13 @@ export function mapResourceToBackend(
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   if (frontend.name !== undefined) out.name = frontend.name
-  if (frontend.type !== undefined) out.resourceType = frontend.type
+  if (frontend.resourceType !== undefined) out.resourceType = frontend.resourceType
   if (frontend.description !== undefined) out.description = frontend.description
-  if (frontend.capacity !== undefined) out.capacity = frontend.capacity
-  if (frontend.isActive !== undefined) out.status = frontend.isActive ? 'AVAILABLE' : 'UNAVAILABLE'
-  if (frontend.metadata !== undefined) out.metadata = frontend.metadata
+  if (frontend.imageUrl !== undefined) out.imageUrl = frontend.imageUrl
+  if (frontend.config !== undefined) out.config = frontend.config
+  if (frontend.isActive !== undefined) out.isActive = frontend.isActive
+  if (frontend.status !== undefined) out.status = frontend.status
+  if (frontend.staffId !== undefined) out.staffId = frontend.staffId
   return out
 }
 
@@ -92,10 +107,13 @@ export function mapResourceToBackend(
 export function mapBooking(backend: BackendBooking): Booking {
   return {
     id: backend.id,
-    orgId: backend.organizationId,
-    resourceId: backend.resourceId,
-    resourceName: backend.resource?.name ?? '',
-    resourceType: backend.resource?.resourceType ?? 'TABLE',
+    orgId: backend.orgId,
+    primaryResourceId: backend.primaryResourceId,
+    primaryResource: backend.primaryResource ? mapResource(backend.primaryResource) : undefined,
+    personId: backend.personId,
+    person: backend.person ? mapResource(backend.person) : undefined,
+    spaceId: backend.spaceId,
+    space: backend.space ? mapResource(backend.space) : undefined,
     customerName: backend.customerName,
     customerPhone: backend.customerPhone,
     customerEmail: backend.customerEmail,
@@ -109,7 +127,6 @@ export function mapBooking(backend: BackendBooking): Booking {
     depositRequired: backend.depositRequired,
     depositAmount: backend.depositAmount,
     depositStatus: backend.depositStatus,
-    stripeSessionUrl: backend.stripeSessionUrl,
     cancelReason: backend.cancelReason,
     createdAt: backend.createdAt,
   }

@@ -77,7 +77,7 @@ function displayItem(item: Item) {
 }
 ```
 
-#### 2.3 修饰符选项价格
+#### 2.3 自定义选项选项价格
 
 **原来的做法**：
 ```typescript
@@ -99,7 +99,7 @@ const option = {
 const display = formatPrice(option.defaultPrice)  // "¥1.00"
 ```
 
-#### 2.4 商品修饰符价格设置
+#### 2.4 商品自定义选项价格设置
 
 **原来的做法**：
 ```typescript
@@ -153,9 +153,9 @@ async setItemModifierPrices(itemId, prices) {
    }
    ```
 
-3. **修饰符选项显示**
+3. **自定义选项选项显示**
    ```typescript
-   // 显示修饰符默认价格
+   // 显示自定义选项默认价格
    <span>{formatPrice(option.defaultPrice)}</span>
    ```
 
@@ -163,13 +163,13 @@ async setItemModifierPrices(itemId, prices) {
 
 **需要修改的地方**：
 
-1. **修饰符选项价格显示**
+1. **自定义选项选项价格显示**
    ```typescript
-   // 显示修饰符选项的默认价格和商品级价格
+   // 显示自定义选项选项的默认价格和商品级价格
    const displayPrice = (cents) => formatPrice(cents)
    ```
 
-2. **编辑修饰符选项**
+2. **编辑自定义选项选项**
    ```typescript
    // 编辑时转换
    const handleSaveOption = (option: ModifierOption) => {
@@ -180,7 +180,7 @@ async setItemModifierPrices(itemId, prices) {
    }
    ```
 
-3. **商品级修饰符价格覆盖**
+3. **商品级自定义选项价格覆盖**
    ```typescript
    // 设置商品级价格时
    const itemPrice = parseUserInput(userInput)  // 自动转换为分
@@ -241,9 +241,9 @@ async setItemModifierPrices(itemId, prices) {
    }
    ```
 
-2. **修饰符相关API调用**
+2. **自定义选项相关API调用**
    ```typescript
-   // 创建修饰符选项
+   // 创建自定义选项选项
    export async function createModifierOption(
      groupId: string,
      data: CreateModifierOptionPayload
@@ -256,7 +256,7 @@ async setItemModifierPrices(itemId, prices) {
      return httpService.post(`/modifier-groups/${groupId}/options`, payload)
    }
 
-   // 设置商品修饰符价格
+   // 设置商品自定义选项价格
    export async function setItemModifierPrices(
      itemId: string,
      prices: Array<{ modifierOptionId: string; price: number }>
@@ -369,8 +369,8 @@ async function getItemsDisplay() {
 - [ ] 商品列表显示价格正确
 - [ ] 创建商品时价格转换正确
 - [ ] 编辑商品时价格转换正确
-- [ ] 修饰符选项显示价格正确
-- [ ] 设置商品修饰符价格转换正确
+- [ ] 自定义选项选项显示价格正确
+- [ ] 设置商品自定义选项价格转换正确
 - [ ] Combo组合商品价格转换正确
 - [ ] 所有小数点舍入正确（避免出现 5.995 这样的显示）
 - [ ] 菜单同步功能中的价格转换正确

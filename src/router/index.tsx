@@ -11,12 +11,12 @@ import ItemApiTest from '@/pages/ItemApiTest'
 import OrganizationManagement from '@/pages/OrganizationManagement'
 import AccountManagement from '@/pages/AccountManagement'
 import DeviceManagement from '@/pages/DeviceManagement'
-import ReceiptTemplateManagement from '@/pages/ReceiptTemplateManagement'
+import PrintSettings from '@/pages/PrintSettings'
 import RecipeGuide from '@/pages/RecipeGuide'
 import Features from '@/pages/Features'
 import OrderConfig from '@/pages/OrderConfig'
-import ChannelManagement from '@/pages/OrderConfig/ChannelManagement'
 import PricingManagement from '@/pages/OrderConfig/PricingManagement'
+import ChannelManagementPage from '@/pages/ChannelManagement'
 import { RequireAuth } from '@/auth/RequireAuth'
 import { RequireOrganization } from '@/auth/RequireOrganization'
 import MenuCenter from '@/pages/MenuCenter'
@@ -24,7 +24,6 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import ErrorPage from '@/pages/ErrorPage'
 import { UberIntegration } from '@/pages/Integration'
 import TaxManagement from '@/pages/TaxManagement'
-import UberOrders from '@/pages/UberOrders'
 import PaymentSettings from '@/pages/PaymentSettings'
 import BookingDashboard from '@/pages/BookingManagement/Dashboard'
 import BookingList from '@/pages/BookingManagement/Bookings'
@@ -32,6 +31,14 @@ import BookingResources from '@/pages/BookingManagement/Resources'
 import BookingSettings from '@/pages/BookingManagement/Settings'
 import PublicBookingPage from '@/pages/PublicBooking'
 import SubscriptionManagement from '@/pages/SubscriptionManagement'
+import OnlineOrderConfig from '@/pages/OnlineOrderConfig'
+import StripeConnectCallback from '@/pages/StripeConnectCallback'
+import UberDirectPage from '@/pages/UberDirect'
+import RewardManagement from '@/pages/RewardManagement'
+import MemberManagement from '@/pages/MemberManagement'
+import MultiMenuManagement from '@/pages/MultiMenuManagement'
+import GiftCardSettings from '@/pages/GiftCardSettings'
+import Reports from '@/pages/Reports'
 
 // 辅助函数：为路由元素包装 ErrorBoundary
 const withErrorBoundary = (element: ReactElement): ReactElement => (
@@ -99,11 +106,11 @@ const routes: RouteObject[] = [
         errorElement: <ErrorPage />
       },
       {
-        path: 'receipt-templates',
+        path: 'print-settings',
         element: withErrorBoundary(
           <RequireAuth>
             <RequireOrganization>
-              <ReceiptTemplateManagement />
+              <PrintSettings />
             </RequireOrganization>
           </RequireAuth>
         ),
@@ -122,10 +129,18 @@ const routes: RouteObject[] = [
       },
       {
         path: 'order-config/channels',
+        element: <Navigate to="/channel-management" replace />,
+      },
+      {
+        path: 'order-config/channel-settlement',
+        element: <Navigate to="/channel-management" replace />,
+      },
+      {
+        path: 'channel-management',
         element: withErrorBoundary(
           <RequireAuth>
             <RequireOrganization>
-              <ChannelManagement />
+              <ChannelManagementPage />
             </RequireOrganization>
           </RequireAuth>
         ),
@@ -141,6 +156,10 @@ const routes: RouteObject[] = [
           </RequireAuth>
         ),
         errorElement: <ErrorPage />
+      },
+      {
+        path: 'order-config/pickup-number',
+        element: <Navigate to="/order-config" replace />,
       },
       {
         path: 'features',
@@ -224,23 +243,23 @@ const routes: RouteObject[] = [
         ),
         errorElement: <ErrorPage />
       },
-      {
-        path: 'uber-orders',
+{
+        path: 'payment-settings',
         element: withErrorBoundary(
           <RequireAuth>
             <RequireOrganization>
-              <UberOrders />
+              <PaymentSettings />
             </RequireOrganization>
           </RequireAuth>
         ),
         errorElement: <ErrorPage />
       },
       {
-        path: 'payment-settings',
+        path: 'gift-card-settings',
         element: withErrorBoundary(
           <RequireAuth>
             <RequireOrganization>
-              <PaymentSettings />
+              <GiftCardSettings />
             </RequireOrganization>
           </RequireAuth>
         ),
@@ -297,6 +316,90 @@ const routes: RouteObject[] = [
             <RequireOrganization>
               <SubscriptionManagement />
             </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'online-order-config',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <OnlineOrderConfig />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'direct-delivery',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <UberDirectPage />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'reward-management',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <RewardManagement />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'member-management',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <MemberManagement />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'reports',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <Reports />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'multi-menu',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <RequireOrganization>
+              <MultiMenuManagement />
+            </RequireOrganization>
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'merchants/stripe/complete',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <StripeConnectCallback />
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'merchants/stripe/reauth',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <StripeConnectCallback />
           </RequireAuth>
         ),
         errorElement: <ErrorPage />

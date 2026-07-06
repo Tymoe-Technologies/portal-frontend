@@ -1,13 +1,5 @@
 // ─── Resource Types ──────────────────────────────────────────────────
-export type ResourceType =
-  | 'TABLE'
-  | 'ROOM'
-  | 'BED'
-  | 'CHAIR'
-  | 'DOCTOR'
-  | 'INSTRUCTOR'
-  | 'CLASS'
-  | 'TIMESLOT'
+export type ResourceType = 'TABLE' | 'SPACE' | 'PRODUCT' | 'PERSON'
 
 // ─── Booking Status ──────────────────────────────────────────────────
 export type BookingStatus =
@@ -19,28 +11,105 @@ export type BookingStatus =
   | 'FAILED'
 
 // ─── Deposit Status ──────────────────────────────────────────────────
-export type DepositStatus = 'PENDING' | 'CAPTURED' | 'REFUNDED' | 'FAILED'
+export type DepositStatus = 'PENDING' | 'AUTHORIZED' | 'CAPTURED' | 'REFUNDED' | 'FAILED'
+
+// ─── Table Config ────────────────────────────────────────────────────
+export interface TableConfig {
+  minCapacity: number
+  maxCapacity: number
+  shape: 'round' | 'square' | 'long'
+  location?: 'indoor' | 'outdoor' | 'window' | 'bar'
+  combinable?: boolean
+  rotation?: number  // 旋转角度（度），步进 90
+}
+
+// ─── Space Config ────────────────────────────────────────────────────
+export interface SpaceConfig {
+  capacity: number
+  minDurationMinutes: number
+  maxDurationMinutes?: number
+  hourlyRate?: number
+  amenities?: string[]
+}
+
+// ─── Product Config ──────────────────────────────────────────────────
+// 注意：关联人员/空间通过 ResourceAssignment 表维护，不再存于 config
+export interface ProductConfig {
+  durationMinutes: number
+  price: number
+  maxGroupSize: number
+  requiresPerson: boolean
+  requiresSpace: boolean
+  depositEnabled?: boolean
+  depositAmount?: number
+}
+
+// ─── Person Config ───────────────────────────────────────────────────
+// 注意：可提供的服务通过 ResourceAssignment 表维护，不再存于 config
+export interface PersonConfig {
+  weeklySchedule?: {
+    mon?: Array<{ start: string; end: string }>
+    tue?: Array<{ start: string; end: string }>
+    wed?: Array<{ start: string; end: string }>
+    thu?: Array<{ start: string; end: string }>
+    fri?: Array<{ start: string; end: string }>
+    sat?: Array<{ start: string; end: string }>
+    sun?: Array<{ start: string; end: string }>
+  }
+  maxConcurrent?: number
+  breakMinutes?: number
+  skills?: string[]  // 技能列表（如：["烫", "染", "剪"]）
+  gender?: 'male' | 'female' | 'non-binary' | 'not-specified'  // 性别
+  title?: string  // 职称
+}
 
 // ─── Frontend Models ─────────────────────────────────────────────────
 export interface BookableResource {
   id: string
   orgId: string
   name: string
-  type: ResourceType
+  resourceType: ResourceType
   description?: string
-  capacity?: number
+  imageUrl?: string
+  config?: TableConfig | SpaceConfig | ProductConfig | PersonConfig | null
+  // TABLE 专用位置字段
+  floorPlanId?: string | null
+  posX?: number | null
+  posY?: number | null
+  // PERSON 专用：关联员工账号
+  staffId?: string | null
+  status: 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE'
   isActive: boolean
-  metadata: Record<string, unknown>
+  sortOrder: number
   createdAt: string
   updatedAt: string
 }
 
+// ─── Floor Plan ──────────────────────────────────────────────────────
+export interface FloorPlan {
+  id: string
+  orgId: string
+  name: string
+  isDefault: boolean
+  width: number
+  height: number
+  isActive: boolean
+  sortOrder: number
+  tables: BookableResource[]
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── Booking ─────────────────────────────────────────────────────────
 export interface Booking {
   id: string
   orgId: string
-  resourceId: string
-  resourceName: string
-  resourceType: ResourceType
+  primaryResourceId: string
+  primaryResource?: BookableResource
+  personId?: string
+  person?: BookableResource
+  spaceId?: string
+  space?: BookableResource
   customerName: string
   customerPhone: string
   customerEmail?: string
@@ -54,85 +123,92 @@ export interface Booking {
   depositRequired?: boolean
   depositAmount?: number
   depositStatus?: DepositStatus
-  stripeSessionUrl?: string
   cancelReason?: string
   createdAt: string
 }
 
+// ─── TABLE 营业时段配置 ────────────────────────────────────────────────
+export interface OperatingPeriod {
+  name?: string
+  start: string    // "HH:mm"
+  end: string      // "HH:mm"
+  days?: number[]  // 0=周日, 1=周一…6=周六；空/undefined 表示每天
+}
+
+export interface TableSettingsConfig {
+  operatingPeriods?: OperatingPeriod[]
+  autoAccept?: boolean
+  autoAcceptCutoffMinutes?: number
+  autoAssignSeat?: boolean
+}
+
+// ─── Booking Settings ────────────────────────────────────────────────
 export interface BookingSettings {
-  orgId: string
-  businessName: string
+  orgId?: string
+  businessName?: string
   openTime: string
   closeTime: string
   advanceBookingDays: number
-  slotDurationMinutes: number
-  requireStaffSelection: boolean
-  allowWalkIn: boolean
-  autoConfirm: boolean
-  maxPartySize: number
-  allowAutoAssignment: boolean
-  resourceType?: ResourceType
-  depositRequired?: boolean
+  minAdvanceHours?: number
+  requireCustomerPhone?: boolean
+  requireCustomerEmail?: boolean
+  depositEnabled?: boolean
   depositAmount?: number
-}
-
-export interface PublicOrgConfig {
-  settings: BookingSettings
-  resources: BookableResource[]
-  primaryResourceType: ResourceType
-  brandColor?: string
-  logoText?: string
-  tagline?: string
-}
-
-export interface DashboardStats {
-  todayBookings: number
-  confirmedBookings: number
-  pendingBookings: number
-  cancelledBookings: number
-  totalResources: number
-  activeResources: number
-  utilizationRate: number
+  slotDurationMinutes?: number
+  allowWalkIn?: boolean
+  autoConfirm?: boolean
+  requireStaffSelection?: boolean
+  allowAutoAssignment?: boolean
+  maxPartySize?: number
+  tableConfig?: TableSettingsConfig
 }
 
 // ─── Backend DTOs ────────────────────────────────────────────────────
 export interface BackendBookingSettings {
   id: string
-  organizationId: string
-  resourceType: ResourceType
+  orgId: string
   openingTime: string
   closingTime: string
-  slotDuration: number
   advanceBookingDays: number
-  maxPartySize: number
-  requireStaffSelection: boolean
-  allowWalkIn: boolean
-  autoConfirm: boolean
-  allowAutoAssignment: boolean
-  depositRequired: boolean
-  depositAmount: number
+  minAdvanceHours: number
+  slotDurationMinutes: number
+  requireCustomerPhone: boolean
+  requireCustomerEmail: boolean
+  depositEnabled: boolean
+  depositAmount?: number
+  tableConfig?: TableSettingsConfig
+  cancellationPolicy?: unknown
   createdAt: string
   updatedAt: string
 }
 
 export interface BackendResource {
   id: string
-  organizationId: string
+  orgId: string
   name: string
   resourceType: ResourceType
   description?: string
-  capacity: number
-  status: 'AVAILABLE' | 'UNAVAILABLE' | 'MAINTENANCE'
-  metadata: Record<string, unknown>
+  imageUrl?: string
+  config?: unknown
+  floorPlanId?: string | null
+  posX?: number | null
+  posY?: number | null
+  status: 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE'
+  isActive: boolean
+  sortOrder: number
   createdAt: string
   updatedAt: string
 }
 
 export interface BackendBooking {
   id: string
-  organizationId: string
-  resourceId: string
-  resource?: BackendResource
+  orgId: string
+  primaryResourceId: string
+  primaryResource?: BackendResource
+  personId?: string
+  person?: BackendResource
+  spaceId?: string
+  space?: BackendResource
   customerName: string
   customerPhone: string
   customerEmail?: string
@@ -146,35 +222,12 @@ export interface BackendBooking {
   depositRequired: boolean
   depositAmount?: number
   depositStatus?: DepositStatus
-  stripeSessionUrl?: string
   cancelReason?: string
   createdAt: string
   updatedAt: string
 }
 
 // ─── Constants ───────────────────────────────────────────────────────
-export const RESOURCE_TYPE_LABELS: Record<ResourceType, string> = {
-  TABLE: 'Table',
-  ROOM: 'Room',
-  BED: 'Bed',
-  CHAIR: 'Chair',
-  DOCTOR: 'Doctor',
-  INSTRUCTOR: 'Instructor',
-  CLASS: 'Class',
-  TIMESLOT: 'Time Slot',
-}
-
-export const RESOURCE_TYPE_ICONS: Record<ResourceType, string> = {
-  TABLE: 'UtensilsCrossed',
-  ROOM: 'DoorOpen',
-  BED: 'BedDouble',
-  CHAIR: 'Armchair',
-  DOCTOR: 'Stethoscope',
-  INSTRUCTOR: 'GraduationCap',
-  CLASS: 'Users',
-  TIMESLOT: 'Clock',
-}
-
 export const BOOKING_STATUS_COLORS: Record<BookingStatus, string> = {
   PENDING: 'orange',
   CONFIRMED: 'green',
@@ -186,7 +239,8 @@ export const BOOKING_STATUS_COLORS: Record<BookingStatus, string> = {
 
 export const DEPOSIT_STATUS_COLORS: Record<DepositStatus, string> = {
   PENDING: 'orange',
+  AUTHORIZED: 'blue',
   CAPTURED: 'green',
-  REFUNDED: 'blue',
+  REFUNDED: 'cyan',
   FAILED: 'red',
 }

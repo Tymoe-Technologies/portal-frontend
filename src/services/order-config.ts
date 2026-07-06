@@ -2,11 +2,42 @@ import { httpService } from './http'
 
 const API_BASE = (import.meta.env.VITE_ORDER_API_BASE as string | undefined) ?? '/api/order/v1'
 
-// 订单渠道类型
-export type OrderSourceType = 'POS' | 'ONLINE' | 'DELIVERY' | 'SELF_SERVICE' | 'CUSTOM'
+// 销售渠道类型（OrderSourceConfig.sourceType）
+export type SalesChannelType = 'POS' | 'ONLINE' | 'DELIVERY' | 'SELF_SERVICE' | 'CUSTOM'
 
-// 订单渠道配置
-export interface OrderSource {
+// 订单终端类型（Order.orderSource enum）
+export type OrderTerminal = 'POS' | 'WEB' | 'KIOSK' | 'UBER_EATS'
+
+export type CheckoutMode = 'NORMAL' | 'CREDIT_ACCOUNT'
+export type ChannelAccessMode = 'PUBLIC' | 'MEMBER_ONLY'
+export type BillingCycle = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'
+export type DiscountType = 'PERCENTAGE' | 'FIXED'
+export type DeliveryPlatform =
+  | 'UBER_EATS'
+  | 'DOORDASH'
+  | 'SKIP_THE_DISHES'
+  | 'GRUBHUB'
+  | 'RITUAL'
+  | 'FANTUAN'
+  | 'OTHER_PLATFORM'
+
+export interface CreditConfig {
+  billingCycle: BillingCycle
+  cycleLimit: number // 分
+}
+
+export interface OrderDiscountRule {
+  enabled: boolean
+  type: DiscountType
+  value: number // PERCENTAGE: 0-100；FIXED: 分
+}
+
+export interface CheckoutRules {
+  orderDiscount?: OrderDiscountRule
+}
+
+// 销售渠道配置（对应后端 OrderSourceConfig / sales-channels API）
+export interface SalesChannel {
   id: string
   tenantId: string
   sourceType: string
@@ -14,25 +45,41 @@ export interface OrderSource {
   description?: string
   isActive: boolean
   displayOrder: number
+  isSystemChannel: boolean
+  platformType?: DeliveryPlatform
+  commissionRate?: string // Decimal 序列化为字符串
+  accessMode: ChannelAccessMode
+  checkoutMode: CheckoutMode
+  creditConfig?: CreditConfig
+  checkoutRules?: CheckoutRules
   createdAt: string
   updatedAt: string
 }
 
-// 创建订单渠道请求
-export interface CreateOrderSourceRequest {
+export interface CreateSalesChannelRequest {
   channelType: string
   channelName: string
   description?: string
   isActive?: boolean
   displayOrder?: number
+  accessMode?: ChannelAccessMode
+  checkoutMode?: CheckoutMode
+  creditConfig?: CreditConfig
+  checkoutRules?: CheckoutRules
+  commissionRate?: number
+  platformType?: DeliveryPlatform
 }
 
-// 更新订单渠道请求
-export interface UpdateOrderSourceRequest {
+export interface UpdateSalesChannelRequest {
   channelName?: string
   description?: string
   isActive?: boolean
   displayOrder?: number
+  accessMode?: ChannelAccessMode
+  checkoutMode?: CheckoutMode
+  creditConfig?: CreditConfig | null
+  checkoutRules?: CheckoutRules | null
+  commissionRate?: number | null
 }
 
 // API 响应类型
@@ -53,34 +100,31 @@ export interface ListResponse<T> {
   }
 }
 
-// 获取订单渠道列表
-export async function getOrderSources(): Promise<OrderSource[]> {
+// 获取销售渠道列表
+export async function getSalesChannels(): Promise<SalesChannel[]> {
   try {
     const response = await httpService.get<any>(
-      `${API_BASE}/order-sources`
+      `${API_BASE}/sales-channels`
     )
-    // httpService 返回的 data 实际上是完整的 API 响应 { success, data: [...] }
-    // 需要提取内层的 data 字段
     const apiResponse = response.data
     if (apiResponse && apiResponse.data && Array.isArray(apiResponse.data)) {
       return apiResponse.data
     }
-    // 如果直接返回数组（某些情况下）
     if (Array.isArray(apiResponse)) {
       return apiResponse
     }
     return []
   } catch (error) {
-    console.error('Failed to fetch order channels:', error)
+    console.error('Failed to fetch sales channels:', error)
     throw error
   }
 }
 
-// 初始化默认订单渠道
-export async function initializeDefaultOrderSources(): Promise<OrderSource[]> {
+// 初始化默认销售渠道
+export async function initializeDefaultSalesChannels(): Promise<SalesChannel[]> {
   try {
     const response = await httpService.post<any>(
-      `${API_BASE}/order-sources/init-defaults`,
+      `${API_BASE}/sales-channels/init-defaults`,
       {}
     )
     const apiResponse = response.data
@@ -92,55 +136,112 @@ export async function initializeDefaultOrderSources(): Promise<OrderSource[]> {
     }
     return []
   } catch (error) {
-    console.error('Failed to initialize default order channels:', error)
+    console.error('Failed to initialize default sales channels:', error)
     throw error
   }
 }
 
-// 创建订单渠道
-export async function createOrderSource(request: CreateOrderSourceRequest): Promise<OrderSource> {
+// 创建销售渠道
+export async function createSalesChannel(request: CreateSalesChannelRequest): Promise<SalesChannel> {
   try {
     const response = await httpService.post<any>(
-      `${API_BASE}/order-sources`,
+      `${API_BASE}/sales-channels`,
       request
     )
     const apiResponse = response.data
     if (apiResponse && apiResponse.data) {
-      return apiResponse.data as OrderSource
+      return apiResponse.data as SalesChannel
     }
-    return apiResponse as OrderSource
+    return apiResponse as SalesChannel
   } catch (error) {
-    console.error('Failed to create order channel:', error)
+    console.error('Failed to create sales channel:', error)
     throw error
   }
 }
 
-// 更新订单渠道
-export async function updateOrderSource(id: string, request: UpdateOrderSourceRequest): Promise<OrderSource> {
+// 更新销售渠道
+export async function updateSalesChannel(id: string, request: UpdateSalesChannelRequest): Promise<SalesChannel> {
   try {
     const response = await httpService.put<any>(
-      `${API_BASE}/order-sources/${id}`,
+      `${API_BASE}/sales-channels/${id}`,
       request
     )
     const apiResponse = response.data
     if (apiResponse && apiResponse.data) {
-      return apiResponse.data as OrderSource
+      return apiResponse.data as SalesChannel
     }
-    return apiResponse as OrderSource
+    return apiResponse as SalesChannel
   } catch (error) {
-    console.error('Failed to update order channel:', error)
+    console.error('Failed to update sales channel:', error)
     throw error
   }
 }
 
-// 删除订单渠道
-export async function deleteOrderSource(id: string): Promise<void> {
+// 删除销售渠道
+export async function deleteSalesChannel(id: string): Promise<void> {
   try {
     await httpService.delete(
-      `${API_BASE}/order-sources/${id}`
+      `${API_BASE}/sales-channels/${id}`
     )
   } catch (error) {
-    console.error('Failed to delete order channel:', error)
+    console.error('Failed to delete sales channel:', error)
     throw error
   }
 }
+
+// ── 渠道成员管理 ──────────────────────────────────────────────────────
+
+export interface ChannelMember {
+  id: string
+  channelId: string
+  phone: string
+  name?: string | null
+  note?: string | null
+  isActive: boolean
+  createdAt: string
+}
+
+export async function getChannelMembers(channelId: string): Promise<ChannelMember[]> {
+  const res = await httpService.get<any>(`${API_BASE}/sales-channels/${channelId}/members`)
+  const payload = res.data
+  return Array.isArray(payload) ? payload : (payload?.data ?? [])
+}
+
+export async function addChannelMember(channelId: string, data: { phone: string; name?: string; note?: string }): Promise<ChannelMember> {
+  const res = await httpService.post<any>(`${API_BASE}/sales-channels/${channelId}/members`, data)
+  return res.data?.data ?? res.data
+}
+
+export async function batchAddChannelMembers(channelId: string, members: { phone: string; name?: string; note?: string }[]) {
+  const res = await httpService.post<any>(`${API_BASE}/sales-channels/${channelId}/members/batch`, { members })
+  return res.data?.data ?? res.data
+}
+
+export async function updateChannelMember(channelId: string, memberId: string, data: { name?: string; note?: string; isActive?: boolean }): Promise<ChannelMember> {
+  const res = await httpService.put<any>(`${API_BASE}/sales-channels/${channelId}/members/${memberId}`, data)
+  return res.data?.data ?? res.data
+}
+
+export async function removeChannelMember(channelId: string, memberId: string): Promise<void> {
+  await httpService.delete(`${API_BASE}/sales-channels/${channelId}/members/${memberId}`)
+}
+
+// ── 向后兼容别名（逐步废弃） ────────────────────────────────────────────
+/** @deprecated 使用 SalesChannel */
+export type OrderSource = SalesChannel
+/** @deprecated 使用 SalesChannelType */
+export type OrderSourceType = SalesChannelType
+/** @deprecated 使用 CreateSalesChannelRequest */
+export type CreateOrderSourceRequest = CreateSalesChannelRequest
+/** @deprecated 使用 UpdateSalesChannelRequest */
+export type UpdateOrderSourceRequest = UpdateSalesChannelRequest
+/** @deprecated 使用 getSalesChannels */
+export const getOrderSources = getSalesChannels
+/** @deprecated 使用 initializeDefaultSalesChannels */
+export const initializeDefaultOrderSources = initializeDefaultSalesChannels
+/** @deprecated 使用 createSalesChannel */
+export const createOrderSource = createSalesChannel
+/** @deprecated 使用 updateSalesChannel */
+export const updateOrderSource = updateSalesChannel
+/** @deprecated 使用 deleteSalesChannel */
+export const deleteOrderSource = deleteSalesChannel

@@ -1,329 +1,167 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Select, Input, Button, Space, Card, Tag, Alert, Divider, Checkbox } from 'antd'
-import { PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
-import type { StepType } from '@/services/recipe/types'
-import { generateStepPreviews, type StepPreview } from '@/utils/printCodeGenerator'
+import React from 'react'
+import { Plus, Trash2, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { SelectInput, TextInput, Btn, Badge } from '@/components/ui-kit'
+import type { StepType, StepEditorItem } from '@/services/recipe/types'
+import { generateStepCode, generateRecipePrintCode, WRAP_SYMBOLS } from '@/utils/printCodeGenerator'
 
 interface RecipeStepEditorProps {
-  value?: Array<{
-    stepTypeId: string
-    instruction?: string
-    containedSteps?: number[]
-  }>
-  onChange?: (steps: Array<{
-    stepTypeId: string
-    instruction?: string
-    containedSteps?: number[]
-  }>) => void
-  onPrintCodeChange?: (printCode: string) => void  // 新增：打印代码变化回调
+  value?: StepEditorItem[]
+  onChange?: (steps: StepEditorItem[]) => void
+  onPrintCodeChange?: (printCode: string) => void
   stepTypes: StepType[]
 }
 
-/**
- * 配方步骤编辑器
- * 
- * 功能：
- * 1. 选择步骤类型
- * 2. 输入instruction
- * 3. 设备步骤可以包含其他步骤
- * 4. 实时显示生成的打印代码
- */
+const emptySubStep = () => ({ stepTypeId: '', instruction: '' })
+const emptyStep = (): StepEditorItem => ({
+  subSteps: [emptySubStep()],
+  wrapSymbol: '',
+  stepInstruction: ''
+})
+
 const RecipeStepEditor: React.FC<RecipeStepEditorProps> = ({
   value = [],
   onChange,
   onPrintCodeChange,
   stepTypes
 }) => {
-  const [steps, setSteps] = useState(value)
-
-  useEffect(() => {
-    setSteps(value)
-  }, [value])
-
-  // 创建步骤类型映射
+  // 步骤类型映射
   const stepTypeMap = new Map<string, StepType>()
   stepTypes.forEach(st => stepTypeMap.set(st.id, st))
 
-  // 生成预览
-  const previews = generateStepPreviews(steps, stepTypeMap)
-
-  // 计算最终的recipe打印代码
-  const recipePrintCode = previews
-    .filter(p => !p.isContained)
-    .map(p => p.generatedCode)
-    .join(' ')
-
-  // 当打印代码变化时，通知父组件
-  useEffect(() => {
-    onPrintCodeChange?.(recipePrintCode)
-  }, [recipePrintCode, onPrintCodeChange])
-
-  const handleAddStep = () => {
-    const newSteps = [...steps, { stepTypeId: '', instruction: '' }]
-    setSteps(newSteps)
-    onChange?.(newSteps)
+  // 通知父组件
+  const notify = (steps: StepEditorItem[]) => {
+    onChange?.(steps)
+    onPrintCodeChange?.(generateRecipePrintCode(steps, stepTypeMap))
   }
 
-  const handleRemoveStep = (index: number) => {
-    const newSteps = steps.filter((_, i) => i !== index)
-    // 更新其他步骤中的containedSteps索引
-    const updatedSteps = newSteps.map(step => {
-      if (step.containedSteps) {
-        return {
-          ...step,
-          containedSteps: step.containedSteps
-            .map(i => (i > index ? i - 1 : i))
-            .filter(i => i !== index)
-        }
-      }
-      return step
-    })
-    setSteps(updatedSteps)
-    onChange?.(updatedSteps)
+  // ---- 步骤级别操作 ----
+  const addStep = () => notify([...value, emptyStep()])
+
+  const removeStep = (i: number) => notify(value.filter((_, idx) => idx !== i))
+
+  const moveStep = (i: number, dir: 'up' | 'down') => {
+    const j = dir === 'up' ? i - 1 : i + 1
+    if (j < 0 || j >= value.length) return
+    const steps = [...value]
+    ;[steps[i], steps[j]] = [steps[j], steps[i]]
+    notify(steps)
   }
 
-  const handleStepChange = (index: number, field: string, value: any) => {
-    const newSteps = [...steps]
-    newSteps[index] = { ...newSteps[index], [field]: value }
-    setSteps(newSteps)
-    onChange?.(newSteps)
+  const updateStep = (i: number, patch: Partial<StepEditorItem>) => {
+    const steps = value.map((s, idx) => idx === i ? { ...s, ...patch } : s)
+    notify(steps)
   }
 
-  const handleMoveStep = (index: number, direction: 'up' | 'down') => {
-    const newIndex = direction === 'up' ? index - 1 : index + 1
-    if (newIndex < 0 || newIndex >= steps.length) return
-
-    const newSteps = [...steps]
-    ;[newSteps[index], newSteps[newIndex]] = [newSteps[newIndex], newSteps[index]]
-
-    // 更新containedSteps中的索引
-    const updatedSteps = newSteps.map(step => {
-      if (step.containedSteps) {
-        return {
-          ...step,
-          containedSteps: step.containedSteps.map(i => {
-            if (i === index) return newIndex
-            if (i === newIndex) return index
-            return i
-          })
-        }
-      }
-      return step
-    })
-
-    setSteps(updatedSteps)
-    onChange?.(updatedSteps)
+  // ---- subStep 级别操作 ----
+  const addSubStep = (i: number) => {
+    const step = value[i]
+    updateStep(i, { subSteps: [...step.subSteps, emptySubStep()] })
   }
 
-  const handleContainedStepsChange = (index: number, containedIndices: number[]) => {
-    const newSteps = [...steps]
-    newSteps[index] = { ...newSteps[index], containedSteps: containedIndices }
-    setSteps(newSteps)
-    onChange?.(newSteps)
+  const removeSubStep = (i: number, j: number) => {
+    const step = value[i]
+    if (step.subSteps.length <= 1) return  // 至少保留一个
+    updateStep(i, { subSteps: step.subSteps.filter((_, idx) => idx !== j) })
+  }
+
+  const updateSubStep = (i: number, j: number, field: 'stepTypeId' | 'instruction', val: string) => {
+    const step = value[i]
+    const subSteps = step.subSteps.map((s, idx) =>
+      idx === j ? { ...s, [field]: val } : s
+    )
+    updateStep(i, { subSteps })
   }
 
   return (
     <div>
-      {/* 步骤列表 */}
-      {steps.map((step, index) => {
-        const stepType = stepTypeMap.get(step.stepTypeId)
-        const preview = previews[index]
-        const isContained = preview?.isContained
+      {value.map((step, i) => {
+        const code = generateStepCode(step, stepTypeMap)
 
         return (
-          <Card
-            key={index}
-            size="small"
-            style={{
-              marginBottom: 8,
-              border: isContained ? '1px dashed #91d5ff' : undefined,
-              backgroundColor: isContained ? '#f0f5ff' : undefined,
-              padding: '12px'
-            }}
-            bodyStyle={{ padding: '8px 12px' }}
-            title={
-              <Space size="small" style={{ fontSize: '12px' }}>
-                <span style={{ fontWeight: 'bold' }}>步骤 {index + 1}</span>
-                {stepType?.isContainer && (
-                  <Tag color="orange">⚙️ 设备</Tag>
-                )}
-                {isContained && <Tag color="warning" style={{ fontSize: '11px' }}>被包含</Tag>}
-                {preview && (
-                  <Tag color="green" style={{ fontFamily: 'monospace', fontSize: 11 }}>
-                    {preview.generatedCode}
-                  </Tag>
-                )}
-              </Space>
-            }
-            extra={
-              <Space size="small">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<ArrowUpOutlined />}
-                  disabled={index === 0}
-                  onClick={() => handleMoveStep(index, 'up')}
-                  style={{ padding: '0 4px' }}
-                />
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<ArrowDownOutlined />}
-                  disabled={index === steps.length - 1}
-                  onClick={() => handleMoveStep(index, 'down')}
-                  style={{ padding: '0 4px' }}
-                />
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleRemoveStep(index)}
-                  style={{ padding: '0 4px' }}
-                />
-              </Space>
-            }
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {/* 步骤类型选择 */}
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
-                  步骤类型
-                </label>
-                <Select
-                  value={step.stepTypeId}
-                  onChange={(value) => handleStepChange(index, 'stepTypeId', value)}
-                  placeholder="选择"
-                  showSearch
-                  optionFilterProp="children"
-                  style={{ width: '100%' }}
-                  size="small"
-                >
-                  {stepTypes.map(st => (
-                    <Select.Option key={st.id} value={st.id}>
-                      <Space size="small">
-                        <Tag style={{ fontSize: '11px' }}>{st.code}</Tag>
-                        <span style={{ fontSize: '12px' }}>{st.name}</span>
-                        <span style={{ color: '#999', fontSize: '11px' }}>
-                          {st.category === 'equipment' ? '设备' : st.category === 'ingredient' ? '材料' : '操作'}
+          <div key={i} className="mb-2 rounded-lg border border-slate-200 bg-white">
+            {/* 卡片头 */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-semibold text-slate-700">步骤 {i + 1}</span>
+                {code && <Badge variant="green"><span className="font-mono">{code}</span></Badge>}
+              </div>
+              <div className="flex items-center gap-0.5">
+                <Btn variant="ghost" size="sm" icon={<ArrowUp size={14} />} disabled={i === 0} onClick={() => moveStep(i, 'up')} />
+                <Btn variant="ghost" size="sm" icon={<ArrowDown size={14} />} disabled={i === value.length - 1} onClick={() => moveStep(i, 'down')} />
+                <Btn variant="ghost" size="sm" icon={<Trash2 size={14} className="text-red-500" />} onClick={() => removeStep(i)} />
+              </div>
+            </div>
+
+            <div className="px-3 py-2.5">
+              {/* subStep 列表 */}
+              <div className="mb-2">
+                <div className="mb-1.5 text-xs font-medium text-slate-500">步骤类型</div>
+                {step.subSteps.map((sub, j) => {
+                  const type = stepTypeMap.get(sub.stepTypeId)
+                  return (
+                    <div key={j} className="mb-1.5 flex items-center gap-1.5">
+                      {/* 步骤类型选择 */}
+                      <div className="flex-[2]">
+                        <SelectInput
+                          value={sub.stepTypeId}
+                          onChange={v => updateSubStep(i, j, 'stepTypeId', v)}
+                          placeholder="选择类型"
+                          options={stepTypes.map(st => ({ value: st.id, label: `${st.code} ${st.name}` }))}
+                        />
+                      </div>
+                      {/* 用量输入 */}
+                      <div className="flex-1">
+                        <TextInput value={sub.instruction} onChange={v => updateSubStep(i, j, 'instruction', v)} placeholder="用量" />
+                      </div>
+                      {/* 预览 */}
+                      {type && (
+                        <span className="whitespace-nowrap rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600">
+                          {type.code}{sub.instruction || ''}
                         </span>
-                      </Space>
-                    </Select.Option>
-                  ))}
-                </Select>
-              </div>
-
-              {/* Instruction输入 */}
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
-                  操作说明 (Instruction)
-                </label>
-                <Input
-                  value={step.instruction}
-                  onChange={(e) => handleStepChange(index, 'instruction', e.target.value)}
-                  placeholder={stepType?.isContainer ? "按键" : "数量"}
-                  size="small"
-                />
-              </div>
-            </div>
-
-            {/* 任何步骤都可以包含其他步骤 */}
-            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #f0f0f0' }}>
-              <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: '6px' }}>
-                包含其他步骤 (可选)
-              </div>
-              {steps.filter((_, i) => i !== index).length > 0 ? (
-                <>
-                  <Checkbox.Group
-                    value={step.containedSteps || []}
-                    onChange={(checkedValues) =>
-                      handleContainedStepsChange(index, checkedValues as number[])
-                    }
-                    style={{ width: '100%' }}
-                  >
-                    <Space direction="vertical" style={{ width: '100%', gap: '4px' }}>
-                      {steps.map((s, i) => {
-                        if (i === index) return null
-                        const sType = stepTypeMap.get(s.stepTypeId)
-                        if (!sType) return null
-
-                        return (
-                          <Checkbox key={i} value={i} style={{ fontSize: '12px' }}>
-                            <span style={{ marginRight: '4px' }}>步{i + 1}</span>
-                            <Tag style={{ fontSize: '11px' }}>{sType.code}</Tag>
-                            {s.instruction && (
-                              <Tag style={{ fontSize: '11px' }}>{sType.code}{s.instruction}</Tag>
-                            )}
-                          </Checkbox>
-                        )
-                      })}
-                    </Space>
-                  </Checkbox.Group>
-                  {step.containedSteps && step.containedSteps.length > 0 && (
-                    <div style={{ marginTop: '4px', fontSize: '11px', color: '#1890ff' }}>
-                      ✓ 已选择 {step.containedSteps.length} 个步骤
+                      )}
+                      {/* 删除 subStep */}
+                      <Btn variant="ghost" size="sm" icon={<X size={14} className="text-slate-400" />} disabled={step.subSteps.length <= 1} onClick={() => removeSubStep(i, j)} />
                     </div>
-                  )}
-                </>
-              ) : (
-                <div style={{ fontSize: '11px', color: '#999' }}>
-                  暂无其他步骤
-                </div>
-              )}
-            </div>
-
-            {/* 代码预览说明 */}
-            {stepType && (
-              <div style={{ marginTop: '6px', fontSize: '11px', color: '#666' }}>
-                <span style={{ marginRight: '4px' }}>代码:</span>
-                <Tag color="blue" style={{ fontSize: '11px' }}>{stepType.code}</Tag>
-                {step.instruction && (
-                  <>
-                    <span style={{ margin: '0 2px' }}>+</span>
-                    <Tag color="green" style={{ fontSize: '11px' }}>{step.instruction}</Tag>
-                    <span style={{ margin: '0 2px' }}>=</span>
-                    <Tag color="purple" style={{ fontSize: '11px' }}>{stepType.code}{step.instruction}</Tag>
-                  </>
-                )}
+                  )
+                })}
+                <Btn variant="secondary" size="sm" icon={<Plus size={14} />} onClick={() => addSubStep(i)} className="w-full">添加类型</Btn>
               </div>
-            )}
-          </Card>
+
+              {/* 包裹符号 + 步骤说明 */}
+              <div className="border-t border-slate-100 pt-2">
+                <div className="mb-1.5 text-xs font-medium text-slate-500">包裹符号</div>
+                <div className="flex flex-wrap gap-1">
+                  {WRAP_SYMBOLS.map(sym => (
+                    <button
+                      key={sym.value}
+                      type="button"
+                      onClick={() => updateStep(i, { wrapSymbol: sym.value })}
+                      className={`min-w-8 cursor-pointer select-none rounded px-2 py-0.5 text-center font-mono text-xs ring-1 ${
+                        step.wrapSymbol === sym.value
+                          ? 'bg-blue-50 text-blue-600 ring-blue-200'
+                          : 'bg-slate-50 text-slate-600 ring-slate-200'
+                      }`}
+                    >
+                      {sym.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="whitespace-nowrap text-xs text-slate-500">步骤说明</span>
+                  <div className="w-32">
+                    <TextInput value={step.stepInstruction} onChange={v => updateStep(i, { stepInstruction: v })} placeholder="如：2、热" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )
       })}
 
-      {/* 添加步骤按钮 */}
-      <Button
-        type="dashed"
-        onClick={handleAddStep}
-        icon={<PlusOutlined />}
-        block
-      >
-        添加步骤
-      </Button>
-
-      <Divider />
-
-      {/* 打印代码说明 */}
-      <Alert
-        message="打印代码规则"
-        description={
-          <ul style={{ marginBottom: 0, paddingLeft: 20, fontSize: '12px' }}>
-            <li>步骤代码 = 步骤类型代码 + 操作说明</li>
-            <li>例：A (代码) + 5 (操作说明) = A5</li>
-            <li>步骤包含其他步骤：步骤代码(被包含步骤)操作说明</li>
-            <li>例：B(A5 C3) - B包含A5和C3，无操作说明</li>
-            <li>例：D(A5 C3)2 - D包含A5和C3，操作说明为2</li>
-            <li>被包含的步骤不会单独出现在最终代码中</li>
-            <li>最终代码：所有顶层步骤用空格分隔</li>
-            <li>例：A5 C3 D(A5 C3)2</li>
-          </ul>
-        }
-        type="info"
-        style={{ fontSize: '12px' }}
-      />
+      <Btn variant="secondary" onClick={addStep} icon={<Plus size={16} />} className="w-full">添加步骤</Btn>
     </div>
   )
 }
 
 export default RecipeStepEditor
-

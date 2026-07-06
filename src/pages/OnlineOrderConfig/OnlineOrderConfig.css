@@ -1,0 +1,15 @@
+.online-order-config-page {
+  padding: 24px;
+}
+
+.online-order-config-page .ant-card {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+}
+
+.online-order-config-page .ant-form-item {
+  margin-bottom: 16px;
+}
+
+.online-order-config-page .ant-card-head-title {
+  font-weight: 600;
+}

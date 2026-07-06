@@ -2,6 +2,7 @@ const zhCN = {
   translation: {
     app: { title: 'Tymoe 管理平台' },
     common: {
+      or: '或',
       back: '返回',
       confirm: '确定',
       cancel: '取消',
@@ -33,6 +34,7 @@ const zhCN = {
     },
     nav: {
       dashboard: '仪表盘',
+      reports: '报表',
       features: '特色功能',
       recipeGuide: '制作指引',
       // 分组标签
@@ -48,7 +50,8 @@ const zhCN = {
       // 订单与配送
       orderConfig: '订单配置',
       onlineOrderConfig: '在线点单配置',
-directDelivery: '自配送',
+      channelManagement: '渠道管理',
+      directDelivery: '自配送',
       uberIntegration: 'Uber 集成',
       // 店铺运营
       paymentSettings: '支付设置',
@@ -63,6 +66,9 @@ directDelivery: '自配送',
       // 系统
       subscription: '订阅管理',
       receiptTemplate: '小票模板',
+      profile: '个人资料',
+      settings: '设置',
+      logout: '退出登录',
     },
     organization: {
       title: '组织管理',
@@ -227,6 +233,25 @@ directDelivery: '自配送',
         sendButton: '发送重置链接',
         backToLogin: '返回登录',
         emailSent: '重置密码邮件已发送，请查收邮箱'
+      },
+      brand: {
+        headline: '了解 Tymoe 能为你做什么',
+        subtitle: '更强的门店经营工具，为不断成长的商家而打造。',
+        cta: '登录后了解更多',
+        phrases: [
+          '管理多家门店',
+          '实时同步库存',
+          '会员积分与营销',
+          '线上线下点单',
+          '智能配方指引',
+          '渠道差异定价',
+          '自动出品打印',
+          '数据报表分析',
+          '员工权限管理',
+          '礼品卡与储值',
+          '促销与优惠券',
+          '对接外卖平台'
+        ]
       }
     },
     pages: {

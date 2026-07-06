@@ -89,7 +89,7 @@ export async function testOrderApiConnection() {
     return
   }
   
-  const testUrl = '/api/order/v1/receipt-templates'
+  const testUrl = '/api/order/v1/print-settings'
   
   console.log('📡 发送测试请求到:', testUrl)
   console.log('📋 请求头:')

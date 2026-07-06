@@ -1,40 +1,36 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  Button, 
-  Card, 
-  Table, 
-  Space, 
-  Typography, 
-  Tag, 
-  Modal, 
-  Form, 
-  Input, 
-  Select, 
-  message,
-  Tooltip,
-  Alert,
-  Empty,
-  Popconfirm,
-  Divider
-} from 'antd'
-import { 
-  PlusOutlined, 
-  EditOutlined, 
-  DeleteOutlined, 
-  SearchOutlined,
-  ReloadOutlined,
-  MobileOutlined,
-  DesktopOutlined,
-  TabletOutlined,
-  InfoCircleOutlined,
-  CopyOutlined,
-  CheckOutlined,
-  SyncOutlined
-} from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  RefreshCw,
+  Smartphone,
+  Monitor,
+  Tablet,
+  Info,
+  Copy,
+  Check,
+  RotateCw,
+} from 'lucide-react'
+import {
+  Btn,
+  SectionCard,
+  Table,
+  Badge,
+  Modal,
+  ConfirmDialog,
+  AlertBox,
+  EmptyState,
+  Field,
+  TextInput,
+  SelectInput,
+  toast,
+  type Column,
+} from '@/components/ui-kit'
 import { useAuthContext } from '../../auth/AuthProvider'
-import { 
+import {
   getDevices,
   createDevice,
   updateDevice,
@@ -47,38 +43,49 @@ import {
   type CreateDeviceRequest,
   type UpdateDeviceRequest,
   type UpdateActivationCodeRequest,
-  type DeviceSessionResponse
+  type DeviceSessionResponse,
 } from '../../services/device'
 import { getOrganizations, type Organization } from '../../services/auth'
 
-const { Title, Text, Paragraph } = Typography
-const { Option } = Select
-
 interface DeviceFormData {
   orgId: string
-  deviceType: DeviceType
+  deviceType: DeviceType | ''
   deviceName: string
+}
+
+interface DeviceFormErrors {
+  orgId?: string
+  deviceType?: string
+  deviceName?: string
 }
 
 interface UpdateCodeFormData {
   orgId: string
-  deviceType: DeviceType
+  deviceType: DeviceType | ''
   currentActivationCode: string
-  newDeviceName?: string
+  newDeviceName: string
+}
+
+interface UpdateCodeFormErrors {
+  currentActivationCode?: string
+}
+
+// 新激活码信息（替代命令式 Modal.success）
+interface NewCodeInfo {
+  deviceId: string
+  newActivationCode: string
 }
 
 const DeviceManagement: React.FC = () => {
   const { t } = useTranslation()
   const { isAuthenticated } = useAuthContext()
-  const [form] = Form.useForm<DeviceFormData>()
-  const [updateCodeForm] = Form.useForm<UpdateCodeFormData>()
 
   // 状态管理
   const [loading, setLoading] = useState(false)
   const [devices, setDevices] = useState<Device[]>([])
   const [filteredDevices, setFilteredDevices] = useState<Device[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
-  
+
   // 模态框状态
   const [modalVisible, setModalVisible] = useState(false)
   const [editingDevice, setEditingDevice] = useState<Device | null>(null)
@@ -89,7 +96,22 @@ const DeviceManagement: React.FC = () => {
   const [sessionModalVisible, setSessionModalVisible] = useState(false)
   const [sessionInfo, setSessionInfo] = useState<DeviceSessionResponse['data'] | null>(null)
   const [sessionLoading, setSessionLoading] = useState(false)
-  
+  // 新激活码结果弹窗（替代命令式 Modal.success）
+  const [newCodeInfo, setNewCodeInfo] = useState<NewCodeInfo | null>(null)
+  // 删除确认弹窗
+  const [deletingDevice, setDeletingDevice] = useState<Device | null>(null)
+
+  // 表单状态（受控）
+  const [form, setForm] = useState<DeviceFormData>({ orgId: '', deviceType: '', deviceName: '' })
+  const [formErrors, setFormErrors] = useState<DeviceFormErrors>({})
+  const [updateCodeForm, setUpdateCodeForm] = useState<UpdateCodeFormData>({
+    orgId: '',
+    deviceType: '',
+    currentActivationCode: '',
+    newDeviceName: '',
+  })
+  const [updateCodeErrors, setUpdateCodeErrors] = useState<UpdateCodeFormErrors>({})
+
   // 搜索和筛选状态
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedOrgId, setSelectedOrgId] = useState<string>(localStorage.getItem('organization_id') || '')
@@ -152,7 +174,7 @@ const DeviceManagement: React.FC = () => {
     }
 
     window.addEventListener('organizationChanged', handleOrganizationChange as EventListener)
-    
+
     return () => {
       window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener)
     }
@@ -164,14 +186,14 @@ const DeviceManagement: React.FC = () => {
       setLoading(true)
       const organizations = await getOrganizations({})
       setOrganizations(organizations || [])
-      
+
       // 如果只有一个组织，自动选择
       if (organizations && organizations.length === 1) {
         setSelectedOrgId(organizations[0].id)
       }
     } catch (error: any) {
       console.error('Failed to load organizations:', error)
-      message.error(t('pages.devices.loadFailed'))
+      toast.error(t('pages.devices.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -193,9 +215,9 @@ const DeviceManagement: React.FC = () => {
         error,
         message: error.message,
         response: error.response,
-        orgId: selectedOrgId
+        orgId: selectedOrgId,
       })
-      message.error(error.message || t('pages.devices.loadFailed'))
+      toast.error(error.message || t('pages.devices.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -204,17 +226,19 @@ const DeviceManagement: React.FC = () => {
   // 打开创建/编辑模态框
   const openModal = (device?: Device) => {
     setEditingDevice(device || null)
+    setFormErrors({})
     if (device) {
-      form.setFieldsValue({
+      setForm({
         orgId: device.orgId,
         deviceType: device.deviceType,
-        deviceName: device.deviceName
+        deviceName: device.deviceName,
       })
     } else {
-      form.resetFields()
-      if (selectedOrgId) {
-        form.setFieldValue('orgId', selectedOrgId)
-      }
+      setForm({
+        orgId: selectedOrgId || '',
+        deviceType: '',
+        deviceName: '',
+      })
     }
     setModalVisible(true)
   }
@@ -223,18 +247,20 @@ const DeviceManagement: React.FC = () => {
   const closeModal = () => {
     setModalVisible(false)
     setEditingDevice(null)
-    form.resetFields()
+    setForm({ orgId: '', deviceType: '', deviceName: '' })
+    setFormErrors({})
   }
 
   // 打开更新激活码模态框
   const openUpdateCodeModal = (device: Device) => {
     setUpdatingDevice(device)
-    updateCodeForm.setFieldsValue({
+    setUpdateCodeForm({
       orgId: device.orgId,
       deviceType: device.deviceType,
       currentActivationCode: '',
-      newDeviceName: device.deviceName
+      newDeviceName: device.deviceName || '',
     })
+    setUpdateCodeErrors({})
     setUpdateCodeModalVisible(true)
   }
 
@@ -242,33 +268,53 @@ const DeviceManagement: React.FC = () => {
   const closeUpdateCodeModal = () => {
     setUpdateCodeModalVisible(false)
     setUpdatingDevice(null)
-    updateCodeForm.resetFields()
+    setUpdateCodeForm({ orgId: '', deviceType: '', currentActivationCode: '', newDeviceName: '' })
+    setUpdateCodeErrors({})
+  }
+
+  // 校验创建/编辑表单
+  const validateForm = (): boolean => {
+    const errors: DeviceFormErrors = {}
+    if (!form.orgId) {
+      errors.orgId = t('pages.devices.selectOrgRequired')
+    }
+    if (!form.deviceType) {
+      errors.deviceType = t('pages.devices.deviceTypeRequired')
+    }
+    if (!form.deviceName) {
+      errors.deviceName = t('pages.devices.deviceNameRequired')
+    } else if (form.deviceName.length < 1 || form.deviceName.length > 100) {
+      errors.deviceName = t('pages.devices.deviceNameLength')
+    }
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   // 处理表单提交
   const handleSubmit = async () => {
+    if (!validateForm()) return
+
     try {
-      const values = await form.validateFields()
       setLoading(true)
 
       if (editingDevice) {
         // 更新设备
         const updateData: UpdateDeviceRequest = {
-          deviceName: values.deviceName
+          deviceName: form.deviceName,
         }
         const deviceId = editingDevice.deviceId || editingDevice.id || ''
         await updateDevice(deviceId, updateData)
-        message.success(t('pages.devices.updateSuccess'))
+        toast.success(t('pages.devices.updateSuccess'))
       } else {
         // 创建设备
         const createData: CreateDeviceRequest = {
-          orgId: values.orgId,
-          deviceType: values.deviceType,
-          deviceName: values.deviceName
+          orgId: form.orgId,
+          deviceType: form.deviceType as DeviceType,
+          deviceName: form.deviceName,
         }
         const response = await createDevice(createData)
-        message.success(t('pages.devices.createSuccess'))
-        
+        toast.success(t('pages.devices.createSuccess'))
+
         // 显示激活信息
         setCreatedDeviceInfo(response.data)
         setActivationInfoModalVisible(true)
@@ -279,7 +325,7 @@ const DeviceManagement: React.FC = () => {
     } catch (error: any) {
       console.error('Failed to save device:', error)
       const errorMsg = error.message || (editingDevice ? t('pages.devices.updateFailed') : t('pages.devices.createFailed'))
-      message.error(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -289,49 +335,37 @@ const DeviceManagement: React.FC = () => {
   const handleUpdateCode = async () => {
     if (!updatingDevice) return
 
+    // 校验
+    if (!updateCodeForm.currentActivationCode) {
+      setUpdateCodeErrors({ currentActivationCode: t('pages.devices.currentActivationCodeRequired') })
+      return
+    }
+
     try {
-      const values = await updateCodeForm.validateFields()
       setLoading(true)
 
       const updateData: UpdateActivationCodeRequest = {
-        orgId: values.orgId,
-        deviceType: values.deviceType,
-        currentActivationCode: values.currentActivationCode,
-        newDeviceName: values.newDeviceName
+        orgId: updateCodeForm.orgId,
+        deviceType: updateCodeForm.deviceType as DeviceType,
+        currentActivationCode: updateCodeForm.currentActivationCode,
+        newDeviceName: updateCodeForm.newDeviceName,
       }
-      
+
       const deviceId = updatingDevice.deviceId || updatingDevice.id || ''
       const response = await updateActivationCode(deviceId, updateData)
-      message.success(t('pages.devices.updateCodeSuccess'))
-      
-      // 显示新激活码
-      Modal.success({
-        title: t('pages.devices.newCodeGenerated'),
-        content: (
-          <div>
-            <Paragraph>
-              <Text strong>{t('pages.devices.deviceId')}: </Text>
-              <Text copyable>{response.data.deviceId}</Text>
-            </Paragraph>
-            <Paragraph>
-              <Text strong>{t('pages.devices.activationCode')}: </Text>
-              <Text copyable>{response.data.newActivationCode}</Text>
-            </Paragraph>
-            <Alert
-              message={t('pages.devices.updateCodeWarning')}
-              type="warning"
-              showIcon
-            />
-          </div>
-        ),
-        width: 600
+      toast.success(t('pages.devices.updateCodeSuccess'))
+
+      // 显示新激活码（受控弹窗，替代命令式 Modal.success）
+      setNewCodeInfo({
+        deviceId: response.data.deviceId,
+        newActivationCode: response.data.newActivationCode,
       })
 
       closeUpdateCodeModal()
       loadDevices()
     } catch (error: any) {
       console.error('Failed to update activation code:', error)
-      message.error(error.message || t('pages.devices.updateCodeFailed'))
+      toast.error(error.message || t('pages.devices.updateCodeFailed'))
     } finally {
       setLoading(false)
     }
@@ -347,7 +381,7 @@ const DeviceManagement: React.FC = () => {
       setSessionInfo(response.data)
     } catch (error: any) {
       console.error('Failed to get device session:', error)
-      message.error(error.message || t('pages.devices.getSessionFailed'))
+      toast.error(error.message || t('pages.devices.getSessionFailed'))
       setSessionModalVisible(false)
     } finally {
       setSessionLoading(false)
@@ -360,11 +394,12 @@ const DeviceManagement: React.FC = () => {
       setLoading(true)
       const deviceId = device.deviceId || device.id || ''
       await deleteDevice(deviceId)
-      message.success(t('pages.devices.deleteSuccess'))
+      toast.success(t('pages.devices.deleteSuccess'))
+      setDeletingDevice(null)
       loadDevices()
     } catch (error: any) {
       console.error('Failed to delete device:', error)
-      message.error(error.message || t('pages.devices.deleteFailed'))
+      toast.error(error.message || t('pages.devices.deleteFailed'))
     } finally {
       setLoading(false)
     }
@@ -375,10 +410,10 @@ const DeviceManagement: React.FC = () => {
     try {
       await navigator.clipboard.writeText(text)
       setCopiedField(field)
-      message.success(t('pages.devices.copySuccess'))
+      toast.success(t('pages.devices.copySuccess'))
       setTimeout(() => setCopiedField(''), 2000)
     } catch (error) {
-      message.error(t('pages.devices.copyFailed'))
+      toast.error(t('pages.devices.copyFailed'))
     }
   }
 
@@ -386,624 +421,606 @@ const DeviceManagement: React.FC = () => {
   const getDeviceTypeIcon = (type: DeviceType) => {
     switch (type) {
       case 'POS':
-        return <DesktopOutlined />
+        return <Monitor className="w-3.5 h-3.5" />
       case 'KIOSK':
-        return <MobileOutlined />
+        return <Smartphone className="w-3.5 h-3.5" />
       case 'TABLET':
-        return <TabletOutlined />
+        return <Tablet className="w-3.5 h-3.5" />
+      case 'DISPLAY':
+        return <Monitor className="w-3.5 h-3.5" />
       default:
-        return <DesktopOutlined />
+        return <Monitor className="w-3.5 h-3.5" />
     }
   }
 
-  // 获取设备类型标签颜色
-  const getDeviceTypeColor = (type: DeviceType) => {
+  // 获取设备类型标签样式（严禁紫色，一律 slate + 语义色）
+  const getDeviceTypeVariant = (type: DeviceType): 'default' | 'gold' | 'blue' | 'green' | 'red' => {
     switch (type) {
       case 'POS':
         return 'blue'
       case 'KIOSK':
         return 'green'
       case 'TABLET':
-        return 'purple'
+        return 'default'
+      case 'DISPLAY':
+        return 'gold'
       default:
         return 'default'
     }
   }
 
-  // 获取状态标签颜色
-  const getStatusColor = (status: DeviceStatus) => {
+  // 获取状态标签样式
+  const getStatusVariant = (status: DeviceStatus): 'default' | 'gold' | 'blue' | 'green' | 'red' => {
     switch (status) {
       case 'ACTIVE':
-        return 'success'
+        return 'green'
       case 'PENDING':
-        return 'warning'
+        return 'gold'
       case 'DELETED':
-        return 'error'
+        return 'red'
       default:
         return 'default'
     }
   }
 
+  // 格式化日期
+  const formatDate = (date?: string) =>
+    date
+      ? new Date(date).toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : '-'
+
+  const deviceTypeLabel = (type: DeviceType) =>
+    t(`pages.devices.type${type.charAt(0) + type.slice(1).toLowerCase()}`)
+
+  const statusLabel = (status: DeviceStatus) =>
+    t(`pages.devices.status${status.charAt(0) + status.slice(1).toLowerCase()}`)
+
   // 表格列定义
-  const columns: ColumnsType<Device> = [
+  const columns: Column<Device>[] = [
     {
-      title: t('pages.devices.deviceName'),
-      dataIndex: 'deviceName',
       key: 'deviceName',
+      title: t('pages.devices.deviceName'),
       width: 120,
-      ellipsis: {
-        showTitle: false,
-      },
-      render: (name: string) => (
-        <Tooltip placement="topLeft" title={name}>
-          {name || '-'}
-        </Tooltip>
-      )
+      render: (record) => (
+        <span title={record.deviceName} className="block truncate max-w-[120px]">
+          {record.deviceName || '-'}
+        </span>
+      ),
     },
     {
-      title: t('pages.devices.deviceType'),
-      dataIndex: 'deviceType',
       key: 'deviceType',
+      title: t('pages.devices.deviceType'),
       width: 110,
-      render: (type: DeviceType) => (
-        <Tag icon={getDeviceTypeIcon(type)} color={getDeviceTypeColor(type)}>
-          {t(`pages.devices.type${type.charAt(0) + type.slice(1).toLowerCase()}`)}
-        </Tag>
-      )
+      render: (record) => (
+        <Badge variant={getDeviceTypeVariant(record.deviceType)} icon={getDeviceTypeIcon(record.deviceType)}>
+          {deviceTypeLabel(record.deviceType)}
+        </Badge>
+      ),
     },
     {
-      title: t('pages.devices.status'),
-      dataIndex: 'status',
       key: 'status',
+      title: t('pages.devices.status'),
       width: 90,
-      render: (status: DeviceStatus) => (
-        <Tag color={getStatusColor(status)}>
-          {t(`pages.devices.status${status.charAt(0) + status.slice(1).toLowerCase()}`)}
-        </Tag>
-      )
+      render: (record) => (
+        <Badge variant={getStatusVariant(record.status)}>{statusLabel(record.status)}</Badge>
+      ),
     },
     {
-      title: t('pages.devices.deviceId'),
-      dataIndex: 'id',
       key: 'id',
+      title: t('pages.devices.deviceId'),
       width: 140,
-      render: (_: any, record: Device) => {
+      render: (record) => {
         const deviceId = record.deviceId || record.id || ''
         return (
-          <Space size="small">
-            <Tooltip title={deviceId}>
-              <Text code style={{ fontSize: '11px' }}>{deviceId.substring(0, 8)}...</Text>
-            </Tooltip>
-            <Tooltip title={copiedField === deviceId ? t('pages.devices.copied') : t('pages.devices.copy')}>
-              <Button
-                type="text"
-                size="small"
-                icon={copiedField === deviceId ? <CheckOutlined /> : <CopyOutlined />}
-                onClick={() => copyToClipboard(deviceId, deviceId)}
-              />
-            </Tooltip>
-          </Space>
+          <div className="flex items-center gap-1">
+            <code
+              title={deviceId}
+              className="text-[11px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5"
+            >
+              {deviceId.substring(0, 8)}...
+            </code>
+            <button
+              type="button"
+              title={copiedField === deviceId ? t('pages.devices.copied') : t('pages.devices.copy')}
+              onClick={() => copyToClipboard(deviceId, deviceId)}
+              className="p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
+            >
+              {copiedField === deviceId ? (
+                <Check className="w-3.5 h-3.5 text-green-600" />
+              ) : (
+                <Copy className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
         )
-      }
+      },
     },
     {
-      title: t('pages.devices.activatedAt'),
-      dataIndex: 'activatedAt',
       key: 'activatedAt',
+      title: t('pages.devices.activatedAt'),
       width: 155,
-      render: (date: string) => date ? new Date(date).toLocaleString('zh-CN', { 
-        year: 'numeric', 
-        month: '2-digit', 
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      }) : '-'
+      render: (record) => formatDate(record.activatedAt),
     },
     {
-      title: t('pages.devices.lastActiveAt'),
-      dataIndex: 'lastActiveAt',
       key: 'lastActiveAt',
+      title: t('pages.devices.lastActiveAt'),
       width: 155,
-      render: (date: string) => date ? new Date(date).toLocaleString('zh-CN', { 
-        year: 'numeric', 
-        month: '2-digit', 
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      }) : '-'
+      render: (record) => formatDate(record.lastActiveAt),
     },
     {
-      title: t('pages.devices.createdAt'),
-      dataIndex: 'createdAt',
       key: 'createdAt',
+      title: t('pages.devices.createdAt'),
       width: 155,
-      render: (date: string) => new Date(date).toLocaleString('zh-CN', { 
-        year: 'numeric', 
-        month: '2-digit', 
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
+      render: (record) => formatDate(record.createdAt),
     },
     {
-      title: t('pages.devices.actions'),
       key: 'actions',
-      fixed: 'right',
+      title: t('pages.devices.actions'),
       width: 150,
-      render: (_: any, record: Device) => (
-        <Space size="small">
-          <Tooltip title={t('pages.devices.edit')}>
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => openModal(record)}
-            />
-          </Tooltip>
+      render: (record) => (
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            title={t('pages.devices.edit')}
+            onClick={() => openModal(record)}
+            className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
           {record.status === 'ACTIVE' && (
             <>
-              <Tooltip title={t('pages.devices.viewSession')}>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<InfoCircleOutlined />}
-                  onClick={() => handleViewSession(record)}
-                />
-              </Tooltip>
-              <Tooltip title={t('pages.devices.updateCode')}>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<SyncOutlined />}
-                  onClick={() => openUpdateCodeModal(record)}
-                />
-              </Tooltip>
+              <button
+                type="button"
+                title={t('pages.devices.viewSession')}
+                onClick={() => handleViewSession(record)}
+                className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <Info className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                title={t('pages.devices.updateCode')}
+                onClick={() => openUpdateCodeModal(record)}
+                className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <RotateCw className="w-4 h-4" />
+              </button>
             </>
           )}
-          <Popconfirm
-            title={t('pages.devices.deleteConfirm')}
-            description={t('pages.devices.deleteWarning')}
-            onConfirm={() => handleDelete(record)}
-            okText={t('pages.devices.confirm')}
-            cancelText={t('pages.devices.cancel')}
+          <button
+            type="button"
+            title={t('pages.devices.delete')}
+            onClick={() => setDeletingDevice(record)}
+            className="p-1.5 rounded-md text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
           >
-            <Tooltip title={t('pages.devices.delete')}>
-              <Button
-                type="link"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Tooltip>
-          </Popconfirm>
-        </Space>
-      )
-    }
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+    },
+  ]
+
+  const orgOptions = organizations.map(org => ({ label: org.orgName, value: org.id }))
+  const deviceTypeOptions = [
+    { label: t('pages.devices.typePos'), value: 'POS' },
+    { label: t('pages.devices.typeKiosk'), value: 'KIOSK' },
+    { label: t('pages.devices.typeTablet'), value: 'TABLET' },
+    { label: t('pages.devices.typeDisplay'), value: 'DISPLAY' },
   ]
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card>
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <div className="p-6">
+      <SectionCard>
+        <div className="flex flex-col gap-6">
           {/* 标题和操作栏 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={2} style={{ margin: 0 }}>
-              {t('pages.devices.title')}
-            </Title>
-            <Space>
-              <Button
-                icon={<ReloadOutlined />}
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-slate-900 m-0">{t('pages.devices.title')}</h2>
+            <div className="flex items-center gap-2">
+              <Btn
+                variant="secondary"
+                icon={<RefreshCw className="w-4 h-4" />}
                 onClick={loadDevices}
                 disabled={!selectedOrgId}
               >
                 {t('pages.devices.refresh')}
-              </Button>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
+              </Btn>
+              <Btn
+                variant="primary"
+                icon={<Plus className="w-4 h-4" />}
                 onClick={() => openModal()}
                 disabled={!selectedOrgId}
               >
                 {t('pages.devices.create')}
-              </Button>
-            </Space>
+              </Btn>
+            </div>
           </div>
 
           {/* 设备类型说明 */}
-          <Alert
-            message={t('pages.devices.deviceTypeTooltip')}
-            description={t('pages.devices.validityPeriod')}
+          <AlertBox
             type="info"
-            showIcon
+            title={t('pages.devices.deviceTypeTooltip')}
+            description={t('pages.devices.validityPeriod')}
           />
 
           {/* 筛选栏 */}
-          <Space wrap>
-            <Select
-              style={{ width: 300 }}
+          <div className="flex flex-wrap items-center gap-3">
+            <SelectInput
+              className="w-[300px]"
               placeholder={t('pages.devices.selectOrgPlaceholder')}
-              value={selectedOrgId || undefined}
-              onChange={setSelectedOrgId}
-              allowClear
-            >
-              {organizations.map(org => (
-                <Option key={org.id} value={org.id}>
-                  {org.orgName}
-                </Option>
-              ))}
-            </Select>
-            <Input
-              placeholder={t('pages.devices.search')}
-              prefix={<SearchOutlined />}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{ width: 250 }}
-              allowClear
+              value={selectedOrgId}
+              onChange={(v) => setSelectedOrgId(v)}
+              options={orgOptions}
             />
-            <Select
-              style={{ width: 150 }}
+            <div className="relative w-[250px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                placeholder={t('pages.devices.search')}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full text-sm bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-slate-700 placeholder:text-slate-400 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
+              />
+            </div>
+            <SelectInput
+              className="w-[150px]"
               placeholder={t('pages.devices.deviceType')}
-              value={deviceTypeFilter || undefined}
-              onChange={setDeviceTypeFilter}
-              allowClear
-            >
-              <Option value="POS">{t('pages.devices.typePos')}</Option>
-              <Option value="KIOSK">{t('pages.devices.typeKiosk')}</Option>
-              <Option value="TABLET">{t('pages.devices.typeTablet')}</Option>
-            </Select>
-            <Select
-              style={{ width: 120 }}
+              value={deviceTypeFilter}
+              onChange={(v) => setDeviceTypeFilter(v as DeviceType | '')}
+              options={[
+                { label: t('pages.devices.typePos'), value: 'POS' },
+                { label: t('pages.devices.typeKiosk'), value: 'KIOSK' },
+                { label: t('pages.devices.typeTablet'), value: 'TABLET' },
+                { label: t('pages.devices.typeDisplay'), value: 'DISPLAY' },
+              ]}
+            />
+            <SelectInput
+              className="w-[120px]"
               placeholder={t('pages.devices.status')}
-              value={statusFilter || undefined}
-              onChange={setStatusFilter}
-              allowClear
-            >
-              <Option value="PENDING">{t('pages.devices.statusPending')}</Option>
-              <Option value="ACTIVE">{t('pages.devices.statusActive')}</Option>
-            </Select>
-          </Space>
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v as DeviceStatus | '')}
+              options={[
+                { label: t('pages.devices.statusPending'), value: 'PENDING' },
+                { label: t('pages.devices.statusActive'), value: 'ACTIVE' },
+              ]}
+            />
+          </div>
 
           {/* 表格 */}
           {!selectedOrgId ? (
-            <Empty
-              description={t('pages.devices.selectOrgPlaceholder')}
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
+            <EmptyState title={t('pages.devices.selectOrgPlaceholder')} />
           ) : (
             <Table
               columns={columns}
-              dataSource={filteredDevices}
-              rowKey="id"
+              data={filteredDevices}
+              rowKey={(row) => row.id}
               loading={loading}
-              scroll={{ x: 1200 }}
-              pagination={{
-                showSizeChanger: true,
-                showTotal: (total) => t('pages.devices.loadSuccess', { count: total })
-              }}
-              locale={{
-                emptyText: (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description={
-                      searchQuery || deviceTypeFilter || statusFilter
-                        ? t('pages.devices.noResultsDescription')
-                        : t('pages.devices.emptyDescription')
-                    }
-                  >
-                    {!searchQuery && !deviceTypeFilter && !statusFilter && (
-                      <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
+              empty={
+                <EmptyState
+                  title={
+                    searchQuery || deviceTypeFilter || statusFilter
+                      ? t('pages.devices.noResultsDescription')
+                      : t('pages.devices.emptyDescription')
+                  }
+                  action={
+                    !searchQuery && !deviceTypeFilter && !statusFilter ? (
+                      <Btn variant="primary" icon={<Plus className="w-4 h-4" />} onClick={() => openModal()}>
                         {t('pages.devices.emptyButton')}
-                      </Button>
-                    )}
-                  </Empty>
-                )
-              }}
+                      </Btn>
+                    ) : undefined
+                  }
+                />
+              }
             />
           )}
-        </Space>
-      </Card>
+        </div>
+      </SectionCard>
 
       {/* 创建/编辑模态框 */}
       <Modal
         title={editingDevice ? t('pages.devices.edit') : t('pages.devices.create')}
         open={modalVisible}
-        onOk={handleSubmit}
-        onCancel={closeModal}
-        confirmLoading={loading}
-        width={600}
-        okText={t('pages.devices.save')}
-        cancelText={t('pages.devices.cancel')}
+        onOpenChange={(o) => { if (!o) closeModal() }}
+        size="lg"
+        footer={
+          <>
+            <Btn variant="secondary" onClick={closeModal}>{t('pages.devices.cancel')}</Btn>
+            <Btn variant="primary" loading={loading} onClick={handleSubmit}>{t('pages.devices.save')}</Btn>
+          </>
+        }
       >
-        <Form
-          form={form}
-          layout="vertical"
-        >
-          <Form.Item
-            name="orgId"
-            label={t('pages.devices.selectOrg')}
-            rules={[{ required: true, message: t('pages.devices.selectOrgRequired') }]}
-          >
-            <Select
+        <div className="flex flex-col gap-4">
+          <Field label={t('pages.devices.selectOrg')} required error={formErrors.orgId}>
+            <SelectInput
               placeholder={t('pages.devices.selectOrgPlaceholder')}
+              value={form.orgId}
+              onChange={(v) => setForm(f => ({ ...f, orgId: v }))}
+              options={orgOptions}
               disabled={!!editingDevice}
-            >
-              {organizations.map(org => (
-                <Option key={org.id} value={org.id}>
-                  {org.orgName}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+              className="w-full"
+            />
+          </Field>
 
-          <Form.Item
-            name="deviceType"
+          <Field
             label={t('pages.devices.selectDeviceType')}
-            rules={[{ required: true, message: t('pages.devices.deviceTypeRequired') }]}
-            tooltip={t('pages.devices.deviceTypeTooltip')}
+            required
+            error={formErrors.deviceType}
+            hint={t('pages.devices.deviceTypeTooltip')}
           >
-            <Select
+            <SelectInput
               placeholder={t('pages.devices.selectDeviceTypePlaceholder')}
+              value={form.deviceType}
+              onChange={(v) => setForm(f => ({ ...f, deviceType: v as DeviceType }))}
+              options={deviceTypeOptions}
               disabled={!!editingDevice}
-            >
-              <Option value="POS">{t('pages.devices.typePos')}</Option>
-              <Option value="KIOSK">{t('pages.devices.typeKiosk')}</Option>
-              <Option value="TABLET">{t('pages.devices.typeTablet')}</Option>
-            </Select>
-          </Form.Item>
+              className="w-full"
+            />
+          </Field>
 
-          <Form.Item
-            name="deviceName"
-            label={t('pages.devices.deviceName')}
-            rules={[
-              { required: true, message: t('pages.devices.deviceNameRequired') },
-              { min: 1, max: 100, message: t('pages.devices.deviceNameLength') }
-            ]}
-          >
-            <Input placeholder={t('pages.devices.deviceNamePlaceholder')} />
-          </Form.Item>
+          <Field label={t('pages.devices.deviceName')} required error={formErrors.deviceName}>
+            <TextInput
+              placeholder={t('pages.devices.deviceNamePlaceholder')}
+              value={form.deviceName}
+              onChange={(v) => setForm(f => ({ ...f, deviceName: v }))}
+              maxLength={100}
+            />
+          </Field>
 
           {!editingDevice && (
-            <Alert
-              message={t('pages.devices.activationWarning')}
-              type="warning"
-              showIcon
-              icon={<InfoCircleOutlined />}
-            />
+            <AlertBox type="warning" title={t('pages.devices.activationWarning')} />
           )}
-        </Form>
+        </div>
       </Modal>
 
       {/* 更新激活码模态框 */}
       <Modal
         title={t('pages.devices.updateCode')}
         open={updateCodeModalVisible}
-        onOk={handleUpdateCode}
-        onCancel={closeUpdateCodeModal}
-        confirmLoading={loading}
-        width={600}
-        okText={t('pages.devices.confirm')}
-        cancelText={t('pages.devices.cancel')}
+        onOpenChange={(o) => { if (!o) closeUpdateCodeModal() }}
+        size="lg"
+        footer={
+          <>
+            <Btn variant="secondary" onClick={closeUpdateCodeModal}>{t('pages.devices.cancel')}</Btn>
+            <Btn variant="primary" loading={loading} onClick={handleUpdateCode}>{t('pages.devices.confirm')}</Btn>
+          </>
+        }
       >
-        <Alert
-          message={t('pages.devices.updateCodeWarning')}
-          type="warning"
-          showIcon
-          style={{ marginBottom: 16 }}
-        />
-        
-        <Form
-          form={updateCodeForm}
-          layout="vertical"
-        >
-          <Form.Item
-            name="orgId"
-            label={t('pages.devices.selectOrg')}
-            rules={[{ required: true, message: t('pages.devices.selectOrgRequired') }]}
-          >
-            <Select disabled>
-              {organizations.map(org => (
-                <Option key={org.id} value={org.id}>
-                  {org.orgName}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+        <div className="flex flex-col gap-4">
+          <AlertBox type="warning" title={t('pages.devices.updateCodeWarning')} />
 
-          <Form.Item
-            name="deviceType"
-            label={t('pages.devices.selectDeviceType')}
-            rules={[{ required: true, message: t('pages.devices.deviceTypeRequired') }]}
-          >
-            <Select disabled>
-              <Option value="POS">{t('pages.devices.typePos')}</Option>
-              <Option value="KIOSK">{t('pages.devices.typeKiosk')}</Option>
-              <Option value="TABLET">{t('pages.devices.typeTablet')}</Option>
-            </Select>
-          </Form.Item>
+          <Field label={t('pages.devices.selectOrg')}>
+            <SelectInput
+              value={updateCodeForm.orgId}
+              onChange={() => {}}
+              options={orgOptions}
+              disabled
+              className="w-full"
+            />
+          </Field>
 
-          <Form.Item
-            name="currentActivationCode"
+          <Field label={t('pages.devices.selectDeviceType')}>
+            <SelectInput
+              value={updateCodeForm.deviceType}
+              onChange={() => {}}
+              options={deviceTypeOptions}
+              disabled
+              className="w-full"
+            />
+          </Field>
+
+          <Field
             label={t('pages.devices.currentActivationCode')}
-            rules={[{ required: true, message: t('pages.devices.currentActivationCodeRequired') }]}
+            required
+            error={updateCodeErrors.currentActivationCode}
           >
-            <Input.Password placeholder={t('pages.devices.currentActivationCodePlaceholder')} />
-          </Form.Item>
+            <TextInput
+              type="password"
+              placeholder={t('pages.devices.currentActivationCodePlaceholder')}
+              value={updateCodeForm.currentActivationCode}
+              onChange={(v) => setUpdateCodeForm(f => ({ ...f, currentActivationCode: v }))}
+            />
+          </Field>
 
-          <Form.Item
-            name="newDeviceName"
-            label={t('pages.devices.newDeviceName')}
-          >
-            <Input placeholder={t('pages.devices.newDeviceNamePlaceholder')} />
-          </Form.Item>
-        </Form>
+          <Field label={t('pages.devices.newDeviceName')}>
+            <TextInput
+              placeholder={t('pages.devices.newDeviceNamePlaceholder')}
+              value={updateCodeForm.newDeviceName}
+              onChange={(v) => setUpdateCodeForm(f => ({ ...f, newDeviceName: v }))}
+            />
+          </Field>
+        </div>
+      </Modal>
+
+      {/* 新激活码结果弹窗（替代命令式 Modal.success） */}
+      <Modal
+        title={t('pages.devices.newCodeGenerated')}
+        open={!!newCodeInfo}
+        onOpenChange={(o) => { if (!o) setNewCodeInfo(null) }}
+        size="lg"
+        footer={<Btn variant="primary" onClick={() => setNewCodeInfo(null)}>{t('pages.devices.confirm')}</Btn>}
+      >
+        {newCodeInfo && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-slate-700">
+              <span className="font-semibold">{t('pages.devices.deviceId')}: </span>
+              <code className="bg-slate-100 text-slate-700 rounded px-1.5 py-0.5">{newCodeInfo.deviceId}</code>
+            </p>
+            <p className="text-sm text-slate-700">
+              <span className="font-semibold">{t('pages.devices.activationCode')}: </span>
+              <code className="bg-slate-100 text-slate-700 rounded px-1.5 py-0.5">{newCodeInfo.newActivationCode}</code>
+            </p>
+            <AlertBox type="warning" title={t('pages.devices.updateCodeWarning')} />
+          </div>
+        )}
       </Modal>
 
       {/* 激活信息模态框 */}
       <Modal
         title={
-          <Space>
-            <InfoCircleOutlined style={{ color: '#faad14' }} />
-            <Text strong>{t('pages.devices.activationInfo')}</Text>
-          </Space>
+          <span className="inline-flex items-center gap-2">
+            <Info className="w-4 h-4 text-amber-500" />
+            <span>{t('pages.devices.activationInfo')}</span>
+          </span>
         }
         open={activationInfoModalVisible}
-        onOk={() => setActivationInfoModalVisible(false)}
-        onCancel={() => setActivationInfoModalVisible(false)}
-        width={700}
-        closable={false}
-        maskClosable={false}
-        footer={[
-          <Button key="ok" type="primary" size="large" onClick={() => setActivationInfoModalVisible(false)}>
+        onOpenChange={(o) => { if (!o) setActivationInfoModalVisible(false) }}
+        size="xl"
+        footer={
+          <Btn variant="primary" onClick={() => setActivationInfoModalVisible(false)}>
             {t('pages.devices.confirm')}
-          </Button>
-        ]}
+          </Btn>
+        }
       >
         {createdDeviceInfo && (
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <Alert
-              message={t('pages.devices.deviceCreated')}
-              description={
-                <div>
-                  <Text strong style={{ color: '#ff4d4f' }}>
-                    ⚠️ {t('pages.devices.activationCodeOnlyOnce')}
-                  </Text>
-                </div>
-              }
+          <div className="flex flex-col gap-6">
+            <AlertBox
               type="warning"
-              showIcon
+              title={t('pages.devices.deviceCreated')}
+              description={
+                <span className="font-semibold text-red-500">
+                  ⚠️ {t('pages.devices.activationCodeOnlyOnce')}
+                </span>
+              }
             />
-            
-            <div style={{ 
-              background: '#fafafa', 
-              padding: '16px', 
-              borderRadius: '8px',
-              border: '2px dashed #faad14'
-            }}>
-              <Paragraph style={{ marginBottom: 8 }}>
-                <Text strong>{t('pages.devices.deviceId')}: </Text>
-                <Text code copyable style={{ fontSize: '14px' }}>
+
+            <div className="bg-slate-50 rounded-lg p-4 border-2 border-dashed border-amber-400">
+              <p className="text-sm text-slate-700 mb-2">
+                <span className="font-semibold">{t('pages.devices.deviceId')}: </span>
+                <code className="text-sm bg-slate-100 text-slate-700 rounded px-1.5 py-0.5">
                   {createdDeviceInfo.deviceId || createdDeviceInfo.id}
-                </Text>
-              </Paragraph>
-              <Paragraph style={{ marginBottom: 8 }}>
-                <Text strong style={{ color: '#ff4d4f' }}>{t('pages.devices.activationCode')}: </Text>
-                <Text code copyable style={{ fontSize: '14px', color: '#ff4d4f', fontWeight: 'bold' }}>
+                </code>
+              </p>
+              <p className="text-sm text-slate-700 mb-2">
+                <span className="font-semibold text-red-500">{t('pages.devices.activationCode')}: </span>
+                <code className="text-sm bg-red-50 text-red-500 font-bold rounded px-1.5 py-0.5">
                   {createdDeviceInfo.activationCode}
-                </Text>
-              </Paragraph>
-              <Paragraph style={{ marginBottom: 8 }}>
-                <Text strong>{t('pages.devices.deviceName')}: </Text>
-                <Text>{createdDeviceInfo.deviceName}</Text>
-              </Paragraph>
-              <Paragraph style={{ marginBottom: 0 }}>
-                <Text strong>{t('pages.devices.deviceType')}: </Text>
-                <Tag icon={getDeviceTypeIcon(createdDeviceInfo.deviceType)} color={getDeviceTypeColor(createdDeviceInfo.deviceType)}>
-                  {t(`pages.devices.type${createdDeviceInfo.deviceType.charAt(0) + createdDeviceInfo.deviceType.slice(1).toLowerCase()}`)}
-                </Tag>
-              </Paragraph>
+                </code>
+              </p>
+              <p className="text-sm text-slate-700 mb-2">
+                <span className="font-semibold">{t('pages.devices.deviceName')}: </span>
+                <span>{createdDeviceInfo.deviceName}</span>
+              </p>
+              <p className="text-sm text-slate-700 mb-0 flex items-center gap-2">
+                <span className="font-semibold">{t('pages.devices.deviceType')}: </span>
+                <Badge
+                  variant={getDeviceTypeVariant(createdDeviceInfo.deviceType)}
+                  icon={getDeviceTypeIcon(createdDeviceInfo.deviceType)}
+                >
+                  {deviceTypeLabel(createdDeviceInfo.deviceType)}
+                </Badge>
+              </p>
             </div>
 
-            <Divider />
+            <div className="border-t border-slate-100" />
 
             <div>
-              <Title level={5}>{t('pages.devices.activationSteps')}</Title>
-              <ol style={{ paddingLeft: 20 }}>
-                <li style={{ marginBottom: 8 }}>{t('pages.devices.step1')}</li>
-                <li style={{ marginBottom: 8 }}>{t('pages.devices.step2')}</li>
-                <li style={{ marginBottom: 8 }}>{t('pages.devices.step3')}</li>
+              <h5 className="text-sm font-semibold text-slate-900 mb-2">{t('pages.devices.activationSteps')}</h5>
+              <ol className="list-decimal pl-5 text-sm text-slate-700 space-y-2">
+                <li>{t('pages.devices.step1')}</li>
+                <li>{t('pages.devices.step2')}</li>
+                <li>{t('pages.devices.step3')}</li>
                 <li>{t('pages.devices.step4')}</li>
               </ol>
             </div>
 
-            <Alert
-              message={
-                <Space direction="vertical" size="small">
-                  <Text strong>{t('pages.devices.activationWarning')}</Text>
-                  <Text type="danger" strong>
-                    🔒 {t('pages.devices.activationCodeSecurityNote')}
-                  </Text>
-                </Space>
-              }
+            <AlertBox
               type="error"
-              showIcon
+              title={t('pages.devices.activationWarning')}
+              description={
+                <span className="font-semibold text-red-700">
+                  🔒 {t('pages.devices.activationCodeSecurityNote')}
+                </span>
+              }
             />
-          </Space>
+          </div>
         )}
       </Modal>
 
       {/* 设备会话状态模态框 */}
       <Modal
         title={
-          <Space>
-            <InfoCircleOutlined />
-            <Text strong>{t('pages.devices.sessionStatus')}</Text>
-          </Space>
+          <span className="inline-flex items-center gap-2">
+            <Info className="w-4 h-4 text-slate-500" />
+            <span>{t('pages.devices.sessionStatus')}</span>
+          </span>
         }
         open={sessionModalVisible}
-        onCancel={() => setSessionModalVisible(false)}
-        footer={[
-          <Button key="close" type="primary" onClick={() => setSessionModalVisible(false)}>
+        onOpenChange={(o) => { if (!o) setSessionModalVisible(false) }}
+        size="lg"
+        footer={
+          <Btn variant="primary" onClick={() => setSessionModalVisible(false)}>
             {t('pages.devices.close')}
-          </Button>
-        ]}
-        width={600}
+          </Btn>
+        }
       >
         {sessionLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <ReloadOutlined spin style={{ fontSize: '32px', color: '#1890ff' }} />
-            <div style={{ marginTop: '16px' }}>{t('pages.devices.loading')}</div>
+          <div className="text-center py-10">
+            <RotateCw className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
+            <div className="mt-4 text-sm text-slate-600">{t('pages.devices.loading')}</div>
           </div>
         ) : sessionInfo ? (
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <div className="flex flex-col gap-6">
             {sessionInfo.sessionExists ? (
               <>
-                <Alert
-                  message={t('pages.devices.sessionActive')}
-                  type="success"
-                  showIcon
-                />
-                <div style={{ background: '#f5f5f5', padding: '16px', borderRadius: '8px' }}>
-                  <Paragraph style={{ marginBottom: 8 }}>
-                    <Text strong>{t('pages.devices.deviceId')}: </Text>
-                    <Text code>{sessionInfo.deviceId}</Text>
-                  </Paragraph>
-                  <Paragraph style={{ marginBottom: 8 }}>
-                    <Text strong>{t('pages.devices.sessionStatus')}: </Text>
-                    <Tag color="success">{sessionInfo.sessionStatus || 'ACTIVE'}</Tag>
-                  </Paragraph>
+                <AlertBox type="success" title={t('pages.devices.sessionActive')} />
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <p className="text-sm text-slate-700 mb-2">
+                    <span className="font-semibold">{t('pages.devices.deviceId')}: </span>
+                    <code className="bg-slate-100 text-slate-700 rounded px-1.5 py-0.5">{sessionInfo.deviceId}</code>
+                  </p>
+                  <p className="text-sm text-slate-700 mb-2 flex items-center gap-2">
+                    <span className="font-semibold">{t('pages.devices.sessionStatus')}: </span>
+                    <Badge variant="green">{sessionInfo.sessionStatus || 'ACTIVE'}</Badge>
+                  </p>
                   {sessionInfo.activatedAt && (
-                    <Paragraph style={{ marginBottom: 8 }}>
-                      <Text strong>{t('pages.devices.activatedAt')}: </Text>
-                      <Text>{new Date(sessionInfo.activatedAt).toLocaleString('zh-CN')}</Text>
-                    </Paragraph>
+                    <p className="text-sm text-slate-700 mb-2">
+                      <span className="font-semibold">{t('pages.devices.activatedAt')}: </span>
+                      <span>{new Date(sessionInfo.activatedAt).toLocaleString('zh-CN')}</span>
+                    </p>
                   )}
                   {sessionInfo.lastActiveAt && (
-                    <Paragraph style={{ marginBottom: 0 }}>
-                      <Text strong>{t('pages.devices.lastActiveAt')}: </Text>
-                      <Text>{new Date(sessionInfo.lastActiveAt).toLocaleString('zh-CN')}</Text>
-                    </Paragraph>
+                    <p className="text-sm text-slate-700 mb-0">
+                      <span className="font-semibold">{t('pages.devices.lastActiveAt')}: </span>
+                      <span>{new Date(sessionInfo.lastActiveAt).toLocaleString('zh-CN')}</span>
+                    </p>
                   )}
                 </div>
               </>
             ) : (
               <>
-                <Alert
-                  message={t('pages.devices.sessionNotActive')}
-                  description={sessionInfo.message || t('pages.devices.deviceNotActivated')}
+                <AlertBox
                   type="warning"
-                  showIcon
+                  title={t('pages.devices.sessionNotActive')}
+                  description={sessionInfo.message || t('pages.devices.deviceNotActivated')}
                 />
-                <div style={{ background: '#f5f5f5', padding: '16px', borderRadius: '8px' }}>
-                  <Paragraph style={{ marginBottom: 0 }}>
-                    <Text strong>{t('pages.devices.deviceId')}: </Text>
-                    <Text code>{sessionInfo.deviceId}</Text>
-                  </Paragraph>
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <p className="text-sm text-slate-700 mb-0">
+                    <span className="font-semibold">{t('pages.devices.deviceId')}: </span>
+                    <code className="bg-slate-100 text-slate-700 rounded px-1.5 py-0.5">{sessionInfo.deviceId}</code>
+                  </p>
                 </div>
               </>
             )}
-          </Space>
+          </div>
         ) : null}
       </Modal>
+
+      {/* 删除确认弹窗（替代 Popconfirm） */}
+      <ConfirmDialog
+        open={!!deletingDevice}
+        onOpenChange={(o) => { if (!o) setDeletingDevice(null) }}
+        title={t('pages.devices.deleteConfirm')}
+        description={t('pages.devices.deleteWarning')}
+        confirmText={t('pages.devices.confirm')}
+        cancelText={t('pages.devices.cancel')}
+        danger
+        loading={loading}
+        onConfirm={() => { if (deletingDevice) handleDelete(deletingDevice) }}
+      />
     </div>
   )
 }

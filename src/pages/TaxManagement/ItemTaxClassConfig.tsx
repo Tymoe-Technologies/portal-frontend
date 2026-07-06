@@ -1,29 +1,25 @@
 import React, { useState, useEffect } from 'react'
-import { Table, Button, Modal, Select, message, Space, Tag, Typography, Alert, Input } from 'antd'
-import { SettingOutlined, SearchOutlined } from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
+import { Settings, Search } from 'lucide-react'
 import {
   getItems,
   getTaxClasses,
   getItemTaxClass,
-  assignItemTaxClass,
+  addMultipleItemTaxClasses,
   calculateItemTax,
   type Item,
   type TaxClass,
-  type ItemTaxClass,
   type TaxCalculationResult
 } from '../../services/item-management'
-import { formatPrice, fromMinorUnit } from '../../utils/priceConverter'
-
-const { Title, Text } = Typography
+import { formatPrice } from '../../utils/priceConverter'
+import { Table, Btn, Modal, Badge, Checkbox, AlertBox, TextInput, toast, type Column } from '@/components/ui-kit'
 
 interface ItemTaxClassConfigProps {
   regionCode: string
 }
 
 interface ItemWithTaxInfo extends Item {
-  taxClassId?: string
-  taxClassName?: string
+  taxClassIds?: string[]
+  taxClassNames?: string[]
   calculatedTax?: number
   finalPrice?: number
 }
@@ -38,7 +34,7 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
   const [taxClasses, setTaxClasses] = useState<TaxClass[]>([])
   const [modalVisible, setModalVisible] = useState(false)
   const [selectedItem, setSelectedItem] = useState<ItemWithTaxInfo | null>(null)
-  const [selectedTaxClassId, setSelectedTaxClassId] = useState<string>()
+  const [selectedTaxClassIds, setSelectedTaxClassIds] = useState<string[]>([])
   const [searchText, setSearchText] = useState<string>('')
   const [taxResult, setTaxResult] = useState<TaxCalculationResult | null>(null)
 
@@ -55,8 +51,8 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
           const taxInfo = await getItemTaxClass(item.id)
           itemsWithTax.push({
             ...item,
-            taxClassId: taxInfo.taxClassId,
-            taxClassName: taxInfo.taxClassName
+            taxClassIds: taxInfo.taxes?.map(t => t.id) || [],
+            taxClassNames: taxInfo.taxes?.map(t => t.name) || []
           })
         } catch {
           // 如果没有配置税类，直接添加商品
@@ -66,7 +62,7 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
 
       setItems(itemsWithTax)
     } catch (error: any) {
-      message.error(`加载商品失败: ${error.message}`)
+      toast.error(`加载商品失败: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -80,7 +76,7 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
       const classes = await getTaxClasses(regionCode)
       setTaxClasses(classes)
     } catch (error: any) {
-      message.error(`加载税类失败: ${error.message}`)
+      toast.error(`加载税类失败: ${error.message}`)
     }
   }
 
@@ -95,9 +91,14 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
   // 打开配置对话框
   const handleConfigClick = (item: ItemWithTaxInfo) => {
     setSelectedItem(item)
-    setSelectedTaxClassId(item.taxClassId)
+    setSelectedTaxClassIds(item.taxClassIds || [])
     setTaxResult(null)
     setModalVisible(true)
+  }
+
+  // 切换税类勾选
+  const toggleTaxClass = (id: string, checked: boolean) => {
+    setSelectedTaxClassIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))
   }
 
   // 计算税费
@@ -108,24 +109,24 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
       const result = await calculateItemTax(selectedItem.id, regionCode)
       setTaxResult(result)
     } catch (error: any) {
-      message.error(`计算税费失败: ${error.message}`)
+      toast.error(`计算税费失败: ${error.message}`)
     }
   }
 
   // 保存税类配置
   const handleSave = async () => {
-    if (!selectedItem || !selectedTaxClassId) {
-      message.warning('请选择税类')
+    if (!selectedItem || selectedTaxClassIds.length === 0) {
+      toast.warning('请选择至少一个税类')
       return
     }
 
     try {
-      await assignItemTaxClass(selectedItem.id, { taxClassId: selectedTaxClassId })
-      message.success('税类配置成功')
+      await addMultipleItemTaxClasses(selectedItem.id, { taxClassIds: selectedTaxClassIds })
+      toast.success('税类配置成功')
       setModalVisible(false)
-      loadItems() // 重新加载商品列表
+      loadItems()
     } catch (error: any) {
-      message.error(`配置失败: ${error.message}`)
+      toast.error(`配置失败: ${error.message}`)
     }
   }
 
@@ -135,56 +136,49 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
   )
 
   // 表格列定义
-  const columns: ColumnsType<ItemWithTaxInfo> = [
+  const columns: Column<ItemWithTaxInfo>[] = [
     {
-      title: '商品名称',
-      dataIndex: 'name',
       key: 'name',
-      width: 200
+      title: '商品名称',
+      width: 200,
+      render: (r) => r.name
     },
     {
-      title: '基础价格',
-      dataIndex: 'basePrice',
       key: 'basePrice',
+      title: '基础价格',
       width: 120,
-      render: (price: number) => <Text strong>{formatPrice(price)}</Text>
+      render: (r) => <span className="font-medium text-slate-700">{formatPrice(r.basePrice)}</span>
     },
     {
+      key: 'taxClassNames',
       title: '税类',
-      dataIndex: 'taxClassName',
-      key: 'taxClassName',
-      width: 150,
-      render: (taxClassName?: string) =>
-        taxClassName ? (
-          <Tag color="blue">{taxClassName}</Tag>
+      width: 200,
+      render: (r) =>
+        r.taxClassNames && r.taxClassNames.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {r.taxClassNames.map((name, idx) => (
+              <Badge key={idx} variant="blue">{name}</Badge>
+            ))}
+          </div>
         ) : (
-          <Tag>未配置</Tag>
+          <Badge variant="default">未配置</Badge>
         )
     },
     {
-      title: '状态',
-      dataIndex: 'isActive',
       key: 'isActive',
+      title: '状态',
       width: 100,
       align: 'center',
-      render: (isActive: boolean) => (
-        <Tag color={isActive ? 'success' : 'default'}>
-          {isActive ? '启用' : '禁用'}
-        </Tag>
+      render: (r) => (
+        <Badge variant={r.isActive ? 'green' : 'default'}>{r.isActive ? '启用' : '禁用'}</Badge>
       )
     },
     {
-      title: '操作',
       key: 'action',
+      title: '操作',
       width: 120,
-      render: (_, record: ItemWithTaxInfo) => (
-        <Button
-          type="link"
-          icon={<SettingOutlined />}
-          onClick={() => handleConfigClick(record)}
-        >
-          配置税类
-        </Button>
+      render: (record) => (
+        <Btn variant="link" size="sm" icon={<Settings size={14} />} onClick={() => handleConfigClick(record)}>配置税类</Btn>
       )
     }
   ]
@@ -192,129 +186,120 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
   return (
     <div>
       {/* 搜索栏 */}
-      <Space style={{ marginBottom: 16 }}>
-        <Input
-          placeholder="搜索商品名称"
-          prefix={<SearchOutlined />}
-          value={searchText}
-          onChange={e => setSearchText(e.target.value)}
-          style={{ width: 300 }}
-        />
-        <Button type="primary" onClick={loadItems}>
-          刷新
-        </Button>
-      </Space>
+      <div className="mb-4 flex items-center gap-2">
+        <div className="relative w-80">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <TextInput
+            placeholder="搜索商品名称"
+            value={searchText}
+            onChange={setSearchText}
+            className="pl-9!"
+          />
+        </div>
+        <Btn variant="primary" onClick={loadItems}>刷新</Btn>
+      </div>
 
       {/* 商品列表 */}
       <Table
         columns={columns}
-        dataSource={filteredItems}
-        rowKey="id"
+        data={filteredItems}
+        rowKey={(r) => r.id}
         loading={loading}
-        pagination={{
-          pageSize: 20,
-          showSizeChanger: true,
-          showTotal: total => `共 ${total} 个商品`
-        }}
       />
 
       {/* 配置对话框 */}
       <Modal
-        title={`配置商品税类: ${selectedItem?.name}`}
         open={modalVisible}
-        onOk={handleSave}
-        onCancel={() => setModalVisible(false)}
-        width={700}
-        okText="保存"
-        cancelText="取消"
+        onOpenChange={(o) => { if (!o) setModalVisible(false) }}
+        size="lg"
+        title={`配置商品税类: ${selectedItem?.name || ''}`}
+        footer={
+          <>
+            <Btn variant="secondary" onClick={() => setModalVisible(false)}>取消</Btn>
+            <Btn variant="primary" onClick={handleSave}>保存</Btn>
+          </>
+        }
       >
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <div className="space-y-6">
           {/* 商品基本信息 */}
           <div>
-            <Text type="secondary">商品基础价格：</Text>
-            <Text strong style={{ fontSize: '16px', marginLeft: 8 }}>
+            <span className="text-slate-400">商品基础价格：</span>
+            <span className="ml-2 text-base font-medium text-slate-700">
               {selectedItem && formatPrice(selectedItem.basePrice)}
-            </Text>
+            </span>
           </div>
 
-          {/* 税类选择 */}
+          {/* 税类选择（多选） */}
           <div>
-            <Text strong>选择税类：</Text>
-            <Select
-              value={selectedTaxClassId}
-              onChange={setSelectedTaxClassId}
-              style={{ width: '100%', marginTop: 8 }}
-              placeholder="请选择税类"
-            >
-              {taxClasses.map(taxClass => (
-                <Select.Option key={taxClass.id} value={taxClass.id}>
-                  <div>
-                    <Text strong>{taxClass.name}</Text>
-                    {taxClass.description && (
-                      <Text type="secondary" style={{ marginLeft: 8, fontSize: '12px' }}>
-                        ({taxClass.description})
-                      </Text>
-                    )}
-                  </div>
-                  <div style={{ marginTop: 4 }}>
-                    {taxClass.rates.map((rate, idx) => (
-                      <Tag key={idx} color="blue" style={{ marginRight: 4 }}>
-                        {rate.taxType}: {(rate.rate * 100).toFixed(2)}%
-                      </Tag>
-                    ))}
-                  </div>
-                </Select.Option>
-              ))}
-            </Select>
+            <div className="mb-2 font-medium text-slate-700">选择税类（可多选）：</div>
+            {taxClasses.length === 0 ? (
+              <div className="text-sm text-slate-400">暂无可用税类</div>
+            ) : (
+              <div className="space-y-2">
+                {taxClasses.map(taxClass => (
+                  <label
+                    key={taxClass.id}
+                    className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-3 hover:border-slate-300"
+                  >
+                    <Checkbox
+                      checked={selectedTaxClassIds.includes(taxClass.id)}
+                      onCheckedChange={(c) => toggleTaxClass(taxClass.id, c)}
+                    />
+                    <div className="flex-1">
+                      <div>
+                        <span className="font-medium text-slate-700">{taxClass.name}</span>
+                        {taxClass.description && (
+                          <span className="ml-2 text-xs text-slate-400">({taxClass.description})</span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {taxClass.rates.map((rate, idx) => (
+                          <Badge key={idx} variant="blue">{rate.taxType}: {(rate.rate * 100).toFixed(2)}%</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 计算税费按钮 */}
-          <Button
-            type="dashed"
-            onClick={handleCalculateTax}
-            disabled={!selectedTaxClassId}
-            block
-          >
+          <Btn variant="secondary" onClick={handleCalculateTax} disabled={selectedTaxClassIds.length === 0} className="w-full">
             预览税费计算
-          </Button>
+          </Btn>
 
           {/* 税费计算结果 */}
           {taxResult && (
-            <Alert
-              message="税费计算结果"
+            <AlertBox
+              type="success"
+              title="税费计算结果"
               description={
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <div>
-                    <Text>基础价格：</Text>
-                    <Text strong>{taxResult.basePriceDisplay}</Text>
-                  </div>
+                <div className="space-y-1">
+                  <div><span>基础价格：</span><span className="font-medium">{taxResult.basePriceDisplay}</span></div>
 
                   {taxResult.taxes.map((tax, idx) => (
                     <div key={idx}>
-                      <Text>{tax.taxName} ({tax.taxType})：</Text>
-                      <Text strong>{tax.amountDisplay}</Text>
-                      <Text type="secondary"> ({(tax.rate * 100).toFixed(2)}%)</Text>
+                      <span>{tax.taxName} ({tax.taxType})：</span>
+                      <span className="font-medium">{tax.amountDisplay}</span>
+                      <span className="text-slate-400"> ({(tax.rate * 100).toFixed(2)}%)</span>
                     </div>
                   ))}
 
-                  <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 8, marginTop: 8 }}>
-                    <Text>总税费：</Text>
-                    <Text strong style={{ color: '#ff4d4f' }}>{taxResult.totalTaxDisplay}</Text>
+                  <div className="mt-2 border-t border-slate-200 pt-2">
+                    <span>总税费：</span>
+                    <span className="font-medium text-red-500">{taxResult.totalTaxDisplay}</span>
                   </div>
 
                   <div>
-                    <Text>最终价格：</Text>
-                    <Text strong style={{ fontSize: '16px', color: '#52c41a' }}>
-                      {taxResult.finalPriceDisplay}
-                    </Text>
+                    <span>最终价格：</span>
+                    <span className="text-base font-medium text-green-600">{taxResult.finalPriceDisplay}</span>
                   </div>
-                </Space>
+                </div>
               }
-              type="success"
-              showIcon
             />
           )}
-        </Space>
+        </div>
       </Modal>
     </div>
   )

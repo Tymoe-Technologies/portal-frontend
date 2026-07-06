@@ -35,10 +35,9 @@ export function toMinorUnit(amount: number): number {
  */
 export function fromMinorUnit(amount: number | bigint): number {
   const num = typeof amount === 'bigint' ? Number(amount) : amount
-  if (!Number.isInteger(num)) {
-    throw new Error(`副单位必须是整数: ${amount}`)
-  }
-  return num / 100
+  // 容忍浮点精度误差，先四舍五入再转换
+  const rounded = Math.round(num)
+  return rounded / 100
 }
 
 /**

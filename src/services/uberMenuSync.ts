@@ -489,7 +489,7 @@ class UberMenuSyncService {
   }
 
   /**
-   * 获取商品的修饰符配置
+   * 获取商品的自定义选项配置
    */
   async getModifierConfig(
     integrationId: string,
@@ -515,19 +515,19 @@ class UberMenuSyncService {
         return responseData.data
       }
 
-      throw new Error('获取修饰符配置失败')
+      throw new Error('获取自定义选项配置失败')
     } catch (error: any) {
-      console.error('获取修饰符配置失败:', error)
+      console.error('获取自定义选项配置失败:', error)
       throw new Error(
         error?.response?.data?.message ||
         error?.message ||
-        '获取修饰符配置失败'
+        '获取自定义选项配置失败'
       )
     }
   }
 
   /**
-   * 保存修饰符配置
+   * 保存自定义选项配置
    */
   async saveModifierConfig(
     integrationId: string,
@@ -556,13 +556,13 @@ class UberMenuSyncService {
         return responseData.data
       }
 
-      throw new Error('保存修饰符配置失败')
+      throw new Error('保存自定义选项配置失败')
     } catch (error: any) {
-      console.error('保存修饰符配置失败:', error)
+      console.error('保存自定义选项配置失败:', error)
       throw new Error(
         error?.response?.data?.message ||
         error?.message ||
-        '保存修饰符配置失败'
+        '保存自定义选项配置失败'
       )
     }
   }
@@ -1070,7 +1070,7 @@ export interface SyncHistoryItem {
 }
 
 /**
- * 修饰符配置项接口
+ * 自定义选项配置项接口
  */
 export interface ModifierConfigItem {
   posItemId: string

@@ -4,7 +4,7 @@
 2025-11-05
 
 ## 📋 重构目标
-将系统中的"修饰符"术语统一改为"自定义选项/自定义选项组"，并将自定义选项定价整合到商品定价页面中。
+将系统中的"自定义选项"术语统一改为"自定义选项/自定义选项组"，并将自定义选项定价整合到商品定价页面中。
 
 ---
 
@@ -117,8 +117,8 @@ export const deleteModifierSourcePrice = deleteCustomOptionSourcePrice
 #### 移除独立Tab (`PricingManagement.tsx`)
 
 **变更前**：
-- 4个Tab：商品定价 | 加料定价 | 套餐定价 | 修饰符定价
-- 修饰符定价使用独立的 `ModifierPricingTab` 组件
+- 4个Tab：商品定价 | 加料定价 | 套餐定价 | 自定义选项定价
+- 自定义选项定价使用独立的 `ModifierPricingTab` 组件
 
 **变更后**：
 - 2个Tab：商品定价 | 套餐定价
@@ -130,12 +130,12 @@ export const deleteModifierSourcePrice = deleteCustomOptionSourcePrice
 - import ModifierPricingTab from './ModifierPricingTab'
 + import CustomOptionPricingRow from './CustomOptionPricingRow'
 
-// 移除修饰符Tab
+// 移除自定义选项Tab
 <Tabs
   items={[
     { key: 'items', label: `商品定价 (${items.length})`, ... },
     { key: 'combos', label: `套餐定价 (${combos.length})`, ... }
--   { key: 'modifiers', label: '修饰符定价', children: <ModifierPricingTab .../> }
+-   { key: 'modifiers', label: '自定义选项定价', children: <ModifierPricingTab .../> }
   ]}
 />
 ```
@@ -233,8 +233,8 @@ const renderPriceCards = (
 ### 1. 术语统一
 | 旧术语 | 新术语 |
 |-------|-------|
-| 修饰符 | 自定义选项 |
-| 修饰符组 | 自定义选项组 |
+| 自定义选项 | 自定义选项 |
+| 自定义选项组 | 自定义选项组 |
 | modifierOptionId | customOptionId |
 | ModifierPriceData | CustomOptionPriceData |
 
@@ -266,7 +266,7 @@ const renderPriceCards = (
 7. ✅ `/CUSTOM_OPTION_TERMINOLOGY_REFACTOR.md` - 本文档
 
 ### 可删除的文件（可选）
-- `/src/pages/OrderConfig/ModifierPricingTab.tsx` - 原修饰符定价Tab组件（已不再使用）
+- `/src/pages/OrderConfig/ModifierPricingTab.tsx` - 原自定义选项定价Tab组件（已不再使用）
 
 ---
 
@@ -487,7 +487,7 @@ const prices = await queryModifierSourcePrices(sourceCode, itemId)
 
 本次重构成功实现了以下目标：
 
-1. **术语统一**: 全面采用"自定义选项"替代"修饰符"
+1. **术语统一**: 全面采用"自定义选项"替代"自定义选项"
 2. **用户体验**: UI更简洁直观，自定义选项价格与商品价格在同一视图
 3. **代码质量**: TypeScript类型完整，向后兼容性良好
 4. **可维护性**: 模块化设计，组件可复用

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo, useState, useEffect } from 'react'
 import { getProfile, getOrganizations, logout as authLogout, type AuthUser, type Organization } from '../services/auth'
+import { isTokenExpired } from '../services/http'
 
 export interface UserInfo {
   id: string
@@ -45,19 +46,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const token = localStorage.getItem('access_token')
       if (token) {
+        // 检查token是否已过期（5秒容差防止时钟偏差，避免短期token误判）
+        if (isTokenExpired(token, 5)) {
+          console.warn('[AUTH] Token is expired at startup, clearing credentials')
+          localStorage.removeItem('access_token')
+          localStorage.removeItem('refresh_token')
+          setLoading(false)
+          return
+        }
+
         try {
           // 分别获取用户资料和组织信息
           const profile = await getProfile()
           if (profile) {
             console.log('🔧 [AUTH PROVIDER DEBUG] Setting user from profile:', JSON.stringify(profile, null, 2))
             setUser(profile)
-            
+
             // 获取组织信息
             try {
               const userOrganizations = await getOrganizations(undefined, 'beverage')
               console.log('🔧 [AUTH PROVIDER DEBUG] Setting organizations:', JSON.stringify(userOrganizations, null, 2))
               setOrganizations(userOrganizations)
-              
+
               // 只有在没有选中组织时，才自动选择第一个
               const currentOrgId = localStorage.getItem('organization_id')
               if (!currentOrgId && userOrganizations.length > 0) {
@@ -69,6 +79,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } catch (orgError) {
               console.warn('Failed to get organizations:', orgError)
               setOrganizations([])
+            }
+          } else {
+            // profile 获取失败（网络问题或服务暂时不可用），但 token 有效
+            // 用 JWT payload 中的基本信息构造临时用户，避免误登出
+            console.warn('[AUTH] getProfile returned null, using token payload as fallback')
+            try {
+              const parts = token.split('.')
+              // Base64URL → 标准 Base64，补全 padding
+              const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+              const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=')
+              const payload = JSON.parse(atob(padded))
+              if (payload.sub && payload.email) {
+                setUser({
+                  id: payload.sub,
+                  email: payload.email,
+                  name: payload.email.split('@')[0]
+                })
+                console.log('[AUTH] Fallback user set from token payload')
+              }
+            } catch (parseError) {
+              console.warn('[AUTH] Failed to parse token payload for fallback')
             }
           }
         } catch (error) {

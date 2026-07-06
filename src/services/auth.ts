@@ -35,8 +35,22 @@ export interface Organization {
   parentOrgName?: string
   description?: string
   location?: string
+  street?: string
+  unit?: string
+  city?: string
+  province?: string
+  postalCode?: string
+  country?: string
+  latitude?: number
+  longitude?: number
   phone?: string
   email?: string
+  timezone?: string | null
+  businessHours?: Record<string, any> | null
+  // 品牌身份字段（仅 MAIN 适用）—— 由 auth-service 管理
+  subdomain?: string | null
+  customDomain?: string | null
+  themeSettings?: Record<string, any> | null
   status: 'ACTIVE' | 'SUSPENDED' | 'DELETED'
   createdAt: string
   updatedAt: string
@@ -48,9 +62,23 @@ export interface CreateOrganizationPayload {
   parentOrgId?: string | null
   description?: string
   location?: string
+  street?: string
+  unit?: string
+  city?: string
+  province?: string
+  postalCode?: string
+  country?: string
+  latitude?: number
+  longitude?: number
   phone?: string
   email?: string
+  timezone?: string
+  businessHours?: Record<string, any>
   productType?: 'beauty' | 'fb' | 'beverage'
+  // 品牌身份字段（仅 MAIN 适用）
+  subdomain?: string
+  customDomain?: string
+  themeSettings?: Record<string, any>
 }
 
 export interface CreateOrganizationResponse {
@@ -472,13 +500,44 @@ export async function createOrganization(payload: CreateOrganizationPayload, pro
   if (payload.location && payload.location.trim()) {
     requestPayload.location = payload.location.trim()
   }
+  if (payload.street && payload.street.trim()) {
+    requestPayload.street = payload.street.trim()
+  }
+  if (payload.city && payload.city.trim()) {
+    requestPayload.city = payload.city.trim()
+  }
+  if (payload.province && payload.province.trim()) {
+    requestPayload.province = payload.province.trim()
+  }
+  if (payload.postalCode && payload.postalCode.trim()) {
+    requestPayload.postalCode = payload.postalCode.trim()
+  }
+  if (payload.country && payload.country.trim()) {
+    requestPayload.country = payload.country.trim()
+  }
+  if (payload.latitude != null) {
+    requestPayload.latitude = payload.latitude
+  }
+  if (payload.longitude != null) {
+    requestPayload.longitude = payload.longitude
+  }
   if (payload.phone && payload.phone.trim()) {
     requestPayload.phone = payload.phone.trim()
   }
   if (payload.email && payload.email.trim()) {
     requestPayload.email = payload.email.trim()
   }
-  
+  // 品牌身份字段（仅 MAIN 有意义；分店传了会被 auth-service 拒绝）
+  if (payload.subdomain && payload.subdomain.trim()) {
+    requestPayload.subdomain = payload.subdomain.trim().toLowerCase()
+  }
+  if (payload.customDomain && payload.customDomain.trim()) {
+    requestPayload.customDomain = payload.customDomain.trim().toLowerCase()
+  }
+  if (payload.themeSettings) {
+    requestPayload.themeSettings = payload.themeSettings
+  }
+
   console.log('🏢 [AUTH DEBUG] Final request payload:', JSON.stringify(requestPayload, null, 2))
   
   const response = await httpService.post<CreateOrganizationResponse>(`${API_BASE}/organizations`, requestPayload, {
@@ -528,4 +587,19 @@ export async function deleteOrganization(id: string, productType: 'beauty' | 'fb
       'X-Product-Type': productType
     }
   })
+}
+
+export async function uploadOrgLogo(orgId: string, file: File): Promise<{ logoUrl: string }> {
+  const formData = new FormData()
+  formData.append('image', file)
+  const response = await httpService.post<{ success: boolean; logoUrl: string }>(
+    `${API_BASE}/organizations/${orgId}/logo`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  )
+  return { logoUrl: response.data.logoUrl }
+}
+
+export async function deleteOrgLogo(orgId: string): Promise<void> {
+  await httpService.delete(`${API_BASE}/organizations/${orgId}/logo`)
 }

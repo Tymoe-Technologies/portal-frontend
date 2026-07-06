@@ -2,6 +2,7 @@ const zhTW = {
   translation: {
     app: { title: 'Tymoe 管理平台' },
     common: {
+      or: '或',
       back: '返回',
       confirm: '確定',
       cancel: '取消',
@@ -28,6 +29,7 @@ const zhTW = {
     },
     nav: {
       dashboard: '儀表板',
+      reports: '報表',
       features: '特色功能',
       recipeGuide: '製作指引',
       // 分組標籤
@@ -43,7 +45,8 @@ const zhTW = {
       // 訂單與配送
       orderConfig: '訂單配置',
       onlineOrderConfig: '線上點餐配置',
-directDelivery: '自配送',
+      channelManagement: '渠道管理',
+      directDelivery: '自配送',
       uberIntegration: 'Uber 集成',
       // 店鋪運營
       paymentSettings: '支付設置',
@@ -58,6 +61,9 @@ directDelivery: '自配送',
       // 系統
       subscription: '訂閱管理',
       receiptTemplate: '小票模板',
+      profile: '個人資料',
+      settings: '設置',
+      logout: '退出登錄',
     },
     organization: {
       title: '組織管理',
@@ -222,6 +228,25 @@ directDelivery: '自配送',
         sendButton: '發送重置鏈接',
         backToLogin: '返回登入',
         emailSent: '重置密碼郵件已發送，請查收郵箱'
+      },
+      brand: {
+        headline: '了解 Tymoe 能為你做什麼',
+        subtitle: '更強的門店經營工具，為不斷成長的商家而打造。',
+        cta: '登入後了解更多',
+        phrases: [
+          '管理多家門店',
+          '即時同步庫存',
+          '會員積分與行銷',
+          '線上線下點單',
+          '智慧配方指引',
+          '渠道差異定價',
+          '自動出品列印',
+          '數據報表分析',
+          '員工權限管理',
+          '禮品卡與儲值',
+          '促銷與優惠券',
+          '對接外送平台'
+        ]
       }
     },
     pages: {

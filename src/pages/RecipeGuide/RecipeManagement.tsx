@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Table, Button, Space, message, Tag, Popconfirm, Empty } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { Plus, Pencil, Trash2, CheckCircle2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRecipes, deleteRecipe } from '@/services/recipe'
 import type { Recipe } from '@/services/recipe'
-import type { ColumnsType } from 'antd/es/table'
+import { Table, Btn, Badge, EmptyState, ConfirmDialog, toast, type Column } from '@/components/ui-kit'
 import RecipeFormModal from './RecipeFormModal'
 
 interface RecipeManagementProps {
@@ -17,6 +16,7 @@ const RecipeManagement: React.FC<RecipeManagementProps> = ({ itemId }) => {
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingRecipe, setEditingRecipe] = useState<Recipe | undefined>()
+  const [deletingRecipe, setDeletingRecipe] = useState<Recipe | undefined>()
 
   useEffect(() => {
     if (itemId) {
@@ -27,36 +27,29 @@ const RecipeManagement: React.FC<RecipeManagementProps> = ({ itemId }) => {
   }, [itemId])
 
   const loadRecipes = async () => {
-    if (!itemId) {
-      console.log('⚠️ itemId为空，跳过加载')
-      return
-    }
-    
-    console.log('📋 加载配方列表, itemId:', itemId)
+    if (!itemId) return
+
     setLoading(true)
     try {
       const data = await getRecipes(itemId)
-      console.log('📋 获取到的配方数据:', data)
-      console.log('📋 配方数量:', data?.length)
-      console.log('📋 配方详情:', JSON.stringify(data, null, 2))
-      setRecipes(data || [])
-      console.log('✅ 配方列表已更新到state')
+      setRecipes(data.recipes || [])
     } catch (error: any) {
-      console.error('❌ 加载配方失败:', error)
-      message.error(error.message || t('pages.recipeGuide.loadFailed'))
+      toast.error(error.message || t('pages.recipeGuide.loadFailed'))
       setRecipes([])
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!deletingRecipe) return
     try {
-      await deleteRecipe(id)
-      message.success(t('pages.recipeGuide.deleteSuccess'))
+      await deleteRecipe(deletingRecipe.id)
+      toast.success(t('pages.recipeGuide.deleteSuccess'))
+      setDeletingRecipe(undefined)
       loadRecipes()
     } catch (error: any) {
-      message.error(error.message || t('pages.recipeGuide.deleteFailed'))
+      toast.error(error.message || t('pages.recipeGuide.deleteFailed'))
     }
   }
 
@@ -75,115 +68,69 @@ const RecipeManagement: React.FC<RecipeManagementProps> = ({ itemId }) => {
     setEditingRecipe(undefined)
   }
 
-  const handleModalSuccess = () => {
-    loadRecipes()
-  }
-
-  const columns: ColumnsType<Recipe> = [
+  const columns: Column<Recipe>[] = [
     {
-      title: t('pages.recipeGuide.recipeName'),
-      dataIndex: 'name',
       key: 'name',
-      width: 200
+      title: t('pages.recipeGuide.recipeName'),
+      width: 200,
+      render: (r) => r.name
     },
     {
-      title: t('pages.recipeGuide.recipeVersion'),
-      dataIndex: 'version',
       key: 'version',
-      width: 100
+      title: t('pages.recipeGuide.recipeVersion'),
+      width: 100,
+      render: (r) => r.version
     },
     {
-      title: t('pages.recipeGuide.isDefault'),
-      dataIndex: 'isDefault',
       key: 'isDefault',
+      title: t('pages.recipeGuide.isDefault'),
       width: 120,
-      render: (isDefault: boolean) =>
-        isDefault ? (
-          <Tag icon={<CheckCircleOutlined />} color="success">
-            {t('pages.recipeGuide.isDefault')}
-          </Tag>
-        ) : null
+      render: (r) => r.isDefault
+        ? <Badge variant="green" icon={<CheckCircle2 size={12} />}>{t('pages.recipeGuide.isDefault')}</Badge>
+        : null
     },
     {
-      title: t('pages.recipeGuide.isActive'),
-      dataIndex: 'isActive',
       key: 'isActive',
+      title: t('pages.recipeGuide.isActive'),
       width: 100,
-      render: (isActive: boolean) =>
-        isActive ? (
-          <Tag color="success">{t('pages.recipeGuide.isActive')}</Tag>
-        ) : (
-          <Tag color="default">{t('pages.menuCenter.inactive')}</Tag>
-        )
+      render: (r) => r.isActive
+        ? <Badge variant="green">{t('pages.recipeGuide.isActive')}</Badge>
+        : <Badge variant="default">{t('pages.menuCenter.inactive')}</Badge>
     },
     {
-      title: t('pages.recipeGuide.stepCount'),
       key: 'stepCount',
+      title: t('pages.recipeGuide.stepCount'),
       width: 100,
-      render: (_, record) => record.steps?.length || 0
+      render: (r) => r.steps?.length || 0
     },
     {
-      title: t('pages.recipeGuide.actions'),
       key: 'actions',
+      title: t('pages.recipeGuide.actions'),
       width: 150,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            编辑
-          </Button>
-          <Popconfirm
-            title={t('pages.recipeGuide.deleteRecipeConfirm')}
-            description={t('pages.recipeGuide.deleteWarning')}
-            onConfirm={() => handleDelete(record.id)}
-            okText={t('pages.recipeGuide.confirm')}
-            cancelText={t('pages.recipeGuide.cancel')}
-          >
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              title="删除配方"
-            />
-          </Popconfirm>
-        </Space>
+      render: (r) => (
+        <div className="flex items-center gap-1">
+          <Btn variant="link" size="sm" icon={<Pencil size={14} />} onClick={() => handleEdit(r)}>编辑</Btn>
+          <Btn variant="ghost" size="sm" icon={<Trash2 size={14} className="text-red-500" />} title="删除配方" onClick={() => setDeletingRecipe(r)} />
+        </div>
       )
     }
   ]
 
   if (!itemId) {
     return (
-      <Empty
-        description={t('pages.recipeGuide.noItemSelected')}
-        style={{ padding: '60px 0' }}
-      />
+      <div className="py-16">
+        <EmptyState title={t('pages.recipeGuide.noItemSelected')} />
+      </div>
     )
   }
 
-  console.log('🎨 RecipeManagement 渲染, recipes:', recipes)
-  console.log('🎨 recipes.length:', recipes.length)
-
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <Space>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleCreate}
-          >
-            {t('pages.recipeGuide.createRecipe')}
-          </Button>
-          <span style={{ color: '#999' }}>
-            当前配方数量: {recipes.length}
-          </span>
-        </Space>
+      <div className="mb-4 flex items-center gap-3">
+        <Btn variant="primary" icon={<Plus size={16} />} onClick={handleCreate}>
+          {t('pages.recipeGuide.createRecipe')}
+        </Btn>
+        <span className="text-sm text-slate-400">当前配方数量: {recipes.length}</span>
       </div>
 
       <RecipeFormModal
@@ -191,34 +138,31 @@ const RecipeManagement: React.FC<RecipeManagementProps> = ({ itemId }) => {
         recipe={editingRecipe}
         itemId={itemId}
         onClose={handleModalClose}
-        onSuccess={handleModalSuccess}
+        onSuccess={loadRecipes}
       />
 
       <Table
         columns={columns}
-        dataSource={recipes}
-        rowKey="id"
+        data={recipes}
+        rowKey={(r) => r.id}
         loading={loading}
-        pagination={{
-          showSizeChanger: true,
-          showTotal: (total) => `${t('pages.menuCenter.total')} ${total} ${t('pages.menuCenter.items')}`
-        }}
-        locale={{
-          emptyText: (
-            <Empty
-              description={t('pages.recipeGuide.noRecipes')}
-              style={{ padding: '40px 0' }}
-            >
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleCreate}
-              >
-                {t('pages.recipeGuide.createFirstRecipe')}
-              </Button>
-            </Empty>
-          )
-        }}
+        empty={
+          <EmptyState
+            title={t('pages.recipeGuide.noRecipes')}
+            action={<Btn variant="primary" icon={<Plus size={16} />} onClick={handleCreate}>{t('pages.recipeGuide.createFirstRecipe')}</Btn>}
+          />
+        }
+      />
+
+      <ConfirmDialog
+        open={!!deletingRecipe}
+        onOpenChange={(o) => { if (!o) setDeletingRecipe(undefined) }}
+        title={t('pages.recipeGuide.deleteRecipeConfirm')}
+        description={t('pages.recipeGuide.deleteWarning')}
+        confirmText={t('pages.recipeGuide.confirm')}
+        cancelText={t('pages.recipeGuide.cancel')}
+        danger
+        onConfirm={handleDelete}
       />
     </div>
   )

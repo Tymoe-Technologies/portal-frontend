@@ -11,8 +11,8 @@ import * as AlertDialog from '@radix-ui/react-alert-dialog'
 import * as RadixSelect from '@radix-ui/react-select'
 import clsx from 'clsx'
 import {
-  Loader2, Info, AlertTriangle, CheckCircle2, X, ChevronRight,
-  Image as ImageIcon, Trash2, Check, ChevronsUpDown,
+  Loader2, Info, AlertTriangle, CheckCircle2, X, ChevronRight, ChevronLeft,
+  Image as ImageIcon, Trash2, Check, ChevronsUpDown, Calendar as CalendarIcon, ArrowRight, Clock,
 } from 'lucide-react'
 
 // ─── 徽章 ───────────────────────────────────────────────────────────────────────
@@ -425,6 +425,412 @@ export function NumberInput({ value, onChange, min, max, suffix, disabled, class
         )}
       />
       {suffix && <span className="text-xs text-slate-400">{suffix}</span>}
+    </div>
+  )
+}
+
+// ─── 日期选择器（自绘弹出日历，替代原生 input[type=date] 的浏览器默认样式） ────────
+
+function fmtDate(d: Date) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+function parseDate(v?: string) {
+  if (!v) return null
+  const [y, m, d] = v.split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
+}
+// 展示用短格式：同年省略年份（6月30日），跨年份补上（2025年12月31日）
+function fmtDisplay(d: Date) {
+  const y = d.getFullYear()
+  const now = new Date()
+  return y === now.getFullYear() ? `${d.getMonth() + 1}月${d.getDate()}日` : `${y}年${d.getMonth() + 1}月${d.getDate()}日`
+}
+const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+// 与 inputBase 同源的时间输入样式（原生 time 控件的图标/弹层浏览器不可控，但边框/圆角/焦点态统一）
+const isSameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+
+// 自绘时间输入（HH:mm 双列滚动选择，替代原生 input[type=time] 的系统级弹层——那个弹层不可能被 CSS 统一样式）
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+
+export function TimeInput({ value, onChange, className }: {
+  value: string // 'HH:mm'
+  onChange: (v: string) => void
+  className?: string
+}) {
+  const [open, setOpen] = React.useState(false)
+  const rootRef = React.useRef<HTMLDivElement>(null)
+  const [hh, mm] = (value || '00:00').split(':')
+
+  React.useEffect(() => {
+    if (!open) return
+    const onDocClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [open])
+
+  return (
+    <div ref={rootRef} className={clsx('relative inline-block', className)}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={clsx(
+          'inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700 tabular-nums',
+          'hover:border-slate-300 transition-colors cursor-pointer',
+          'focus:outline-2 focus:outline-slate-900 focus:outline-offset-0',
+        )}
+      >
+        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        {hh}:{mm}
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1.5 flex rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+          {[{ list: HOURS, active: hh, pick: (v: string) => onChange(`${v}:${mm}`) },
+            { list: MINUTES, active: mm, pick: (v: string) => onChange(`${hh}:${v}`) }].map((col, ci) => (
+            <div key={ci} className={clsx('w-14 h-40 overflow-y-auto py-1', ci === 0 && 'border-r border-slate-100')}>
+              {col.list.map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => col.pick(v)}
+                  className={clsx(
+                    'w-full text-center text-sm py-1.5 cursor-pointer tabular-nums',
+                    v === col.active ? 'bg-slate-900 text-white!' : 'text-slate-600 hover:bg-slate-100',
+                  )}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+function monthCells(year: number, month: number): (Date | null)[] {
+  const startOffset = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  return [
+    ...Array(startOffset).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
+  ]
+}
+
+export function DatePicker({ value, onChange, min, max, placeholder, disabled, className }: {
+  value: string // 'YYYY-MM-DD'
+  onChange: (v: string) => void
+  min?: string
+  max?: string
+  placeholder?: string
+  disabled?: boolean
+  className?: string
+}) {
+  const [open, setOpen] = React.useState(false)
+  const selected = parseDate(value)
+  const [viewDate, setViewDate] = React.useState(() => selected ?? new Date())
+  const rootRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!open) return
+    const onDocClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [open])
+
+  React.useEffect(() => { if (open) setViewDate(selected ?? new Date()) }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const minD = parseDate(min)
+  const maxD = parseDate(max)
+
+  const year = viewDate.getFullYear()
+  const month = viewDate.getMonth()
+  const cells = monthCells(year, month)
+
+  const isDisabled = (d: Date) => (minD && d < minD) || (maxD && d > maxD)
+  const today = new Date()
+
+  return (
+    <div ref={rootRef} className={clsx('relative inline-block', className)}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        className={clsx(
+          'inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700',
+          'hover:border-slate-300 transition-colors cursor-pointer',
+          'focus:outline-2 focus:outline-slate-900 focus:outline-offset-0',
+          'disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed',
+        )}
+      >
+        <CalendarIcon className="w-4 h-4 text-slate-400 shrink-0" />
+        <span className={clsx(!value && 'text-slate-400')}>{value || placeholder || '选择日期'}</span>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1.5 w-64 rounded-xl border border-slate-200 bg-white shadow-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              type="button"
+              onClick={() => setViewDate(new Date(year, month - 1, 1))}
+              className="p-1 rounded-md hover:bg-slate-100 text-slate-500 cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-medium text-slate-900">{year} 年 {month + 1} 月</span>
+            <button
+              type="button"
+              onClick={() => setViewDate(new Date(year, month + 1, 1))}
+              className="p-1 rounded-md hover:bg-slate-100 text-slate-500 cursor-pointer"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-y-1 text-center">
+            {WEEKDAY_LABELS.map(w => (
+              <span key={w} className="text-xs text-slate-400 py-1">{w}</span>
+            ))}
+            {cells.map((d, i) => {
+              if (!d) return <span key={i} />
+              const disabledDay = isDisabled(d)
+              const active = selected && isSameDay(d, selected)
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  disabled={disabledDay}
+                  onClick={() => { onChange(fmtDate(d)); setOpen(false) }}
+                  className={clsx(
+                    'w-8 h-8 mx-auto text-sm rounded-lg transition-colors cursor-pointer',
+                    disabledDay && 'text-slate-300 cursor-not-allowed',
+                    !disabledDay && !active && 'text-slate-700 hover:bg-slate-100',
+                    active && 'bg-slate-900 text-white!',
+                    !active && isSameDay(d, today) && 'font-semibold',
+                  )}
+                >
+                  {d.getDate()}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// 日期区间选择器（单次打开、双月面板，直接点起始日再点结束日；替代"开两个日历分别选"）
+// showTime=true 时在同一面板内加入起始/结束时间，选完日期后不自动关闭，点"确定"才关闭
+export function DateRangePicker({
+  startValue, endValue, onChange, min, max, disabled, className,
+  showTime, startTime, endTime, onTimeChange,
+}: {
+  startValue: string // 'YYYY-MM-DD'
+  endValue: string // 'YYYY-MM-DD'
+  onChange: (start: string, end: string) => void
+  min?: string
+  max?: string
+  disabled?: boolean
+  className?: string
+  showTime?: boolean
+  startTime?: string // 'HH:mm'
+  endTime?: string // 'HH:mm'
+  onTimeChange?: (startTime: string, endTime: string) => void
+}) {
+  const [open, setOpen] = React.useState(false)
+  const start = parseDate(startValue)
+  const end = parseDate(endValue)
+  // 未选择时间时展示默认值，而不是空白
+  const startTimeValue = startTime || '00:00'
+  const endTimeValue = endTime || '23:59'
+  // pickingEnd=true 表示已点了起始日，等待点结束日；此时 draftStart 为本次选择的起点（未必等于 start）
+  const [pickingEnd, setPickingEnd] = React.useState(false)
+  const [draftStart, setDraftStart] = React.useState<Date | null>(null)
+  const [hoverDate, setHoverDate] = React.useState<Date | null>(null)
+  const [leftView, setLeftView] = React.useState(() => start ?? new Date())
+  const rootRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!open) return
+    const onDocClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [open])
+
+  React.useEffect(() => {
+    if (open) {
+      setLeftView(start ?? new Date())
+      setPickingEnd(false)
+      setDraftStart(null)
+      setHoverDate(null)
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const minD = parseDate(min)
+  const maxD = parseDate(max)
+  const isDisabled = (d: Date) => (minD && d < minD) || (maxD && d > maxD)
+  const today = new Date()
+
+  const rangeStart = pickingEnd ? draftStart : start
+  const rangeEndForDisplay = pickingEnd ? (hoverDate ?? draftStart) : end
+  const inRange = (d: Date) => {
+    if (!rangeStart || !rangeEndForDisplay) return false
+    const lo = rangeStart <= rangeEndForDisplay ? rangeStart : rangeEndForDisplay
+    const hi = rangeStart <= rangeEndForDisplay ? rangeEndForDisplay : rangeStart
+    return d >= lo && d <= hi
+  }
+
+  const handlePick = (d: Date) => {
+    if (!pickingEnd) {
+      setDraftStart(d)
+      setPickingEnd(true)
+      return
+    }
+    const lo = draftStart && draftStart <= d ? draftStart : d
+    const hi = draftStart && draftStart <= d ? d : draftStart!
+    onChange(fmtDate(lo), fmtDate(hi))
+    setPickingEnd(false)
+    setDraftStart(null)
+    // 带时间选择时先不关闭，等用户调整完时间点"确定"
+    if (!showTime) setOpen(false)
+  }
+
+  const renderMonth = (year: number, month: number, onPrev: () => void, onNext: () => void) => {
+    const cells = monthCells(year, month)
+    return (
+      <div className="w-56">
+        <div className="flex items-center justify-between mb-2">
+          <button type="button" onClick={onPrev} className="p-1 rounded-md hover:bg-slate-100 text-slate-500 cursor-pointer">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-sm font-medium text-slate-900">{year} 年 {month + 1} 月</span>
+          <button type="button" onClick={onNext} className="p-1 rounded-md hover:bg-slate-100 text-slate-500 cursor-pointer">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-y-1 text-center">
+          {WEEKDAY_LABELS.map(w => (
+            <span key={w} className="text-xs text-slate-400 py-1">{w}</span>
+          ))}
+          {cells.map((d, i) => {
+            if (!d) return <span key={i} />
+            const disabledDay = isDisabled(d)
+            const isEdge = (rangeStart && isSameDay(d, rangeStart)) || (rangeEndForDisplay && isSameDay(d, rangeEndForDisplay))
+            const within = inRange(d)
+            return (
+              <button
+                key={i}
+                type="button"
+                disabled={disabledDay}
+                onMouseEnter={() => pickingEnd && setHoverDate(d)}
+                onClick={() => handlePick(d)}
+                className={clsx(
+                  'w-8 h-8 mx-auto text-sm transition-colors cursor-pointer',
+                  disabledDay && 'text-slate-300 cursor-not-allowed',
+                  !disabledDay && !within && 'text-slate-700 hover:bg-slate-100 rounded-lg',
+                  within && !isEdge && 'bg-slate-100 text-slate-700',
+                  isEdge && 'bg-slate-900 text-white! rounded-lg',
+                  !isEdge && isSameDay(d, today) && 'font-semibold',
+                )}
+              >
+                {d.getDate()}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  const leftYear = leftView.getFullYear()
+  const leftMonth = leftView.getMonth()
+  const rightDate = new Date(leftYear, leftMonth + 1, 1)
+
+  return (
+    <div ref={rootRef} className={clsx('relative inline-block', className)}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        className={clsx(
+          'inline-flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white pl-3 pr-3.5 py-2 text-sm',
+          'hover:border-slate-300 transition-colors cursor-pointer',
+          'focus:outline-2 focus:outline-slate-900 focus:outline-offset-0',
+          'disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed',
+        )}
+      >
+        <CalendarIcon className="w-4 h-4 text-slate-400 shrink-0" />
+        {start && end ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="font-medium text-slate-900 tabular-nums">
+              {fmtDisplay(start)}{showTime ? ` ${startTimeValue}` : ''}
+            </span>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+            <span className="font-medium text-slate-900 tabular-nums">
+              {fmtDisplay(end)}{showTime ? ` ${endTimeValue}` : ''}
+            </span>
+          </span>
+        ) : (
+          <span className="text-slate-400">选择日期区间</span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          className="absolute z-50 mt-1.5 rounded-xl border border-slate-200 bg-white shadow-lg p-3"
+          onMouseLeave={() => setHoverDate(null)}
+        >
+          <div className="flex gap-4">
+            {renderMonth(leftYear, leftMonth,
+              () => setLeftView(new Date(leftYear, leftMonth - 1, 1)),
+              () => setLeftView(new Date(leftYear, leftMonth + 1, 1)))}
+            {renderMonth(rightDate.getFullYear(), rightDate.getMonth(),
+              () => setLeftView(new Date(leftYear, leftMonth - 1, 1)),
+              () => setLeftView(new Date(leftYear, leftMonth + 1, 1)))}
+          </div>
+          {pickingEnd && (
+            <p className="text-xs text-slate-400 mt-1">已选起始日，请点击结束日</p>
+          )}
+          {showTime && start && end && (
+            <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                <span className="shrink-0">{fmtDisplay(start)}</span>
+                <TimeInput value={startTimeValue} onChange={(v) => onTimeChange?.(v, endTimeValue)} />
+                <ArrowRight className="w-3 h-3 text-slate-300 shrink-0" />
+                <span className="shrink-0">{fmtDisplay(end)}</span>
+                <TimeInput value={endTimeValue} onChange={(v) => onTimeChange?.(startTimeValue, v)} />
+              </div>
+              <Btn size="sm" onClick={() => setOpen(false)}>确定</Btn>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

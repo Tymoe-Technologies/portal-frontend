@@ -2,7 +2,7 @@ import { httpService } from './http'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'https://tymoe.com/api/auth-service/v1'
 
-export type DeviceType = 'POS' | 'KIOSK' | 'TABLET'
+export type DeviceType = 'POS' | 'KIOSK' | 'TABLET' | 'DISPLAY'
 export type DeviceStatus = 'PENDING' | 'ACTIVE' | 'DELETED'
 
 export interface Device {

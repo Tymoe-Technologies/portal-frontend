@@ -1120,9 +1120,8 @@ const en = {
         iceNormalExample: 'Normal Ice',
         iceLightExample: 'Less Ice',
         iceMoreExample: 'Extra Ice',
-        iceNoneExample: 'No Ice'
-      },
-      modifierGroupManager: {
+        iceNoneExample: 'No Ice',
+        modifierGroupManager: {
         loadGroupsFailed: 'Failed to load modifier groups',
         loadOptionsFailed: 'Failed to load options',
         nameRequired: 'Please enter a modifier group name',
@@ -1202,6 +1201,7 @@ const en = {
         confirmDeleteGroupDescription: 'Are you sure you want to delete this modifier group?',
         confirmDeleteOptionDescription: 'Are you sure you want to delete this option? This cannot be undone.',
         deleteConfirmText: 'Delete'
+        }
       },
       multiMenu: {
         title: 'Menu',

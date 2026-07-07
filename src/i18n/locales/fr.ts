@@ -1235,9 +1235,8 @@ const fr = {
         iceNormalExample: 'Glace normale',
         iceLightExample: 'Moins de glace',
         iceMoreExample: 'Plus de glace',
-        iceNoneExample: 'Sans glace'
-      },
-      modifierGroupManager: {
+        iceNoneExample: 'Sans glace',
+        modifierGroupManager: {
         loadGroupsFailed: 'Échec du chargement des groupes de modificateurs',
         loadOptionsFailed: 'Échec du chargement des options',
         nameRequired: 'Veuillez saisir un nom de groupe de modificateurs',
@@ -1317,6 +1316,7 @@ const fr = {
         confirmDeleteGroupDescription: 'Êtes-vous sûr de vouloir supprimer ce groupe de modificateurs ?',
         confirmDeleteOptionDescription: 'Êtes-vous sûr de vouloir supprimer cette option ? Cette action est irréversible.',
         deleteConfirmText: 'Supprimer'
+        }
       },
       menuSync: {
         title: 'Synchronisation du menu',

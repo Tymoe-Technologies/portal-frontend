@@ -1102,9 +1102,8 @@ const zhTW = {
         iceNormalExample: '正常冰',
         iceLightExample: '少冰',
         iceMoreExample: '多冰',
-        iceNoneExample: '去冰'
-      },
-      modifierGroupManager: {
+        iceNoneExample: '去冰',
+        modifierGroupManager: {
         loadGroupsFailed: '載入自定義選項組失敗',
         loadOptionsFailed: '載入選項失敗',
         nameRequired: '請輸入選項組名稱',
@@ -1184,6 +1183,7 @@ const zhTW = {
         confirmDeleteGroupDescription: '確定要刪除此自定義選項組嗎？',
         confirmDeleteOptionDescription: '確定要刪除此選項嗎？刪除後無法恢復。',
         deleteConfirmText: '刪除'
+        }
       },
       multiMenu: {
         title: '菜單',

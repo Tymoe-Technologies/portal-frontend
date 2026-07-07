@@ -1137,9 +1137,8 @@ const zhCN = {
         iceNormalExample: '正常冰',
         iceLightExample: '少冰',
         iceMoreExample: '多冰',
-        iceNoneExample: '去冰'
-      },
-      modifierGroupManager: {
+        iceNoneExample: '去冰',
+        modifierGroupManager: {
         loadGroupsFailed: '加载自定义选项组失败',
         loadOptionsFailed: '加载选项失败',
         nameRequired: '请输入选项组名称',
@@ -1219,6 +1218,7 @@ const zhCN = {
         confirmDeleteGroupDescription: '确定要删除此自定义选项组吗？',
         confirmDeleteOptionDescription: '确定要删除此选项吗？删除后无法恢复。',
         deleteConfirmText: '删除'
+        }
       },
       multiMenu: {
         title: '菜单',

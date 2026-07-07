@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Pencil, User, ArrowLeftRight, X } from 'lucide-react'
 import { resourcesApi } from '@/services/booking'
 import type { BookableResource } from '@/types/booking'
@@ -12,15 +13,18 @@ interface PersonResource extends BookableResource {
 }
 
 // 性别选项
-const GENDER_OPTIONS = [
-  { label: '男', value: 'male' },
-  { label: '女', value: 'female' },
-  { label: '非二元性别', value: 'non-binary' },
-  { label: '不公开', value: 'not-specified' },
+const getGenderOptions = (t: (key: string) => string) => [
+  { label: t('pages.booking.personManagement.genderMale'), value: 'male' },
+  { label: t('pages.booking.personManagement.genderFemale'), value: 'female' },
+  { label: t('pages.booking.personManagement.genderNonBinary'), value: 'non-binary' },
+  { label: t('pages.booking.personManagement.genderNotSpecified'), value: 'not-specified' },
 ]
-const GENDER_LABEL: Record<string, string> = {
-  male: '男', female: '女', 'non-binary': '非二元', 'not-specified': '不公开',
-}
+const getGenderLabel = (t: (key: string) => string): Record<string, string> => ({
+  male: t('pages.booking.personManagement.genderMaleShort'),
+  female: t('pages.booking.personManagement.genderFemaleShort'),
+  'non-binary': t('pages.booking.personManagement.genderNonBinaryShort'),
+  'not-specified': t('pages.booking.personManagement.genderNotSpecifiedShort'),
+})
 
 // 标签输入（回车添加，替代 antd Select tags 模式）
 function TagsInput({ value, onChange, placeholder }: { value: string[]; onChange: (v: string[]) => void; placeholder?: string }) {
@@ -51,6 +55,7 @@ function TagsInput({ value, onChange, placeholder }: { value: string[]; onChange
 }
 
 export default function PersonManagement() {
+  const { t } = useTranslation()
   const [persons, setPersons] = useState<PersonResource[]>([])
   const [loading, setLoading] = useState(false)
   const [modal, setModal] = useState(false)
@@ -77,7 +82,7 @@ export default function PersonManagement() {
       const resources = await resourcesApi.list({ type: 'PERSON' })
       setPersons(resources as PersonResource[])
     } catch (error) {
-      toast.error('加载人员列表失败')
+      toast.error(t('pages.booking.personManagement.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -93,7 +98,7 @@ export default function PersonManagement() {
     reader.onload = () => {
       setImageUrl(reader.result as string)
       setImageFile(file)
-      toast.success('图片已选择，保存时将上传')
+      toast.success(t('pages.booking.personManagement.imagePickedToast'))
     }
     reader.readAsDataURL(file)
   }
@@ -126,7 +131,7 @@ export default function PersonManagement() {
 
   // 保存（新增或编辑）
   const handleSave = async () => {
-    if (!fName.trim()) { setNameError('请输入名字'); return }
+    if (!fName.trim()) { setNameError(t('pages.booking.personManagement.nameRequired')); return }
     setNameError('')
     setSaving(true)
     try {
@@ -151,7 +156,7 @@ export default function PersonManagement() {
           const uploadResult = await resourcesApi.uploadImage(resource.id, imageFile)
           resource = uploadResult.resource
         } catch (uploadError) {
-          toast.error('图片上传失败')
+          toast.error(t('pages.booking.personManagement.imageUploadFailed'))
         }
       }
 
@@ -165,10 +170,10 @@ export default function PersonManagement() {
         return [...prev, resource]
       })
 
-      toast.success(editingId ? '人员已更新' : '人员已添加')
+      toast.success(editingId ? t('pages.booking.personManagement.personUpdated') : t('pages.booking.personManagement.personAdded'))
       setModal(false)
     } catch (error) {
-      toast.error('保存失败')
+      toast.error(t('pages.booking.personManagement.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -183,7 +188,7 @@ export default function PersonManagement() {
       const updated = await resourcesApi.update(person.id, { status: nextStatus }) as PersonResource
       setPersons(prev => prev.map(p => p.id === updated.id ? updated : p))
     } catch {
-      toast.error('状态更新失败')
+      toast.error(t('pages.booking.personManagement.statusUpdateFailed'))
     } finally {
       setTogglingId(null)
     }
@@ -195,10 +200,10 @@ export default function PersonManagement() {
     try {
       await resourcesApi.delete(deleteId)
       setPersons(prev => prev.filter(p => p.id !== deleteId))
-      toast.success('人员已删除')
+      toast.success(t('pages.booking.personManagement.personDeleted'))
       setDeleteId(null)
     } catch (error) {
-      toast.error('删除失败')
+      toast.error(t('pages.booking.personManagement.deleteFailed'))
     }
   }
 
@@ -244,7 +249,7 @@ export default function PersonManagement() {
             </div>
           )}
 
-          {gender && <div className="text-xs text-slate-400 mb-2.5">{GENDER_LABEL[gender]}</div>}
+          {gender && <div className="text-xs text-slate-400 mb-2.5">{getGenderLabel(t)[gender]}</div>}
 
           {/* 底部操作 */}
           <div className="mt-auto flex gap-1.5 pt-3 border-t border-slate-100">
@@ -256,7 +261,7 @@ export default function PersonManagement() {
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isAvailable ? 'bg-green-500' : 'bg-slate-300'}`} />
-              <span>{toggling ? '更新中' : isAvailable ? '接单中' : '已暂停'}</span>
+              <span>{toggling ? t('pages.booking.personManagement.statusUpdating') : isAvailable ? t('pages.booking.personManagement.statusAvailable') : t('pages.booking.personManagement.statusPaused')}</span>
               <ArrowLeftRight className="w-2.5 h-2.5 opacity-40" />
             </button>
 
@@ -278,13 +283,13 @@ export default function PersonManagement() {
   return (
     <div className="p-4">
       <div className="mb-5">
-        <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>添加人员</Btn>
+        <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.booking.personManagement.addPersonBtn')}</Btn>
       </div>
 
       {loading ? (
         <div className="text-center py-16"><Spinner className="w-8 h-8 mx-auto text-slate-400" /></div>
       ) : persons.length === 0 ? (
-        <EmptyState icon={<User className="w-8 h-8" />} title="暂无人员" description="点击上方按钮添加" />
+        <EmptyState icon={<User className="w-8 h-8" />} title={t('pages.booking.personManagement.emptyTitle')} description={t('pages.booking.personManagement.emptyDescription')} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {persons.map(renderPersonCard)}
@@ -293,32 +298,32 @@ export default function PersonManagement() {
 
       {/* 编辑模态框 */}
       <Modal
-        title={editingId ? '编辑人员' : '添加人员'}
+        title={editingId ? t('pages.booking.personManagement.editPersonTitle') : t('pages.booking.personManagement.addPersonTitle')}
         open={modal}
         onOpenChange={(o) => !o && setModal(false)}
         size="lg"
         footer={
           <div className="flex justify-end gap-2">
-            <Btn variant="secondary" onClick={() => setModal(false)}>取消</Btn>
-            <Btn variant="primary" loading={saving} onClick={handleSave}>{editingId ? '保存' : '添加'}</Btn>
+            <Btn variant="secondary" onClick={() => setModal(false)}>{t('pages.booking.personManagement.cancelBtn')}</Btn>
+            <Btn variant="primary" loading={saving} onClick={handleSave}>{editingId ? t('pages.booking.personManagement.saveBtn') : t('pages.booking.personManagement.addBtn')}</Btn>
           </div>
         }
       >
         <div className="space-y-4">
-          <FormRow label="名字">
-            <TextInput className="w-full" value={fName} onChange={(v) => { setFName(v); if (nameError) setNameError('') }} placeholder="如：张师傅" />
+          <FormRow label={t('pages.booking.personManagement.nameLabel')}>
+            <TextInput className="w-full" value={fName} onChange={(v) => { setFName(v); if (nameError) setNameError('') }} placeholder={t('pages.booking.personManagement.namePlaceholder')} />
           </FormRow>
           {nameError && <p className="text-sm text-red-500 -mt-2">{nameError}</p>}
 
-          <FormRow label="介绍">
-            <Textarea className="w-full" rows={3} value={fDescription} onChange={setFDescription} placeholder="如：资深理发师，擅长烫染" />
+          <FormRow label={t('pages.booking.personManagement.descriptionLabel')}>
+            <Textarea className="w-full" rows={3} value={fDescription} onChange={setFDescription} placeholder={t('pages.booking.personManagement.descriptionPlaceholder')} />
           </FormRow>
 
-          <FormRow label="职称">
-            <TextInput className="w-full" value={fTitle} onChange={setFTitle} placeholder="如：首席设计师" />
+          <FormRow label={t('pages.booking.personManagement.titleLabel')}>
+            <TextInput className="w-full" value={fTitle} onChange={setFTitle} placeholder={t('pages.booking.personManagement.titlePlaceholder')} />
           </FormRow>
 
-          <FormRow label="头像">
+          <FormRow label={t('pages.booking.personManagement.avatarLabel')}>
             <ImageUpload
               url={imageUrl}
               size={100}
@@ -328,16 +333,16 @@ export default function PersonManagement() {
             />
           </FormRow>
 
-          <FormRow label="技能">
-            <TagsInput value={fSkills} onChange={setFSkills} placeholder="添加技能后回车（如：烫、染、剪）" />
+          <FormRow label={t('pages.booking.personManagement.skillsLabel')}>
+            <TagsInput value={fSkills} onChange={setFSkills} placeholder={t('pages.booking.personManagement.skillsPlaceholder')} />
           </FormRow>
 
-          <FormRow label="性别">
-            <div className="w-52"><SelectInput className="w-full" value={fGender} onChange={(v) => setFGender(String(v))} options={GENDER_OPTIONS} placeholder="选择性别（可选）" /></div>
+          <FormRow label={t('pages.booking.personManagement.genderLabel')}>
+            <div className="w-52"><SelectInput className="w-full" value={fGender} onChange={(v) => setFGender(String(v))} options={getGenderOptions(t)} placeholder={t('pages.booking.personManagement.genderPlaceholder')} /></div>
           </FormRow>
 
-          <FormRow label="关联员工账号" hint="关联后该员工可在员工中心查看自己的预约">
-            <TextInput className="w-full" value={fStaffId} onChange={setFStaffId} placeholder="员工 ID（从 auth-service，可选）" />
+          <FormRow label={t('pages.booking.personManagement.linkedStaffLabel')} hint={t('pages.booking.personManagement.linkedStaffHint')}>
+            <TextInput className="w-full" value={fStaffId} onChange={setFStaffId} placeholder={t('pages.booking.personManagement.linkedStaffPlaceholder')} />
           </FormRow>
         </div>
       </Modal>
@@ -346,9 +351,9 @@ export default function PersonManagement() {
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
-        title="确认删除该人员？"
+        title={t('pages.booking.personManagement.deleteConfirmTitle')}
         danger
-        confirmText="删除"
+        confirmText={t('pages.booking.personManagement.deleteConfirmBtn')}
         onConfirm={handleDelete}
       />
     </div>

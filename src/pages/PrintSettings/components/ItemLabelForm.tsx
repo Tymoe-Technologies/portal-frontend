@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Save } from 'lucide-react'
 import { SectionCard, FormRow, SelectInput, Switch, NumberInput, Btn } from '@/components/ui-kit'
+import type { TFunction } from 'i18next'
 
 interface Props {
   config: Record<string, any>
@@ -8,10 +10,11 @@ interface Props {
   saving: boolean
 }
 
-/** 可选字体列表（与 POS 前端 types.ts 中的 LABEL_FONT_OPTIONS 对应） */
+/** 可选字体列表（与 POS 前端 types.ts 中的 LABEL_FONT_OPTIONS 对应），label 的翻译 key 单独在 getFontLabel 中取 */
 const FONT_OPTIONS = [
   {
     value: 'noto-sans-sc',
+    labelKey: null as string | null, // 品牌字体名，不翻译
     label: 'Noto Sans SC',
     cssName: '"Noto Sans SC", sans-serif',
     // Google Fonts CDN 加载
@@ -19,17 +22,24 @@ const FONT_OPTIONS = [
   },
   {
     value: 'alibaba-puhuiti',
+    labelKey: 'pages.printSettings.itemLabelForm.fontOptionAlibabaPuhuiti',
     label: '阿里巴巴普惠体',
     cssName: '"Alibaba PuHuiTi 2.0", "Alibaba PuHuiTi", sans-serif',
     url: 'https://fonts.googleapis.com/css2?family=Alibaba+PuHuiTi+2.0:wght@400;700&display=swap',
   },
   {
     value: 'system-default',
+    labelKey: 'pages.printSettings.itemLabelForm.fontOptionSystemDefault',
     label: '系统默认',
     cssName: '"Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif',
     url: '',
   },
 ]
+
+/** 获取字体下拉选项（翻译后的 label） */
+function getFontOptions(t: TFunction) {
+  return FONT_OPTIONS.map(f => ({ value: f.value, label: f.labelKey ? (t(f.labelKey) as string) : f.label }))
+}
 
 const FONT_SIZE_MAP: Record<string, number> = { small: 24, medium: 48, large: 72 }
 const LINE_HEIGHT_MAP: Record<string, number> = { small: 28, medium: 52, large: 76 }
@@ -95,18 +105,30 @@ const DEFAULT_STATE: LabelState = {
   bold: true, printDensity: 'normal',
 }
 
-const LANG_OPTIONS = [
-  { label: '简体中文', value: 'zh-CN' },
-  { label: 'English', value: 'en' },
-  { label: '繁體中文', value: 'zh-TW' },
-]
-const SIZE_OPTIONS = [
-  { label: '小', value: 'small' },
-  { label: '中', value: 'medium' },
-  { label: '大', value: 'large' },
-]
+function getLangOptions(t: TFunction) {
+  return [
+    { label: t('pages.printSettings.itemLabelForm.langOptionZhCN') as string, value: 'zh-CN' },
+    { label: t('pages.printSettings.itemLabelForm.langOptionEn') as string, value: 'en' },
+    { label: t('pages.printSettings.itemLabelForm.langOptionZhTW') as string, value: 'zh-TW' },
+  ]
+}
+function getSizeOptions(t: TFunction) {
+  return [
+    { label: t('pages.printSettings.itemLabelForm.sizeOptionSmall') as string, value: 'small' },
+    { label: t('pages.printSettings.itemLabelForm.sizeOptionMedium') as string, value: 'medium' },
+    { label: t('pages.printSettings.itemLabelForm.sizeOptionLarge') as string, value: 'large' },
+  ]
+}
+function getDensityOptions(t: TFunction) {
+  return [
+    { label: t('pages.printSettings.itemLabelForm.densityOptionLight') as string, value: 'light' },
+    { label: t('pages.printSettings.itemLabelForm.densityOptionNormal') as string, value: 'normal' },
+    { label: t('pages.printSettings.itemLabelForm.densityOptionDark') as string, value: 'dark' },
+  ]
+}
 
 const ItemLabelForm: React.FC<Props> = ({ config, onSave, saving }) => {
+  const { t } = useTranslation()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [fontsReady, setFontsReady] = useState(false)
   const [v, setV] = useState<LabelState>(DEFAULT_STATE)
@@ -343,68 +365,68 @@ const ItemLabelForm: React.FC<Props> = ({ config, onSave, saving }) => {
       {/* 左侧：配置表单 */}
       <div className="lg:col-span-2 space-y-4">
         {/* 打印样式 */}
-        <SectionCard title="🎨 打印样式">
+        <SectionCard title={t('pages.printSettings.itemLabelForm.printStyleTitle')}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-            <FormRow label="打印字体">
+            <FormRow label={t('pages.printSettings.itemLabelForm.printFontLabel')}>
               <div className="w-44"><SelectInput className="w-full" value={v.fontFamily} onChange={(val) => set('fontFamily', String(val))}
-                options={FONT_OPTIONS.map(f => ({ label: f.label, value: f.value }))} /></div>
+                options={getFontOptions(t)} /></div>
             </FormRow>
-            <FormRow label="打印浓度">
+            <FormRow label={t('pages.printSettings.itemLabelForm.printDensityLabel')}>
               <div className="w-44"><SelectInput className="w-full" value={v.printDensity} onChange={(val) => set('printDensity', String(val))}
-                options={[{ label: '淡色', value: 'light' }, { label: '正常', value: 'normal' }, { label: '深色', value: 'dark' }]} /></div>
+                options={getDensityOptions(t)} /></div>
             </FormRow>
-            <FormRow label="商品名字号">
-              <div className="w-44"><SelectInput className="w-full" value={v.itemNameFontSize} onChange={(val) => set('itemNameFontSize', String(val))} options={SIZE_OPTIONS} /></div>
+            <FormRow label={t('pages.printSettings.itemLabelForm.itemNameFontSizeLabel')}>
+              <div className="w-44"><SelectInput className="w-full" value={v.itemNameFontSize} onChange={(val) => set('itemNameFontSize', String(val))} options={getSizeOptions(t)} /></div>
             </FormRow>
-            <FormRow label="修饰项字号">
-              <div className="w-44"><SelectInput className="w-full" value={v.modifierFontSize} onChange={(val) => set('modifierFontSize', String(val))} options={SIZE_OPTIONS} /></div>
+            <FormRow label={t('pages.printSettings.itemLabelForm.modifierFontSizeLabel')}>
+              <div className="w-44"><SelectInput className="w-full" value={v.modifierFontSize} onChange={(val) => set('modifierFontSize', String(val))} options={getSizeOptions(t)} /></div>
             </FormRow>
-            <FormRow label="加粗显示"><Switch checked={v.bold} onCheckedChange={toggle('bold')} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.boldLabel')}><Switch checked={v.bold} onCheckedChange={toggle('bold')} /></FormRow>
           </div>
         </SectionCard>
 
         {/* 纸张规格 + 标签内容 并排 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <SectionCard title="📋 纸张规格">
-            <FormRow label="宽度(mm)" hint="常见值: 40, 50, 60mm"><NumberInput value={v.labelWidth} onChange={(val) => set('labelWidth', val)} min={20} max={100} /></FormRow>
-            <FormRow label="高度(mm)" hint="常见值: 30, 40mm"><NumberInput value={v.labelHeight} onChange={(val) => set('labelHeight', val)} min={15} max={100} /></FormRow>
-            <FormRow label="间距(mm)" hint="多张标签之间的间距"><NumberInput value={v.labelGap} onChange={(val) => set('labelGap', val)} min={0} max={10} /></FormRow>
-            <FormRow label="语言">
-              <div className="w-40"><SelectInput className="w-full" value={v.language} onChange={(val) => set('language', String(val))} options={LANG_OPTIONS} /></div>
+          <SectionCard title={t('pages.printSettings.itemLabelForm.paperSpecTitle')}>
+            <FormRow label={t('pages.printSettings.itemLabelForm.widthLabel')} hint={t('pages.printSettings.itemLabelForm.widthHint')}><NumberInput value={v.labelWidth} onChange={(val) => set('labelWidth', val)} min={20} max={100} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.heightLabel')} hint={t('pages.printSettings.itemLabelForm.heightHint')}><NumberInput value={v.labelHeight} onChange={(val) => set('labelHeight', val)} min={15} max={100} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.gapLabel')} hint={t('pages.printSettings.itemLabelForm.gapHint')}><NumberInput value={v.labelGap} onChange={(val) => set('labelGap', val)} min={0} max={10} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.languageLabel')}>
+              <div className="w-40"><SelectInput className="w-full" value={v.language} onChange={(val) => set('language', String(val))} options={getLangOptions(t)} /></div>
             </FormRow>
           </SectionCard>
 
-          <SectionCard title="📄 标签内容显示">
-            <FormRow label="商品名称"><Switch checked={v.showItemName} onCheckedChange={toggle('showItemName')} /></FormRow>
-            <FormRow label="商品属性"><Switch checked={v.showAttributes} onCheckedChange={toggle('showAttributes')} /></FormRow>
-            <FormRow label="修饰项"><Switch checked={v.showModifiers} onCheckedChange={toggle('showModifiers')} /></FormRow>
-            <FormRow label="特殊备注"><Switch checked={v.showSpecialNotes} onCheckedChange={toggle('showSpecialNotes')} /></FormRow>
-            <FormRow label="杯数显示"><Switch checked={v.showCupIndex} onCheckedChange={toggle('showCupIndex')} /></FormRow>
-            <FormRow label="订单号"><Switch checked={v.showOrderNumber} onCheckedChange={toggle('showOrderNumber')} /></FormRow>
-            <FormRow label="顾客姓名"><Switch checked={v.showCustomerName} onCheckedChange={toggle('showCustomerName')} /></FormRow>
-            <FormRow label="桌号"><Switch checked={v.showTableNumber} onCheckedChange={toggle('showTableNumber')} /></FormRow>
-            <FormRow label="订单时间"><Switch checked={v.showTimestamp} onCheckedChange={toggle('showTimestamp')} /></FormRow>
-            <FormRow label="二维码"><Switch checked={v.showQrCode} onCheckedChange={toggle('showQrCode')} disabled /></FormRow>
+          <SectionCard title={t('pages.printSettings.itemLabelForm.contentDisplayTitle')}>
+            <FormRow label={t('pages.printSettings.itemLabelForm.showItemNameLabel')}><Switch checked={v.showItemName} onCheckedChange={toggle('showItemName')} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.showAttributesLabel')}><Switch checked={v.showAttributes} onCheckedChange={toggle('showAttributes')} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.showModifiersLabel')}><Switch checked={v.showModifiers} onCheckedChange={toggle('showModifiers')} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.showSpecialNotesLabel')}><Switch checked={v.showSpecialNotes} onCheckedChange={toggle('showSpecialNotes')} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.showCupIndexLabel')}><Switch checked={v.showCupIndex} onCheckedChange={toggle('showCupIndex')} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.showOrderNumberLabel')}><Switch checked={v.showOrderNumber} onCheckedChange={toggle('showOrderNumber')} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.showCustomerNameLabel')}><Switch checked={v.showCustomerName} onCheckedChange={toggle('showCustomerName')} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.showTableNumberLabel')}><Switch checked={v.showTableNumber} onCheckedChange={toggle('showTableNumber')} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.showTimestampLabel')}><Switch checked={v.showTimestamp} onCheckedChange={toggle('showTimestamp')} /></FormRow>
+            <FormRow label={t('pages.printSettings.itemLabelForm.showQrCodeLabel')}><Switch checked={v.showQrCode} onCheckedChange={toggle('showQrCode')} disabled /></FormRow>
           </SectionCard>
         </div>
 
         {/* 保存按钮 */}
         <div className="text-center pt-2">
-          <Btn variant="primary" icon={<Save className="w-3.5 h-3.5" />} onClick={handleSave} loading={saving}>保存配置</Btn>
+          <Btn variant="primary" icon={<Save className="w-3.5 h-3.5" />} onClick={handleSave} loading={saving}>{t('pages.printSettings.itemLabelForm.saveConfigBtn')}</Btn>
         </div>
       </div>
 
       {/* 右侧：实时预览 */}
       <div>
         <div className="sticky top-4">
-          <SectionCard title="标签打印预览" bodyClassName="text-center px-3 py-4">
+          <SectionCard title={t('pages.printSettings.itemLabelForm.previewTitle')} bodyClassName="text-center px-3 py-4">
             <div className="inline-block bg-white border border-slate-200 rounded p-1 shadow-sm">
               <canvas
                 ref={canvasRef}
                 style={{ display: 'block', imageRendering: 'pixelated', maxWidth: '100%', height: 'auto' }}
               />
             </div>
-            <p className="mt-2 text-xs text-slate-400">模拟实际打印效果（切换选项实时更新）</p>
+            <p className="mt-2 text-xs text-slate-400">{t('pages.printSettings.itemLabelForm.previewHint')}</p>
           </SectionCard>
         </div>
       </div>

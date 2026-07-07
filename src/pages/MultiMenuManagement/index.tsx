@@ -19,15 +19,15 @@ import {
   AlertBox, Spinner, EmptyState, Modal, Drawer, ConfirmDialog,
 } from '@/components/ui-kit'
 
-const DAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+const DAY_LABEL_KEYS = ['dayShortSun', 'dayShortMon', 'dayShortTue', 'dayShortWed', 'dayShortThu', 'dayShortFri', 'dayShortSat'] as const
 
 const fmtPrice = (cents: number | null | undefined) =>
   cents != null ? (cents / 100).toFixed(2) : '—'
 
-function scheduleText(schedules: MenuSchedule[]): string {
-  if (!schedules.length) return '无调度'
+function scheduleText(schedules: MenuSchedule[], t: (key: string) => string): string {
+  if (!schedules.length) return t('pages.multiMenu.noSchedule')
   return schedules.map(s => {
-    const days = [...s.days].sort().map(d => DAY_LABELS[d]).join(' ')
+    const days = [...s.days].sort().map(d => t(`pages.multiMenu.${DAY_LABEL_KEYS[d]}`)).join(' ')
     return `${days}  ${s.startTime}–${s.endTime}`
   }).join('　|　')
 }
@@ -39,6 +39,7 @@ const ScheduleEditor: React.FC<{
   schedules: ScheduleRow[]
   onChange: (v: ScheduleRow[]) => void
 }> = ({ schedules, onChange }) => {
+  const { t } = useTranslation()
   const add = () => onChange([...schedules, { days: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '22:00' }])
   const remove = (i: number) => onChange(schedules.filter((_, idx) => idx !== i))
   const update = (i: number, key: keyof ScheduleRow, val: any) =>
@@ -56,14 +57,14 @@ const ScheduleEditor: React.FC<{
         <div key={i} className="rounded-lg border border-slate-200 p-3 space-y-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="flex flex-wrap gap-1">
-              {DAY_LABELS.map((label, d) => (
+              {DAY_LABEL_KEYS.map((key, d) => (
                 <button
                   key={d}
                   onClick={() => toggleDay(i, d)}
                   className={clsx('px-2 py-0.5 rounded-md text-xs cursor-pointer transition-colors',
                     s.days.includes(d) ? 'bg-slate-900 text-white!' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')}
                 >
-                  {label}
+                  {t(`pages.multiMenu.${key}`)}
                 </button>
               ))}
             </div>
@@ -73,14 +74,14 @@ const ScheduleEditor: React.FC<{
           </div>
           <div className="flex items-center gap-2">
             <input type="time" step={900} value={s.startTime} onChange={e => update(i, 'startTime', e.target.value || '00:00')} className={timeCls} />
-            <span className="text-xs text-slate-400">至</span>
+            <span className="text-xs text-slate-400">{t('pages.multiMenu.until')}</span>
             <input type="time" step={900} value={s.endTime} onChange={e => update(i, 'endTime', e.target.value || '23:59')} className={timeCls} />
-            {s.startTime > s.endTime && <Badge variant="gold">跨午夜</Badge>}
+            {s.startTime > s.endTime && <Badge variant="gold">{t('pages.multiMenu.crossMidnight')}</Badge>}
           </div>
         </div>
       ))}
       <button onClick={add} className="w-full rounded-lg border border-dashed border-slate-300 py-2 text-sm text-slate-500 hover:border-slate-400 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
-        <Plus className="w-3.5 h-3.5" />添加时间段
+        <Plus className="w-3.5 h-3.5" />{t('pages.multiMenu.addTimeSlot')}
       </button>
     </div>
   )
@@ -93,6 +94,7 @@ const ItemPicker: React.FC<{
   onSelect: (items: Array<{ catalogItemId: string; priceOverride: null }>) => void
   onCancel: () => void
 }> = ({ open, existingIds, onSelect, onCancel }) => {
+  const { t } = useTranslation()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -123,18 +125,18 @@ const ItemPicker: React.FC<{
     <Modal
       open={open}
       onOpenChange={v => !v && onCancel()}
-      title="添加商品"
+      title={t('pages.multiMenu.addItemsModalTitle')}
       footer={
         <>
-          <Btn variant="secondary" onClick={onCancel}>取消</Btn>
+          <Btn variant="secondary" onClick={onCancel}>{t('pages.multiMenu.cancel')}</Btn>
           <Btn variant="primary" disabled={selected.size === 0} onClick={() => onSelect([...selected].map(id => ({ catalogItemId: id, priceOverride: null })))}>
-            添加 {selected.size} 个
+            {t('pages.multiMenu.addCount', { count: selected.size })}
           </Btn>
         </>
       }
     >
       <div className="space-y-2">
-        <TextInput value={search} onChange={setSearch} placeholder="搜索商品名称" />
+        <TextInput value={search} onChange={setSearch} placeholder={t('pages.multiMenu.searchItemsPlaceholder')} />
         {loading ? <Spinner /> : (
           <div className="max-h-80 overflow-y-auto sidebar-scroll">
             {filtered.map(item => {
@@ -156,7 +158,7 @@ const ItemPicker: React.FC<{
                 </button>
               )
             })}
-            {filtered.length === 0 && <EmptyState title="无匹配商品" />}
+            {filtered.length === 0 && <EmptyState title={t('pages.multiMenu.noMatchingItems')} />}
           </div>
         )}
       </div>
@@ -205,7 +207,7 @@ const MultiMenuManagement: React.FC = () => {
       setMenus(data)
       setSelected(prev => prev ? (data.find(m => m.id === prev.id) ?? null) : null)
     } catch {
-      notify('error', '加载失败')
+      notify('error', t('pages.multiMenu.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -227,7 +229,7 @@ const MultiMenuManagement: React.FC = () => {
   }
 
   const handleSaveMenu = async () => {
-    if (!menuName.trim()) { setMenuErr('请输入菜单名称'); return }
+    if (!menuName.trim()) { setMenuErr(t('pages.multiMenu.menuNameRequired')); return }
     setSavingMenu(true)
     try {
       if (menuDrawer.menu) {
@@ -236,11 +238,11 @@ const MultiMenuManagement: React.FC = () => {
       } else {
         await createMenu({ name: menuName, description: menuDesc, schedules: scheduleRows } as any)
       }
-      notify('success', '已保存')
+      notify('success', t('pages.multiMenu.saved'))
       setMenuDrawer({ open: false })
       load()
     } catch (e: any) {
-      notify('error', e?.response?.data?.error ?? '保存失败')
+      notify('error', e?.response?.data?.error ?? t('pages.multiMenu.saveFailed'))
     } finally {
       setSavingMenu(false)
     }
@@ -251,16 +253,16 @@ const MultiMenuManagement: React.FC = () => {
       await updateMenu(menu.id, { isActive })
       setMenus(prev => prev.map(m => m.id === menu.id ? { ...m, isActive } : m))
       if (selected?.id === menu.id) setSelected(prev => prev ? { ...prev, isActive } : prev)
-    } catch { notify('error', '操作失败') }
+    } catch { notify('error', t('pages.multiMenu.actionFailed')) }
   }
 
   const handleDeleteMenu = async (menu: StoreMenu) => {
     try {
       await deleteMenu(menu.id)
-      notify('success', '已删除')
+      notify('success', t('pages.multiMenu.deleted'))
       if (selected?.id === menu.id) setSelected(null)
       load()
-    } catch { notify('error', '删除失败') }
+    } catch { notify('error', t('pages.multiMenu.deleteFailed')) }
     finally { setDeleteMenuTarget(null) }
   }
 
@@ -278,22 +280,22 @@ const MultiMenuManagement: React.FC = () => {
   const handleSaveSection = async () => {
     const { menuId, section } = sectionModal
     if (!menuId) return
-    if (!sectionName.trim()) { setSectionErr('请输入分区名称'); return }
+    if (!sectionName.trim()) { setSectionErr(t('pages.multiMenu.sectionNameRequired')); return }
     try {
       const payload = { name: sectionName, description: sectionDesc }
       section ? await updateSection(menuId, section.id, payload) : await createSection(menuId, payload)
-      notify('success', '已保存')
+      notify('success', t('pages.multiMenu.saved'))
       setSectionModal({ open: false })
       load()
-    } catch { notify('error', '保存失败') }
+    } catch { notify('error', t('pages.multiMenu.saveFailed')) }
   }
 
   const handleDeleteSection = async (menuId: string, sectionId: string) => {
     try {
       await deleteSection(menuId, sectionId)
-      notify('success', '已删除')
+      notify('success', t('pages.multiMenu.deleted'))
       load()
-    } catch { notify('error', '删除失败') }
+    } catch { notify('error', t('pages.multiMenu.deleteFailed')) }
     finally { setDeleteSectionTarget(null) }
   }
 
@@ -303,11 +305,11 @@ const MultiMenuManagement: React.FC = () => {
     if (!selected || !itemPicker.section) return
     try {
       await addItemsToSection(selected.id, itemPicker.section.id, items)
-      notify('success', `已添加 ${items.length} 个商品`)
+      notify('success', t('pages.multiMenu.itemsAdded', { count: items.length }))
       setItemPicker({ open: false })
       load()
     } catch (e: any) {
-      notify('error', e?.response?.data?.error ?? '添加失败')
+      notify('error', e?.response?.data?.error ?? t('pages.multiMenu.addItemsFailed'))
     }
   }
 
@@ -316,7 +318,7 @@ const MultiMenuManagement: React.FC = () => {
     try {
       await removeSectionItem(selected.id, sectionId, itemId)
       load()
-    } catch { notify('error', '移除失败') }
+    } catch { notify('error', t('pages.multiMenu.removeItemFailed')) }
     finally { setRemoveItemTarget(null) }
   }
 
@@ -330,7 +332,7 @@ const MultiMenuManagement: React.FC = () => {
         actions={
           <>
             <Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading} onClick={load} />
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>新建菜单</Btn>
+            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.multiMenu.newMenu')}</Btn>
           </>
         }
       />
@@ -344,7 +346,7 @@ const MultiMenuManagement: React.FC = () => {
             <Spinner />
           ) : menus.length === 0 ? (
             <SectionCard>
-              <EmptyState title="暂无菜单" action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>新建菜单</Btn>} />
+              <EmptyState title={t('pages.multiMenu.noMenus')} action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.multiMenu.newMenu')}</Btn>} />
             </SectionCard>
           ) : (
             <div className="space-y-2">
@@ -359,19 +361,19 @@ const MultiMenuManagement: React.FC = () => {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium text-slate-800 truncate">{menu.name}</span>
-                        {!menu.isActive && <Badge>停用</Badge>}
+                        {!menu.isActive && <Badge>{t('pages.multiMenu.inactive')}</Badge>}
                       </div>
                       <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
                         <Clock className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{scheduleText(menu.schedules)}</span>
+                        <span className="truncate">{scheduleText(menu.schedules, t)}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                       <Switch checked={menu.isActive} onCheckedChange={v => handleToggle(menu, v)} />
-                      <button title="编辑" onClick={() => openEdit(menu)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
+                      <button title={t('pages.multiMenu.edit')} onClick={() => openEdit(menu)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button title="删除" onClick={() => setDeleteMenuTarget(menu)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+                      <button title={t('pages.multiMenu.delete')} onClick={() => setDeleteMenuTarget(menu)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -385,14 +387,14 @@ const MultiMenuManagement: React.FC = () => {
         {/* 右侧：选中菜单的分区 & 商品 */}
         <div className="flex-1 min-w-0 w-full">
           {!selected ? (
-            <SectionCard><EmptyState title="选择左侧菜单查看分区和商品" /></SectionCard>
+            <SectionCard><EmptyState title={t('pages.multiMenu.selectMenuHint')} /></SectionCard>
           ) : (
             <SectionCard
               title={selected.name}
-              action={<Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openSectionCreate(selected.id)}>添加分区</Btn>}
+              action={<Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openSectionCreate(selected.id)}>{t('pages.multiMenu.addSection')}</Btn>}
             >
               {selected.sections.length === 0 ? (
-                <EmptyState title="暂无分区" action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openSectionCreate(selected.id)}>添加第一个分区</Btn>} />
+                <EmptyState title={t('pages.multiMenu.noSections')} action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openSectionCreate(selected.id)}>{t('pages.multiMenu.addFirstSection')}</Btn>} />
               ) : (
                 <div className="space-y-3">
                   {selected.sections.map(section => (
@@ -400,13 +402,13 @@ const MultiMenuManagement: React.FC = () => {
                       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-100 bg-slate-50/60">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-slate-700 text-sm">{section.name}</span>
-                          <Badge>{section.items.length} 件</Badge>
+                          <Badge>{t('pages.multiMenu.itemsCountUnit', { count: section.items.length })}</Badge>
                         </div>
                         <div className="flex items-center gap-1">
-                          <button title="编辑分区" onClick={() => openSectionEdit(selected.id, section)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
+                          <button title={t('pages.multiMenu.editSection')} onClick={() => openSectionEdit(selected.id, section)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
                             <Pencil className="w-4 h-4" />
                           </button>
-                          <button title="删除分区" onClick={() => setDeleteSectionTarget({ menuId: selected.id, section })} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+                          <button title={t('pages.multiMenu.deleteSection')} onClick={() => setDeleteSectionTarget({ menuId: selected.id, section })} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -424,7 +426,7 @@ const MultiMenuManagement: React.FC = () => {
                                       : <span className="text-slate-400">{fmtPrice(item.catalogItem?.basePrice)}</span>}
                                   </span>
                                 </div>
-                                <button title="移除" onClick={() => setRemoveItemTarget({ sectionId: section.id, itemId: item.id })} className="p-1 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer shrink-0">
+                                <button title={t('pages.multiMenu.removeItem')} onClick={() => setRemoveItemTarget({ sectionId: section.id, itemId: item.id })} className="p-1 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer shrink-0">
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
@@ -432,7 +434,7 @@ const MultiMenuManagement: React.FC = () => {
                           </div>
                         )}
                         <button onClick={() => setItemPicker({ section, open: true })} className="w-full rounded-lg border border-dashed border-slate-300 py-1.5 text-sm text-slate-500 hover:border-slate-400 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
-                          <Plus className="w-3.5 h-3.5" />添加商品
+                          <Plus className="w-3.5 h-3.5" />{t('pages.multiMenu.addItems')}
                         </button>
                       </div>
                     </div>
@@ -448,20 +450,20 @@ const MultiMenuManagement: React.FC = () => {
       <Drawer
         open={menuDrawer.open}
         onOpenChange={v => !v && setMenuDrawer({ open: false })}
-        title={menuDrawer.menu ? '编辑菜单' : '新建菜单'}
+        title={menuDrawer.menu ? t('pages.multiMenu.editMenuTitle') : t('pages.multiMenu.newMenuTitle')}
         width={500}
-        footer={<><Btn variant="secondary" onClick={() => setMenuDrawer({ open: false })}>取消</Btn><Btn variant="primary" loading={savingMenu} onClick={handleSaveMenu}>保存</Btn></>}
+        footer={<><Btn variant="secondary" onClick={() => setMenuDrawer({ open: false })}>{t('pages.multiMenu.cancel')}</Btn><Btn variant="primary" loading={savingMenu} onClick={handleSaveMenu}>{t('pages.multiMenu.save')}</Btn></>}
       >
         <div className="space-y-4">
-          <Field label="菜单名称" required error={menuErr}>
-            <TextInput value={menuName} onChange={setMenuName} placeholder="例：早餐菜单、午餐菜单" />
+          <Field label={t('pages.multiMenu.menuNameLabel')} required error={menuErr}>
+            <TextInput value={menuName} onChange={setMenuName} placeholder={t('pages.multiMenu.menuNamePlaceholder')} />
           </Field>
-          <Field label="描述（可选）">
+          <Field label={t('pages.multiMenu.descriptionOptionalLabel')}>
             <Textarea value={menuDesc} onChange={setMenuDesc} rows={2} />
           </Field>
           <div>
-            <p className="text-sm font-medium text-slate-700 mb-1">时间调度</p>
-            <p className="text-xs text-slate-400 mb-2">设定的时间段内自动激活，支持跨午夜。不设置则永不自动激活。</p>
+            <p className="text-sm font-medium text-slate-700 mb-1">{t('pages.multiMenu.scheduleLabel')}</p>
+            <p className="text-xs text-slate-400 mb-2">{t('pages.multiMenu.scheduleHint')}</p>
             <ScheduleEditor schedules={scheduleRows} onChange={setScheduleRows} />
           </div>
         </div>
@@ -471,14 +473,14 @@ const MultiMenuManagement: React.FC = () => {
       <Modal
         open={sectionModal.open}
         onOpenChange={v => !v && setSectionModal({ open: false })}
-        title={sectionModal.section ? '编辑分区' : '新建分区'}
-        footer={<><Btn variant="secondary" onClick={() => setSectionModal({ open: false })}>取消</Btn><Btn variant="primary" onClick={handleSaveSection}>保存</Btn></>}
+        title={sectionModal.section ? t('pages.multiMenu.editSectionTitle') : t('pages.multiMenu.newSectionTitle')}
+        footer={<><Btn variant="secondary" onClick={() => setSectionModal({ open: false })}>{t('pages.multiMenu.cancel')}</Btn><Btn variant="primary" onClick={handleSaveSection}>{t('pages.multiMenu.save')}</Btn></>}
       >
         <div className="space-y-4">
-          <Field label="分区名称" required error={sectionErr}>
-            <TextInput value={sectionName} onChange={setSectionName} placeholder="例：早餐、主食、饮品" />
+          <Field label={t('pages.multiMenu.sectionNameLabel')} required error={sectionErr}>
+            <TextInput value={sectionName} onChange={setSectionName} placeholder={t('pages.multiMenu.sectionNamePlaceholder')} />
           </Field>
-          <Field label="描述（可选）">
+          <Field label={t('pages.multiMenu.descriptionOptionalLabel')}>
             <Textarea value={sectionDesc} onChange={setSectionDesc} rows={2} />
           </Field>
         </div>
@@ -496,25 +498,25 @@ const MultiMenuManagement: React.FC = () => {
       <ConfirmDialog
         open={!!deleteMenuTarget}
         onOpenChange={v => !v && setDeleteMenuTarget(null)}
-        title="确认删除？"
-        description="删除后不可恢复。"
-        confirmText="删除"
+        title={t('pages.multiMenu.confirmDeleteTitle')}
+        description={t('pages.multiMenu.confirmDeleteDescription')}
+        confirmText={t('pages.multiMenu.delete')}
         danger
         onConfirm={() => deleteMenuTarget && handleDeleteMenu(deleteMenuTarget)}
       />
       <ConfirmDialog
         open={!!deleteSectionTarget}
         onOpenChange={v => !v && setDeleteSectionTarget(null)}
-        title="确认删除此分区？"
-        confirmText="删除"
+        title={t('pages.multiMenu.confirmDeleteSectionTitle')}
+        confirmText={t('pages.multiMenu.delete')}
         danger
         onConfirm={() => deleteSectionTarget && handleDeleteSection(deleteSectionTarget.menuId, deleteSectionTarget.section.id)}
       />
       <ConfirmDialog
         open={!!removeItemTarget}
         onOpenChange={v => !v && setRemoveItemTarget(null)}
-        title="确认移除？"
-        confirmText="移除"
+        title={t('pages.multiMenu.confirmRemoveTitle')}
+        confirmText={t('pages.multiMenu.removeItem')}
         danger
         onConfirm={() => removeItemTarget && handleRemoveItem(removeItemTarget.sectionId, removeItemTarget.itemId)}
       />

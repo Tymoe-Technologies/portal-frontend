@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Gift, DollarSign, Percent, Search, X } from 'lucide-react'
 import type { RewardType, SelectionMode, StackingMode } from '@/services/memberReward'
 import { itemManagementService, type Item } from '@/services/item-management'
@@ -22,14 +23,20 @@ export interface LinkedItemLite {
 
 export type RewardFormValues = Record<string, any>
 
-const REWARD_TYPE_OPTIONS: { value: RewardType; icon: React.ReactNode; label: string; desc: string }[] = [
-  { value: 'FREE_ITEM', icon: <Gift className="w-5 h-5" />, label: '免费商品', desc: '自动加入指定商品' },
-  { value: 'DISCOUNT_AMOUNT', icon: <DollarSign className="w-5 h-5" />, label: '固定金额折扣', desc: '立减固定金额，如 $5 off' },
-  { value: 'DISCOUNT_PERCENTAGE', icon: <Percent className="w-5 h-5" />, label: '百分比折扣', desc: '按比例折扣，如 10% off' },
-]
+// 奖励类型选项（依赖 t，故做成函数，在组件内调用）
+function getRewardTypeOptions(t: (key: string) => string): { value: RewardType; icon: React.ReactNode; label: string; desc: string }[] {
+  return [
+    { value: 'FREE_ITEM', icon: <Gift className="w-5 h-5" />, label: t('pages.rewardManagement.fields.typeOptions.freeItem.label'), desc: t('pages.rewardManagement.fields.typeOptions.freeItem.desc') },
+    { value: 'DISCOUNT_AMOUNT', icon: <DollarSign className="w-5 h-5" />, label: t('pages.rewardManagement.fields.typeOptions.discountAmount.label'), desc: t('pages.rewardManagement.fields.typeOptions.discountAmount.desc') },
+    { value: 'DISCOUNT_PERCENTAGE', icon: <Percent className="w-5 h-5" />, label: t('pages.rewardManagement.fields.typeOptions.discountPercentage.label'), desc: t('pages.rewardManagement.fields.typeOptions.discountPercentage.desc') },
+  ]
+}
 
 // 奖励类型卡片选择器（选中态用 slate，严禁紫色）
-const RewardTypeSelector: React.FC<{ value?: RewardType; onChange: (v: RewardType) => void }> = ({ value, onChange }) => (
+const RewardTypeSelector: React.FC<{ value?: RewardType; onChange: (v: RewardType) => void }> = ({ value, onChange }) => {
+  const { t } = useTranslation()
+  const REWARD_TYPE_OPTIONS = getRewardTypeOptions(t)
+  return (
   <div className="grid grid-cols-3 gap-3">
     {REWARD_TYPE_OPTIONS.map(opt => {
       const active = value === opt.value
@@ -48,7 +55,8 @@ const RewardTypeSelector: React.FC<{ value?: RewardType; onChange: (v: RewardTyp
       )
     })}
   </div>
-)
+  )
+}
 
 // 可选数值输入：空 → undefined（用于"留空 = 无限"语义）
 function OptNumber({ value, onChange, min, max, step, suffix, placeholder, className }: {
@@ -74,6 +82,7 @@ export interface RewardFieldsProps {
 }
 
 const RewardFields: React.FC<RewardFieldsProps> = ({ values, setValue, linkedItems, onLinkedItemsChange, active }) => {
+  const { t } = useTranslation()
   const rewardType: RewardType = values.rewardType ?? 'FREE_ITEM'
   const selectionMode: SelectionMode = values.selectionMode ?? 'FIXED'
   const stackingMode: StackingMode = values.stackingMode ?? 'STACKABLE'
@@ -121,68 +130,68 @@ const RewardFields: React.FC<RewardFieldsProps> = ({ values, setValue, linkedIte
 
   return (
     <div>
-      <FormRow label="奖励类型">
+      <FormRow label={t('pages.rewardManagement.fields.rewardTypeLabel')}>
         <div className="w-full"><RewardTypeSelector value={rewardType} onChange={(v) => setValue({ rewardType: v })} /></div>
       </FormRow>
 
-      <FormRow label="奖励名称">
+      <FormRow label={t('pages.rewardManagement.fields.nameLabel')}>
         <TextInput className="w-full" value={values.name ?? ''} onChange={(v) => setValue({ name: v })}
-          placeholder={rewardType === 'FREE_ITEM' ? '如：生日免费拿铁' : rewardType === 'DISCOUNT_AMOUNT' ? '如：生日 $5 券' : '如：生日九折'} />
+          placeholder={rewardType === 'FREE_ITEM' ? t('pages.rewardManagement.fields.namePlaceholderFreeItem') : rewardType === 'DISCOUNT_AMOUNT' ? t('pages.rewardManagement.fields.namePlaceholderDiscountAmount') : t('pages.rewardManagement.fields.namePlaceholderDiscountPercentage')} />
       </FormRow>
 
-      <FormRow label="说明">
+      <FormRow label={t('pages.rewardManagement.fields.descriptionLabel')}>
         <Textarea className="w-full" rows={2} value={values.description ?? ''} onChange={(v) => setValue({ description: v })}
-          placeholder={rewardType === 'FREE_ITEM' ? '如：生日当月免费一杯中杯拿铁' : rewardType === 'DISCOUNT_AMOUNT' ? '如：消费满 $20 立减 $5' : '如：全单九折'} />
+          placeholder={rewardType === 'FREE_ITEM' ? t('pages.rewardManagement.fields.descriptionPlaceholderFreeItem') : rewardType === 'DISCOUNT_AMOUNT' ? t('pages.rewardManagement.fields.descriptionPlaceholderDiscountAmount') : t('pages.rewardManagement.fields.descriptionPlaceholderDiscountPercentage')} />
       </FormRow>
 
       <div className="grid grid-cols-2 gap-4">
-        <FormRow label="库存数量" hint="不填 = 无限量">
-          <OptNumber value={values.stock} onChange={(v) => setValue({ stock: v })} min={0} placeholder="留空 = 无限" className="w-full" />
+        <FormRow label={t('pages.rewardManagement.fields.stockLabel')} hint={t('pages.rewardManagement.fields.stockHint')}>
+          <OptNumber value={values.stock} onChange={(v) => setValue({ stock: v })} min={0} placeholder={t('pages.rewardManagement.fields.stockPlaceholder')} className="w-full" />
         </FormRow>
-        <FormRow label="每人上限" hint="不填 = 不限次数">
-          <OptNumber value={values.limitPerMember} onChange={(v) => setValue({ limitPerMember: v })} min={1} placeholder="留空 = 不限" className="w-full" />
+        <FormRow label={t('pages.rewardManagement.fields.limitPerMemberLabel')} hint={t('pages.rewardManagement.fields.limitPerMemberHint')}>
+          <OptNumber value={values.limitPerMember} onChange={(v) => setValue({ limitPerMember: v })} min={1} placeholder={t('pages.rewardManagement.fields.limitPerMemberPlaceholder')} className="w-full" />
         </FormRow>
       </div>
 
       {/* 券有效期 */}
-      <FormRow label="券有效期" hint="券发放到顾客后的有效时间">
+      <FormRow label={t('pages.rewardManagement.fields.validityPeriodLabel')} hint={t('pages.rewardManagement.fields.validityPeriodHint')}>
         <div className="flex gap-4">
           {(['PERMANENT', 'DAYS'] as const).map(m => (
             <label key={m} className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
               <input type="radio" checked={validityMode === m} onChange={() => setValue({ validityMode: m })} className="w-4 h-4 accent-slate-900" />
-              {m === 'PERMANENT' ? '永久有效' : '限时有效'}
+              {m === 'PERMANENT' ? t('pages.rewardManagement.fields.validityPermanent') : t('pages.rewardManagement.fields.validityLimited')}
             </label>
           ))}
         </div>
       </FormRow>
       {validityMode === 'DAYS' && (
-        <FormRow label="有效期天数" hint="从发放当天起算，过期后券自动失效">
-          <OptNumber value={values.validityDays} onChange={(v) => setValue({ validityDays: v })} min={1} suffix="天" placeholder="如：30" className="w-52" />
+        <FormRow label={t('pages.rewardManagement.fields.validityDaysLabel')} hint={t('pages.rewardManagement.fields.validityDaysHint')}>
+          <OptNumber value={values.validityDays} onChange={(v) => setValue({ validityDays: v })} min={1} suffix={t('pages.rewardManagement.fields.validityDaysSuffix')} placeholder={t('pages.rewardManagement.fields.validityDaysPlaceholder')} className="w-52" />
         </FormRow>
       )}
 
       {/* FREE_ITEM 专属 */}
       {rewardType === 'FREE_ITEM' && (
         <>
-          {sectionTitle('商品设置')}
-          <FormRow label="顾客选品方式">
+          {sectionTitle(t('pages.rewardManagement.fields.itemSettingsSectionTitle'))}
+          <FormRow label={t('pages.rewardManagement.fields.selectionModeLabel')}>
             <div className="w-full"><SelectInput className="w-full" value={selectionMode} onChange={(v) => setValue({ selectionMode: v })}
               options={[
-                { label: '固定商品（系统自动加入，无需选择）', value: 'FIXED' },
-                { label: '任选 1 件（从以下商品中选一件）', value: 'PICK_ONE' },
-                { label: '任选 N 件（从以下商品中选多件）', value: 'PICK_N' },
-                { label: '从指定品类中自选', value: 'PICK_FROM_CATEGORY' },
+                { label: t('pages.rewardManagement.fields.selectionModeFixed'), value: 'FIXED' },
+                { label: t('pages.rewardManagement.fields.selectionModePickOne'), value: 'PICK_ONE' },
+                { label: t('pages.rewardManagement.fields.selectionModePickN'), value: 'PICK_N' },
+                { label: t('pages.rewardManagement.fields.selectionModePickFromCategory'), value: 'PICK_FROM_CATEGORY' },
               ]} /></div>
           </FormRow>
 
           {selectionMode === 'PICK_N' && (
-            <FormRow label="可选件数">
-              <OptNumber value={values.pickCount} onChange={(v) => setValue({ pickCount: v })} min={2} suffix="件" className="w-40" />
+            <FormRow label={t('pages.rewardManagement.fields.pickCountLabel')}>
+              <OptNumber value={values.pickCount} onChange={(v) => setValue({ pickCount: v })} min={2} suffix={t('pages.rewardManagement.fields.pickCountSuffix')} className="w-40" />
             </FormRow>
           )}
 
           {selectionMode !== 'PICK_FROM_CATEGORY' && (
-            <FormRow label="关联商品">
+            <FormRow label={t('pages.rewardManagement.fields.linkedItemsLabel')}>
               <div className="w-full">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -191,15 +200,15 @@ const RewardFields: React.FC<RewardFieldsProps> = ({ values, setValue, linkedIte
                     onChange={e => handleItemSearch(e.target.value)}
                     onFocus={() => { setShowItemMenu(true); if (itemOptions.length === 0) searchItems() }}
                     onBlur={() => setTimeout(() => setShowItemMenu(false), 150)}
-                    placeholder="搜索商品名称"
+                    placeholder={t('pages.rewardManagement.fields.linkedItemsSearchPlaceholder')}
                     className="w-full text-sm bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
                   />
                   {showItemMenu && (
                     <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg">
                       {itemSearching ? (
-                        <div className="px-3 py-2 text-sm text-slate-400">搜索中...</div>
+                        <div className="px-3 py-2 text-sm text-slate-400">{t('pages.rewardManagement.fields.linkedItemsSearching')}</div>
                       ) : itemOptions.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-slate-400">无匹配商品</div>
+                        <div className="px-3 py-2 text-sm text-slate-400">{t('pages.rewardManagement.fields.linkedItemsNoMatch')}</div>
                       ) : itemOptions.map(item => (
                         <button key={item.id} type="button" onMouseDown={(e) => { e.preventDefault(); addLinkedItem(item) }}
                           className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 cursor-pointer">
@@ -232,9 +241,9 @@ const RewardFields: React.FC<RewardFieldsProps> = ({ values, setValue, linkedIte
       {/* DISCOUNT_AMOUNT 专属 */}
       {rewardType === 'DISCOUNT_AMOUNT' && (
         <>
-          {sectionTitle('折扣设置')}
-          <FormRow label="折扣金额（$）" hint="订单立减此金额">
-            <OptNumber value={values.discountAmount} onChange={(v) => setValue({ discountAmount: v })} min={0.01} step={0.5} placeholder="如：5.00" className="w-full" />
+          {sectionTitle(t('pages.rewardManagement.fields.discountSettingsSectionTitle'))}
+          <FormRow label={t('pages.rewardManagement.fields.discountAmountLabel')} hint={t('pages.rewardManagement.fields.discountAmountHint')}>
+            <OptNumber value={values.discountAmount} onChange={(v) => setValue({ discountAmount: v })} min={0.01} step={0.5} placeholder={t('pages.rewardManagement.fields.discountAmountPlaceholder')} className="w-full" />
           </FormRow>
         </>
       )}
@@ -242,32 +251,32 @@ const RewardFields: React.FC<RewardFieldsProps> = ({ values, setValue, linkedIte
       {/* DISCOUNT_PERCENTAGE 专属 */}
       {rewardType === 'DISCOUNT_PERCENTAGE' && (
         <>
-          {sectionTitle('折扣设置')}
+          {sectionTitle(t('pages.rewardManagement.fields.discountSettingsSectionTitle'))}
           <div className="grid grid-cols-2 gap-4">
-            <FormRow label="折扣百分比" hint="如：10 表示九折">
-              <OptNumber value={values.discountPercentage} onChange={(v) => setValue({ discountPercentage: v })} min={1} max={99} suffix="% off" placeholder="如：10" className="w-full" />
+            <FormRow label={t('pages.rewardManagement.fields.discountPercentageLabel')} hint={t('pages.rewardManagement.fields.discountPercentageHint')}>
+              <OptNumber value={values.discountPercentage} onChange={(v) => setValue({ discountPercentage: v })} min={1} max={99} suffix="% off" placeholder={t('pages.rewardManagement.fields.discountPercentagePlaceholder')} className="w-full" />
             </FormRow>
-            <FormRow label="最高折扣上限（$）" hint="可选，留空不限">
-              <OptNumber value={values.discountMaxAmount} onChange={(v) => setValue({ discountMaxAmount: v })} min={0} step={0.5} placeholder="留空 = 不限" className="w-full" />
+            <FormRow label={t('pages.rewardManagement.fields.discountMaxAmountLabel')} hint={t('pages.rewardManagement.fields.discountMaxAmountHint')}>
+              <OptNumber value={values.discountMaxAmount} onChange={(v) => setValue({ discountMaxAmount: v })} min={0} step={0.5} placeholder={t('pages.rewardManagement.fields.discountMaxAmountPlaceholder')} className="w-full" />
             </FormRow>
           </div>
         </>
       )}
 
       {/* 叠加规则 */}
-      {sectionTitle('叠加规则')}
+      {sectionTitle(t('pages.rewardManagement.fields.stackingSectionTitle'))}
       <div className="grid grid-cols-2 gap-4">
-        <FormRow label="与其他优惠叠加">
+        <FormRow label={t('pages.rewardManagement.fields.stackingModeLabel')}>
           <div className="w-full"><SelectInput className="w-full" value={stackingMode} onChange={(v) => setValue({ stackingMode: v })}
             options={[
-              { label: '可叠加', value: 'STACKABLE' },
-              { label: '独占（不可与任何优惠叠加）', value: 'EXCLUSIVE' },
-              { label: '组内互斥', value: 'GROUP_EXCLUSIVE' },
+              { label: t('pages.rewardManagement.fields.stackingModeStackable'), value: 'STACKABLE' },
+              { label: t('pages.rewardManagement.fields.stackingModeExclusive'), value: 'EXCLUSIVE' },
+              { label: t('pages.rewardManagement.fields.stackingModeGroupExclusive'), value: 'GROUP_EXCLUSIVE' },
             ]} /></div>
         </FormRow>
         {stackingMode === 'GROUP_EXCLUSIVE' && (
-          <FormRow label="互斥分组名称" hint="相同分组名互斥">
-            <TextInput className="w-full" value={values.exclusionGroup ?? ''} onChange={(v) => setValue({ exclusionGroup: v })} placeholder="如：order_discount" />
+          <FormRow label={t('pages.rewardManagement.fields.exclusionGroupLabel')} hint={t('pages.rewardManagement.fields.exclusionGroupHint')}>
+            <TextInput className="w-full" value={values.exclusionGroup ?? ''} onChange={(v) => setValue({ exclusionGroup: v })} placeholder={t('pages.rewardManagement.fields.exclusionGroupPlaceholder')} />
           </FormRow>
         )}
       </div>

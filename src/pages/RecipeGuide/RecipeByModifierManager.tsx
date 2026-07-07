@@ -128,7 +128,7 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
       const combinationsData = await generateCombinations(itemId, { modifierGroupIds: selectedModifierGroupIds })
 
       if (!combinationsData || !combinationsData.combinations || !Array.isArray(combinationsData.combinations)) {
-        toast.error('组合数据格式无效')
+        toast.error(t('pages.recipeGuide.byModifierManager.invalidCombinationData'))
         setCombinations([])
         return
       }
@@ -147,7 +147,7 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
             return {
               modifierGroupId: groupId,
               modifierOptionId: optionId,
-              displayName: option?.displayName || option?.name || cond.optionName || '未知选项'
+              displayName: option?.displayName || option?.name || cond.optionName || t('pages.recipeGuide.byModifierManager.unknownOption')
             }
           })
         }
@@ -210,7 +210,7 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
 
       setCombinations(sortedCombinations)
     } catch (error: any) {
-      toast.error(error.message || '加载配方或组合列表失败')
+      toast.error(error.message || t('pages.recipeGuide.byModifierManager.loadRecipesFailed'))
       setCombinations([])
     } finally {
       setLoading(false)
@@ -225,7 +225,7 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
 
   const handleEditRecipe = async (recipe: Recipe) => {
     if (!recipe) {
-      toast.error('配方数据加载失败，请刷新页面重试')
+      toast.error(t('pages.recipeGuide.byModifierManager.recipeLoadFailedRefresh'))
       return
     }
 
@@ -241,7 +241,7 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
       setSelectedCombination(undefined)
       setModalVisible(true)
     } catch (error: any) {
-      toast.error(error.message || '加载配方详情失败')
+      toast.error(error.message || t('pages.recipeGuide.byModifierManager.loadRecipeDetailFailed'))
     }
   }
 
@@ -249,21 +249,21 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
   const handleCopyToAll = async (sourceRecipe: Recipe) => {
     try {
       if (selectedModifierGroupIds.length === 0) {
-        toast.info('该商品没有自定义选项，无需复制')
+        toast.info(t('pages.recipeGuide.byModifierManager.noModifierGroupsNoCopyNeeded'))
         return
       }
 
       const fullRecipe = await getRecipeById(sourceRecipe.id)
 
       if (!fullRecipe.steps || fullRecipe.steps.length === 0) {
-        toast.error('配方没有步骤数据，无法复制')
+        toast.error(t('pages.recipeGuide.byModifierManager.noStepsCannotCopy'))
         return
       }
 
       const targetCombinations = combinations.filter(c => c.recipe?.id !== sourceRecipe.id)
 
       if (targetCombinations.length === 0) {
-        toast.info('没有其他组合可以复制')
+        toast.info(t('pages.recipeGuide.byModifierManager.noOtherCombinationsToCopy'))
         return
       }
 
@@ -272,7 +272,7 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
 
       setCopyContext({ fullRecipe, targetCombinations, unconfiguredCount, configuredCount })
     } catch (error: any) {
-      toast.error(error.message || '获取配方详情失败')
+      toast.error(error.message || t('pages.recipeGuide.byModifierManager.getRecipeDetailFailed'))
     }
   }
 
@@ -335,13 +335,16 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
     }
 
     const messages = []
-    if (createCount > 0) messages.push(`创建 ${createCount} 个`)
-    if (updateCount > 0) messages.push(`更新 ${updateCount} 个`)
+    if (createCount > 0) messages.push(t('pages.recipeGuide.byModifierManager.createdCount', { count: createCount }))
+    if (updateCount > 0) messages.push(t('pages.recipeGuide.byModifierManager.updatedCount', { count: updateCount }))
 
     if (successCount > 0) {
-      toast.success(`成功${messages.join('，')}配方${errorCount > 0 ? `，失败 ${errorCount} 个` : ''}`)
+      toast.success(t('pages.recipeGuide.byModifierManager.copyResultSuccess', {
+        messages: messages.join('，'),
+        failSuffix: errorCount > 0 ? t('pages.recipeGuide.byModifierManager.failedCountSuffix', { count: errorCount }) : ''
+      }))
     } else {
-      toast.error('所有配方复制都失败了')
+      toast.error(t('pages.recipeGuide.byModifierManager.allCopyFailed'))
     }
 
     setCopying(false)
@@ -353,11 +356,11 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
     if (!deletingRecipe) return
     try {
       await deleteRecipe(deletingRecipe.id)
-      toast.success('删除成功')
+      toast.success(t('pages.recipeGuide.deleteSuccess'))
       setDeletingRecipe(undefined)
       loadRecipesAndCombinations()
     } catch (error: any) {
-      toast.error(error.message || '删除失败')
+      toast.error(error.message || t('pages.recipeGuide.deleteFailed'))
     }
   }
 
@@ -374,7 +377,7 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
 
     const modifierColumns: Column<ModifierCombinationWithRecipe>[] = selectedGroups.map(mg => ({
       key: mg.group!.id,
-      title: mg.group?.displayName || mg.group?.name || '自定义选项',
+      title: mg.group?.displayName || mg.group?.name || t('pages.recipeGuide.byModifierManager.defaultOptionLabel'),
       render: (record) => {
         if (!record.options || !Array.isArray(record.options)) {
           return <span className="text-slate-400">-</span>
@@ -417,9 +420,9 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
           <div className="flex items-center gap-1">
             {record.hasRecipe ? (
               <>
-                <Btn variant="link" size="sm" icon={<Pencil size={14} />} onClick={() => handleEditRecipe(record.recipe!)}>编辑</Btn>
-                <Btn variant="ghost" size="sm" icon={<Copy size={14} />} title="复制到所有其他组合" onClick={() => handleCopyToAll(record.recipe!)} />
-                <Btn variant="ghost" size="sm" icon={<Trash2 size={14} className="text-red-500" />} title="删除配方" onClick={() => setDeletingRecipe(record.recipe!)} />
+                <Btn variant="link" size="sm" icon={<Pencil size={14} />} onClick={() => handleEditRecipe(record.recipe!)}>{t('pages.recipeGuide.byModifierManager.editAction')}</Btn>
+                <Btn variant="ghost" size="sm" icon={<Copy size={14} />} title={t('pages.recipeGuide.byModifierManager.copyToAllTooltip')} onClick={() => handleCopyToAll(record.recipe!)} />
+                <Btn variant="ghost" size="sm" icon={<Trash2 size={14} className="text-red-500" />} title={t('pages.recipeGuide.byModifierManager.deleteRecipeTooltip')} onClick={() => setDeletingRecipe(record.recipe!)} />
               </>
             ) : (
               <Btn variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => handleCreateRecipe(record)}>
@@ -468,12 +471,12 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
     <div className="space-y-6">
       {/* 自定义选项组选择器 - 仅当有自定义选项时显示 */}
       {modifierGroups && modifierGroups.length > 0 && (
-        <SectionCard title="步骤 1: 选择需要的自定义选项组">
+        <SectionCard title={t('pages.recipeGuide.byModifierManager.step1Title')}>
           <div className="space-y-3">
             <Checkbox
               checked={selectedModifierGroupIds.length === modifierGroups.length}
               onCheckedChange={handleSelectAll}
-              label="全选/取消全选"
+              label={t('pages.recipeGuide.byModifierManager.selectAllToggle')}
             />
 
             <div className="flex flex-wrap gap-4">
@@ -485,7 +488,7 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
                   label={
                     <span className="flex items-center gap-2">
                       <span className="font-medium text-slate-700">{mg.group?.displayName || mg.group?.name}</span>
-                      <Badge variant="blue">{mg.group?.options?.length || 0} 个选项</Badge>
+                      <Badge variant="blue">{t('pages.recipeGuide.byModifierManager.optionsCountBadge', { count: mg.group?.options?.length || 0 })}</Badge>
                     </span>
                   }
                 />
@@ -497,8 +500,8 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
                 type="info"
                 title={
                   <span className="flex items-center gap-2">
-                    <span>预计生成 <strong className="text-amber-600">{estimatedCombinations}</strong> 种组合</span>
-                    <Btn variant="link" size="sm" icon={<RefreshCw size={14} />} onClick={loadRecipesAndCombinations} loading={loading}>重新生成组合</Btn>
+                    <span>{t('pages.recipeGuide.byModifierManager.estimatedCombinationsPrefix')} <strong className="text-amber-600">{estimatedCombinations}</strong> {t('pages.recipeGuide.byModifierManager.estimatedCombinationsSuffix')}</span>
+                    <Btn variant="link" size="sm" icon={<RefreshCw size={14} />} onClick={loadRecipesAndCombinations} loading={loading}>{t('pages.recipeGuide.byModifierManager.regenerateCombinations')}</Btn>
                   </span>
                 }
               />
@@ -511,11 +514,11 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
       <SectionCard
         title={
           <span className="flex items-center gap-2">
-            <span>{modifierGroups && modifierGroups.length > 0 ? '步骤 2: ' : ''}{itemName} - {modifierGroups && modifierGroups.length > 0 ? '配方' : '制作指引'}管理</span>
+            <span>{modifierGroups && modifierGroups.length > 0 ? t('pages.recipeGuide.byModifierManager.titleStepPrefix') : ''}{itemName} - {modifierGroups && modifierGroups.length > 0 ? t('pages.recipeGuide.byModifierManager.titleSuffixWithModifiers') : t('pages.recipeGuide.byModifierManager.titleSuffixWithoutModifiers')}</span>
             <Badge variant="blue">{hasRecipeCount} / {totalCount} {t('pages.recipeGuide.configured')}</Badge>
           </span>
         }
-        action={<span className="text-sm text-slate-400">{modifierGroups && modifierGroups.length > 0 ? `共 ${totalCount} 种自定义选项组合` : '共 1 个配方'}</span>}
+        action={<span className="text-sm text-slate-400">{modifierGroups && modifierGroups.length > 0 ? t('pages.recipeGuide.byModifierManager.combinationCountAction', { count: totalCount }) : t('pages.recipeGuide.byModifierManager.singleRecipeAction')}</span>}
       >
         <Table
           columns={columns}
@@ -564,7 +567,7 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
         open={!!deletingRecipe}
         onOpenChange={(o) => { if (!o) setDeletingRecipe(undefined) }}
         title={t('pages.recipeGuide.deleteRecipe')}
-        description="确定要删除这个配方吗？此操作不可恢复。"
+        description={t('pages.recipeGuide.byModifierManager.deleteRecipeConfirmDesc')}
         danger
         onConfirm={handleDeleteRecipe}
       />
@@ -573,22 +576,22 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
       <ConfirmDialog
         open={!!copyContext}
         onOpenChange={(o) => { if (!o && !copying) setCopyContext(undefined) }}
-        title="批量复制配方"
-        confirmText="确定复制"
+        title={t('pages.recipeGuide.byModifierManager.batchCopyTitle')}
+        confirmText={t('pages.recipeGuide.confirmCopy')}
         danger={(copyContext?.configuredCount ?? 0) > 0}
         loading={copying}
         onConfirm={runCopyToAll}
         description={copyContext && (
           <div className="space-y-1">
-            <div>确定要将此配方复制到其他 <strong>{copyContext.targetCombinations.length}</strong> 个组合吗？</div>
+            <div>{t('pages.recipeGuide.byModifierManager.copyToOtherCombinationsDesc', { count: copyContext.targetCombinations.length })}</div>
             {copyContext.unconfiguredCount > 0 && (
-              <div className="text-xs text-green-600">• {copyContext.unconfiguredCount} 个未配置组合（将创建新配方）</div>
+              <div className="text-xs text-green-600">• {t('pages.recipeGuide.byModifierManager.unconfiguredWillCreate', { count: copyContext.unconfiguredCount })}</div>
             )}
             {copyContext.configuredCount > 0 && (
-              <div className="text-xs text-amber-600">• {copyContext.configuredCount} 个已配置组合（将覆盖现有配方）</div>
+              <div className="text-xs text-amber-600">• {t('pages.recipeGuide.byModifierManager.configuredWillOverwrite', { count: copyContext.configuredCount })}</div>
             )}
-            <div className="mt-2 text-xs text-blue-600">📋 将复制 {copyContext.fullRecipe.steps.length} 个制作步骤</div>
-            <div className="text-xs text-slate-400">提示：每个组合的步骤配置将被完整复制，打印代码保持一致。</div>
+            <div className="mt-2 text-xs text-blue-600">{t('pages.recipeGuide.byModifierManager.willCopySteps', { count: copyContext.fullRecipe.steps.length })}</div>
+            <div className="text-xs text-slate-400">{t('pages.recipeGuide.byModifierManager.copyHint')}</div>
           </div>
         )}
       />

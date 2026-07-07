@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FileText, Printer, Tag as TagIcon, BarChart3, ArrowLeftRight, RotateCcw, Image as ImageIcon, Trash2 } from 'lucide-react'
 import LogoCropModal from '../../components/LogoCropModal'
 import type { PrintSetting, TicketType } from '../../services/print-settings'
@@ -17,16 +18,18 @@ import {
   EmptyState, Modal, Slider, Checkbox, Tabs, toast,
 } from '@/components/ui-kit'
 
-// 票据类型 Tab 配置
-const TICKET_TABS: { key: TicketType; label: string; icon: React.ReactNode; description: string }[] = [
-  { key: 'CUSTOMER_RECEIPT', label: '客户收据', icon: <FileText className="w-4 h-4" />, description: '给客户的消费凭证' },
-  { key: 'KITCHEN_TICKET', label: '厨房菜品单', icon: <Printer className="w-4 h-4" />, description: '后厨制作依据' },
-  { key: 'ITEM_LABEL', label: '标签贴纸', icon: <TagIcon className="w-4 h-4" />, description: '贴在商品上的标签' },
-  { key: 'DAILY_REPORT', label: '日结报表', icon: <BarChart3 className="w-4 h-4" />, description: '每日营业汇总' },
-  { key: 'SHIFT_REPORT', label: '交接班单', icon: <ArrowLeftRight className="w-4 h-4" />, description: '交接班数据汇总' },
+// 票据类型 Tab 配置（label/description 需 t()，作为函数在组件内调用）
+const getTicketTabs = (t: (key: string) => string): { key: TicketType; label: string; icon: React.ReactNode; description: string }[] => [
+  { key: 'CUSTOMER_RECEIPT', label: t('pages.printSettings.tabs.customerReceipt.label'), icon: <FileText className="w-4 h-4" />, description: t('pages.printSettings.tabs.customerReceipt.description') },
+  { key: 'KITCHEN_TICKET', label: t('pages.printSettings.tabs.kitchenTicket.label'), icon: <Printer className="w-4 h-4" />, description: t('pages.printSettings.tabs.kitchenTicket.description') },
+  { key: 'ITEM_LABEL', label: t('pages.printSettings.tabs.itemLabel.label'), icon: <TagIcon className="w-4 h-4" />, description: t('pages.printSettings.tabs.itemLabel.description') },
+  { key: 'DAILY_REPORT', label: t('pages.printSettings.tabs.dailyReport.label'), icon: <BarChart3 className="w-4 h-4" />, description: t('pages.printSettings.tabs.dailyReport.description') },
+  { key: 'SHIFT_REPORT', label: t('pages.printSettings.tabs.shiftReport.label'), icon: <ArrowLeftRight className="w-4 h-4" />, description: t('pages.printSettings.tabs.shiftReport.description') },
 ]
 
 const PrintSettings: React.FC = () => {
+  const { t } = useTranslation()
+  const TICKET_TABS = getTicketTabs(t)
   const [settings, setSettings] = useState<PrintSetting[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -69,11 +72,11 @@ const PrintSettings: React.FC = () => {
       let data = await getPrintSettings()
       if (data.length === 0) {
         data = await initializePrintSettings()
-        toast.success('已初始化默认打印设置')
+        toast.success(t('pages.printSettings.initDefaultSuccess'))
       }
       setSettings(data)
     } catch (error: any) {
-      toast.error('加载打印设置失败: ' + (error.message || '未知错误'))
+      toast.error(t('pages.printSettings.loadFailed', { message: error.message || t('pages.printSettings.unknownError') }))
     } finally {
       setLoading(false)
     }
@@ -86,8 +89,8 @@ const PrintSettings: React.FC = () => {
 
   // 选择 Logo 文件：校验后读取为 dataURL 打开裁剪弹窗
   const handleLogoFile = (file: File) => {
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { toast.error('只支持 JPG、PNG、WebP 格式的图片'); return }
-    if (file.size / 1024 / 1024 >= 5) { toast.error('Logo 图片大小不能超过 5MB'); return }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { toast.error(t('pages.printSettings.logoFormatError')); return }
+    if (file.size / 1024 / 1024 >= 5) { toast.error(t('pages.printSettings.logoSizeError')); return }
     const reader = new FileReader()
     reader.onload = (e) => { setCropImageSrc(e.target?.result as string); setCropModalVisible(true) }
     reader.readAsDataURL(file)
@@ -108,7 +111,7 @@ const PrintSettings: React.FC = () => {
       setProcessedResult(result)
       setPreprocessModalVisible(true)
     } catch (error: any) {
-      toast.error('图片处理失败: ' + error.message)
+      toast.error(t('pages.printSettings.imageProcessFailed', { message: error.message }))
     }
   }
 
@@ -119,10 +122,10 @@ const PrintSettings: React.FC = () => {
       const processedFile = new File([processedResult.blob], 'logo.png', { type: 'image/png' })
       const { url } = await uploadBrandLogo(processedFile as unknown as File)
       setBrandLogoUrl(url)
-      toast.success('品牌 Logo 上传成功，所有打印模板将自动使用此 Logo')
+      toast.success(t('pages.printSettings.logoUploadSuccess'))
       setPreprocessModalVisible(false)
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Logo 上传失败')
+      toast.error(error?.response?.data?.error || t('pages.printSettings.logoUploadFailed'))
     } finally {
       setLogoUploading(false)
     }
@@ -136,7 +139,7 @@ const PrintSettings: React.FC = () => {
       const result = await LogoPreprocessor.preprocessImage(originalFile as any, options)
       setProcessedResult(result)
     } catch (error: any) {
-      toast.error('图片处理失败: ' + error.message)
+      toast.error(t('pages.printSettings.imageProcessFailed', { message: error.message }))
     }
   }
 
@@ -145,9 +148,9 @@ const PrintSettings: React.FC = () => {
     try {
       await deleteBrandLogo()
       setBrandLogoUrl(null)
-      toast.success('品牌 Logo 已删除')
+      toast.success(t('pages.printSettings.logoDeleteSuccess'))
     } catch {
-      toast.error('Logo 删除失败')
+      toast.error(t('pages.printSettings.logoDeleteFailed'))
     } finally {
       setLogoUploading(false)
     }
@@ -158,9 +161,9 @@ const PrintSettings: React.FC = () => {
     try {
       const updated = await updatePrintSetting(ticketType, { config })
       setSettings(prev => prev.map(s => s.ticketType === ticketType ? updated : s))
-      toast.success('保存成功')
+      toast.success(t('pages.printSettings.saveSuccess'))
     } catch (error: any) {
-      toast.error('保存失败: ' + (error.message || '未知错误'))
+      toast.error(t('pages.printSettings.saveFailed', { message: error.message || t('pages.printSettings.unknownError') }))
     } finally {
       setSaving(false)
     }
@@ -170,9 +173,9 @@ const PrintSettings: React.FC = () => {
     try {
       const updated = await togglePrintSetting(ticketType)
       setSettings(prev => prev.map(s => s.ticketType === ticketType ? updated : s))
-      toast.success(updated.isEnabled ? '已启用' : '已禁用')
+      toast.success(updated.isEnabled ? t('pages.printSettings.enabledMsg') : t('pages.printSettings.disabledMsg'))
     } catch (error: any) {
-      toast.error('操作失败: ' + (error.message || '未知错误'))
+      toast.error(t('pages.printSettings.operationFailed', { message: error.message || t('pages.printSettings.unknownError') }))
     }
   }
 
@@ -181,7 +184,7 @@ const PrintSettings: React.FC = () => {
       const updated = await updatePrintSetting(ticketType, { copies })
       setSettings(prev => prev.map(s => s.ticketType === ticketType ? updated : s))
     } catch {
-      toast.error('更新份数失败')
+      toast.error(t('pages.printSettings.updateCopiesFailed'))
     }
   }
 
@@ -208,21 +211,21 @@ const PrintSettings: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-6 py-6">
       <PageHeader
-        title="打印设置"
-        description="配置各种票据的打印内容，设置将同步到 POS 设备"
-        actions={<Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} onClick={loadSettings}>刷新</Btn>}
+        title={t('pages.printSettings.pageTitle')}
+        description={t('pages.printSettings.pageDescription')}
+        actions={<Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} onClick={loadSettings}>{t('pages.printSettings.refreshBtn')}</Btn>}
       />
 
       {/* 品牌 Logo */}
       <div className="mb-5">
-        <SectionCard title="品牌 Logo" description="所有打印模板共享，各模板可单独覆盖">
+        <SectionCard title={t('pages.printSettings.brandLogoTitle')} description={t('pages.printSettings.brandLogoDescription')}>
           <div className="flex items-center gap-4">
             {brandLogoUrl ? (
               <>
                 <img src={brandLogoUrl} alt="Logo" className="w-20 h-20 object-contain rounded border border-slate-100 bg-slate-50" />
                 <div className="flex flex-col gap-2">
-                  <Btn variant="secondary" size="sm" icon={<ImageIcon className="w-3.5 h-3.5" />} loading={logoUploading} onClick={() => logoInputRef.current?.click()}>更换 Logo</Btn>
-                  <Btn variant="danger" size="sm" icon={<Trash2 className="w-3.5 h-3.5" />} loading={logoUploading} onClick={handleBrandLogoDelete}>删除 Logo</Btn>
+                  <Btn variant="secondary" size="sm" icon={<ImageIcon className="w-3.5 h-3.5" />} loading={logoUploading} onClick={() => logoInputRef.current?.click()}>{t('pages.printSettings.changeLogoBtn')}</Btn>
+                  <Btn variant="danger" size="sm" icon={<Trash2 className="w-3.5 h-3.5" />} loading={logoUploading} onClick={handleBrandLogoDelete}>{t('pages.printSettings.deleteLogoBtn')}</Btn>
                 </div>
               </>
             ) : (
@@ -231,12 +234,12 @@ const PrintSettings: React.FC = () => {
                 disabled={logoUploading}
                 className="flex flex-col items-center justify-center w-20 h-20 rounded border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-slate-400 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
               >
-                {logoUploading ? <Spinner className="py-0" /> : <><ImageIcon className="w-5 h-5" /><span className="text-[11px] mt-1">上传 Logo</span></>}
+                {logoUploading ? <Spinner className="py-0" /> : <><ImageIcon className="w-5 h-5" /><span className="text-[11px] mt-1">{t('pages.printSettings.uploadLogoBtn')}</span></>}
               </button>
             )}
             <div className="text-xs text-slate-400">
-              上传后所有打印模板（收据、厨房单等）自动使用此 Logo
-              <br />支持 JPG、PNG、WebP，最大 5MB
+              {t('pages.printSettings.logoUploadHint1')}
+              <br />{t('pages.printSettings.logoUploadHint2')}
             </div>
             <input ref={logoInputRef} type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); e.target.value = '' }} />
           </div>
@@ -248,7 +251,7 @@ const PrintSettings: React.FC = () => {
         onChange={(k) => setActiveTab(k as TicketType)}
         items={TICKET_TABS.map(tab => {
           const setting = settings.find(s => s.ticketType === tab.key)
-          return { key: tab.key, label: <>{tab.label}{setting && !setting.isEnabled && <span className="text-slate-400 text-xs ml-1">(已禁用)</span>}</>, icon: tab.icon }
+          return { key: tab.key, label: <>{tab.label}{setting && !setting.isEnabled && <span className="text-slate-400 text-xs ml-1">{t('pages.printSettings.disabledTag')}</span>}</>, icon: tab.icon }
         })}
       />
 
@@ -257,26 +260,26 @@ const PrintSettings: React.FC = () => {
           <div>
             <div className="flex items-center gap-6 rounded-lg bg-slate-50 px-5 py-4 mb-5">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-600">启用打印：</span>
+                <span className="text-sm text-slate-600">{t('pages.printSettings.enablePrintLabel')}</span>
                 <Switch checked={activeSetting.isEnabled} onCheckedChange={() => handleToggle(activeTab)} />
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-600">打印份数：</span>
+                <span className="text-sm text-slate-600">{t('pages.printSettings.printCopiesLabel')}</span>
                 <NumberInput value={activeSetting.copies} onChange={(val) => val && handleCopiesChange(activeTab, val)} min={1} max={10} />
               </div>
-              <span className="text-xs text-slate-400">版本 v{activeSetting.version}</span>
+              <span className="text-xs text-slate-400">{t('pages.printSettings.versionLabel', { version: activeSetting.version })}</span>
             </div>
 
             {!activeSetting.isEnabled && (
               <div className="mb-4">
-                <AlertBox type="warning" title="该票据类型已禁用，POS 设备不会打印此类型的票据" />
+                <AlertBox type="warning" title={t('pages.printSettings.disabledWarning')} />
               </div>
             )}
 
             {renderConfigForm(activeSetting)}
           </div>
         ) : (
-          <EmptyState title="未找到配置，请点击刷新" />
+          <EmptyState title={t('pages.printSettings.emptyStateTitle')} />
         )}
       </div>
 
@@ -292,32 +295,32 @@ const PrintSettings: React.FC = () => {
       <Modal
         open={preprocessModalVisible}
         onOpenChange={(v) => !v && setPreprocessModalVisible(false)}
-        title="品牌 Logo 图片处理"
+        title={t('pages.printSettings.preprocessModalTitle')}
         size="xl"
         footer={
           <>
-            <Btn variant="secondary" onClick={() => setPreprocessModalVisible(false)}>取消</Btn>
-            <Btn variant="primary" loading={logoUploading} onClick={handleBrandLogoConfirmUpload}>上传处理后的图片</Btn>
+            <Btn variant="secondary" onClick={() => setPreprocessModalVisible(false)}>{t('pages.printSettings.cancelBtn')}</Btn>
+            <Btn variant="primary" loading={logoUploading} onClick={handleBrandLogoConfirmUpload}>{t('pages.printSettings.uploadProcessedBtn')}</Btn>
           </>
         }
       >
         <div className="flex gap-10 mb-8">
           <div className="flex-1 text-center">
-            <p className="font-medium text-slate-700 mb-2">原图</p>
+            <p className="font-medium text-slate-700 mb-2">{t('pages.printSettings.originalImageLabel')}</p>
             {originalPreview && (
               <>
-                <img src={originalPreview} alt="原图" className="max-w-full border border-slate-200 rounded mx-auto" />
-                <p className="mt-2 text-sm text-slate-500">大小: {originalFile ? (originalFile.size / 1024).toFixed(2) : 0} KB</p>
+                <img src={originalPreview} alt={t('pages.printSettings.originalImageLabel')} className="max-w-full border border-slate-200 rounded mx-auto" />
+                <p className="mt-2 text-sm text-slate-500">{t('pages.printSettings.sizeLabel', { size: originalFile ? (originalFile.size / 1024).toFixed(2) : 0 })}</p>
               </>
             )}
           </div>
           <div className="flex-1 text-center">
-            <p className="font-medium text-slate-700 mb-2">处理后（纯黑白）</p>
+            <p className="font-medium text-slate-700 mb-2">{t('pages.printSettings.processedImageLabel')}</p>
             {processedResult && (
               <>
                 <img
                   src={processedResult.dataUrl}
-                  alt="处理后"
+                  alt={t('pages.printSettings.processedAltLabel')}
                   className="max-w-full border border-slate-200 rounded mx-auto"
                   style={{
                     background: 'linear-gradient(45deg,#eee 25%,transparent 25%),linear-gradient(-45deg,#eee 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#eee 75%),linear-gradient(-45deg,transparent 75%,#eee 75%)',
@@ -326,10 +329,10 @@ const PrintSettings: React.FC = () => {
                   }}
                 />
                 <p className="mt-2 text-sm text-slate-500">
-                  大小: {(processedResult.stats.processedSize / 1024).toFixed(2)} KB<br />
-                  尺寸: {processedResult.width} × {processedResult.height}<br />
-                  去除背景: {processedResult.stats.removedPixels} 像素<br />
-                  黑色: {processedResult.stats.blackPixels} / 白色: {processedResult.stats.whitePixels}
+                  {t('pages.printSettings.sizeLabel', { size: (processedResult.stats.processedSize / 1024).toFixed(2) })}<br />
+                  {t('pages.printSettings.dimensionLabel', { width: processedResult.width, height: processedResult.height })}<br />
+                  {t('pages.printSettings.removedBgLabel', { count: processedResult.stats.removedPixels })}<br />
+                  {t('pages.printSettings.blackWhiteLabel', { black: processedResult.stats.blackPixels, white: processedResult.stats.whitePixels })}
                 </p>
               </>
             )}
@@ -337,28 +340,28 @@ const PrintSettings: React.FC = () => {
         </div>
 
         <div className="rounded-lg bg-slate-50 p-5">
-          <p className="font-medium text-slate-700 mb-4">调整参数</p>
+          <p className="font-medium text-slate-700 mb-4">{t('pages.printSettings.adjustParamsTitle')}</p>
 
           <div className="mb-5">
             <label className="block mb-2 text-sm text-slate-700">
-              背景去除阈值 ({preprocessOptions.backgroundThreshold})
-              <span className="text-xs text-slate-400 ml-2">越高越激进地移除浅色背景</span>
+              {t('pages.printSettings.bgThresholdLabel', { value: preprocessOptions.backgroundThreshold })}
+              <span className="text-xs text-slate-400 ml-2">{t('pages.printSettings.bgThresholdHint')}</span>
             </label>
             <Slider min={200} max={255} value={preprocessOptions.backgroundThreshold!} onChange={(v) => handleBrandLogoPreprocessOptionsChange({ backgroundThreshold: v })} />
           </div>
 
           <div className="mb-5">
             <label className="block mb-2 text-sm text-slate-700">
-              黑白阈值 ({preprocessOptions.binarizeThreshold})
-              <span className="text-xs text-slate-400 ml-2">低于此值的像素视为黑色</span>
+              {t('pages.printSettings.bwThresholdLabel', { value: preprocessOptions.binarizeThreshold })}
+              <span className="text-xs text-slate-400 ml-2">{t('pages.printSettings.bwThresholdHint')}</span>
             </label>
             <Slider min={0} max={255} value={preprocessOptions.binarizeThreshold!} onChange={(v) => handleBrandLogoPreprocessOptionsChange({ binarizeThreshold: v })} />
           </div>
 
           <div className="mb-5">
             <label className="block mb-2 text-sm text-slate-700">
-              对比度 ({preprocessOptions.contrastFactor?.toFixed(1)})
-              <span className="text-xs text-slate-400 ml-2">增强图片对比度</span>
+              {t('pages.printSettings.contrastLabel', { value: preprocessOptions.contrastFactor?.toFixed(1) })}
+              <span className="text-xs text-slate-400 ml-2">{t('pages.printSettings.contrastHint')}</span>
             </label>
             <Slider min={1} max={3} step={0.1} value={preprocessOptions.contrastFactor!} onChange={(v) => handleBrandLogoPreprocessOptionsChange({ contrastFactor: v })} />
           </div>
@@ -366,7 +369,7 @@ const PrintSettings: React.FC = () => {
           <Checkbox
             checked={!!preprocessOptions.invert}
             onCheckedChange={(c) => handleBrandLogoPreprocessOptionsChange({ invert: c })}
-            label="反色（黑底白字 → 白底黑字）"
+            label={t('pages.printSettings.invertLabel')}
           />
         </div>
       </Modal>

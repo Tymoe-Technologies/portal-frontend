@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Pencil, ArrowLeftRight, LayoutGrid } from 'lucide-react'
 import { resourcesApi, assignmentsApi } from '@/services/booking'
 import type { BookableResource, ProductConfig } from '@/types/booking'
@@ -45,6 +46,7 @@ function DollarInput({ value, onChange, placeholder, className }: { value: numbe
 }
 
 export default function ProductManagement() {
+  const { t } = useTranslation()
   const [products, setProducts] = useState<ProductResource[]>([])
   const [persons, setPersons] = useState<BookableResource[]>([])
   const [loading, setLoading] = useState(false)
@@ -69,7 +71,7 @@ export default function ProductManagement() {
       const resources = await resourcesApi.list({ type: 'PRODUCT' })
       setProducts(resources as ProductResource[])
     } catch {
-      toast.error('加载服务列表失败')
+      toast.error(t('pages.booking.productManagement.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -150,7 +152,7 @@ export default function ProductManagement() {
 
   // 保存
   const handleSave = async () => {
-    if (!form.name.trim()) { setNameError('请输入服务名称'); return }
+    if (!form.name.trim()) { setNameError(t('pages.booking.productManagement.nameRequired')); return }
     setNameError('')
     setSaving(true)
     try {
@@ -187,7 +189,7 @@ export default function ProductManagement() {
           })),
         )
       } catch {
-        toast.warning('人员关联同步失败，请稍后重试')
+        toast.warning(t('pages.booking.productManagement.personSyncFailed'))
       }
 
       if (imageFile) {
@@ -195,7 +197,7 @@ export default function ProductManagement() {
           const result = await resourcesApi.uploadImage(resource.id, imageFile)
           resource = result.resource as ProductResource
         } catch {
-          toast.error('图片上传失败')
+          toast.error(t('pages.booking.productManagement.imageUploadFailed'))
         }
       }
 
@@ -209,10 +211,10 @@ export default function ProductManagement() {
         return [...prev, resource]
       })
 
-      toast.success(editingId ? '服务已更新' : '服务已添加')
+      toast.success(editingId ? t('pages.booking.productManagement.serviceUpdated') : t('pages.booking.productManagement.serviceAdded'))
       setModal(false)
     } catch {
-      toast.error('保存失败')
+      toast.error(t('pages.booking.productManagement.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -227,7 +229,7 @@ export default function ProductManagement() {
       const updated = await resourcesApi.update(product.id, { status: next }) as ProductResource
       setProducts(prev => prev.map(p => p.id === updated.id ? updated : p))
     } catch {
-      toast.error('状态更新失败')
+      toast.error(t('pages.booking.productManagement.statusUpdateFailed'))
     } finally {
       setTogglingId(null)
     }
@@ -239,19 +241,21 @@ export default function ProductManagement() {
     try {
       await resourcesApi.delete(deleteId)
       setProducts(prev => prev.filter(p => p.id !== deleteId))
-      toast.success('服务已删除')
+      toast.success(t('pages.booking.productManagement.serviceDeleted'))
       setDeleteId(null)
     } catch {
-      toast.error('删除失败')
+      toast.error(t('pages.booking.productManagement.deleteFailed'))
     }
   }
 
   // 格式化时长显示
-  const formatDuration = (minutes: number) => {
-    if (minutes < 60) return `${minutes} 分钟`
+  const formatDuration = (minutes: number): string => {
+    if (minutes < 60) return t('pages.booking.productManagement.minutesFormat', { minutes }) as string
     const h = Math.floor(minutes / 60)
     const m = minutes % 60
-    return m > 0 ? `${h} 小时 ${m} 分钟` : `${h} 小时`
+    return m > 0
+      ? t('pages.booking.productManagement.hoursMinutesFormat', { hours: h, minutes: m }) as string
+      : t('pages.booking.productManagement.hoursFormat', { hours: h }) as string
   }
 
   const renderCard = (product: ProductResource) => {
@@ -305,10 +309,10 @@ export default function ProductManagement() {
               <span className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{formatDuration(cfg.durationMinutes)}</span>
             )}
             {cfg.requiresPerson && (
-              <span className="text-[11px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">需指定人员</span>
+              <span className="text-[11px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{t('pages.booking.productManagement.requiresPersonTag')}</span>
             )}
             {cfg.depositEnabled && (
-              <span className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">押金 ${((cfg.depositAmount ?? 0) / 100).toFixed(2)}</span>
+              <span className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{t('pages.booking.productManagement.depositTag', { amount: ((cfg.depositAmount ?? 0) / 100).toFixed(2) })}</span>
             )}
           </div>
 
@@ -322,7 +326,7 @@ export default function ProductManagement() {
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isAvailable ? 'bg-green-500' : 'bg-slate-300'}`} />
-              <span>{toggling ? '更新中' : isAvailable ? '上架中' : '已下架'}</span>
+              <span>{toggling ? t('pages.booking.productManagement.statusUpdating') : isAvailable ? t('pages.booking.productManagement.statusAvailable') : t('pages.booking.productManagement.statusPaused')}</span>
               <ArrowLeftRight className="w-2.5 h-2.5 opacity-40" />
             </button>
 
@@ -344,13 +348,13 @@ export default function ProductManagement() {
   return (
     <div className="p-4">
       <div className="mb-5">
-        <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>添加服务</Btn>
+        <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.booking.productManagement.addServiceBtn')}</Btn>
       </div>
 
       {loading ? (
         <div className="text-center py-16"><Spinner className="w-8 h-8 mx-auto text-slate-400" /></div>
       ) : products.length === 0 ? (
-        <EmptyState icon={<LayoutGrid className="w-8 h-8" />} title="暂无服务" description="点击上方按钮添加" />
+        <EmptyState icon={<LayoutGrid className="w-8 h-8" />} title={t('pages.booking.productManagement.emptyTitle')} description={t('pages.booking.productManagement.emptyDescription')} />
       ) : (
         <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 240px))' }}>
           {products.map(renderCard)}
@@ -359,29 +363,29 @@ export default function ProductManagement() {
 
       {/* 新增/编辑弹窗 */}
       <Modal
-        title={editingId ? '编辑服务' : '添加服务'}
+        title={editingId ? t('pages.booking.productManagement.editServiceTitle') : t('pages.booking.productManagement.addServiceTitle')}
         open={modal}
         onOpenChange={(o) => !o && setModal(false)}
         size="lg"
         footer={
           <div className="flex justify-end gap-2">
-            <Btn variant="secondary" onClick={() => setModal(false)}>取消</Btn>
-            <Btn variant="primary" loading={saving} onClick={handleSave}>{editingId ? '保存' : '添加'}</Btn>
+            <Btn variant="secondary" onClick={() => setModal(false)}>{t('pages.booking.productManagement.cancelBtn')}</Btn>
+            <Btn variant="primary" loading={saving} onClick={handleSave}>{editingId ? t('pages.booking.productManagement.saveBtn') : t('pages.booking.productManagement.addBtn')}</Btn>
           </div>
         }
       >
         <div className="space-y-4">
           {/* 基本信息 */}
-          <FormRow label="服务名称">
-            <TextInput className="w-full" value={form.name} onChange={(v) => { setF('name', v); if (nameError) setNameError('') }} placeholder="如：精剪、全套护肤、瑜伽私教" />
+          <FormRow label={t('pages.booking.productManagement.nameLabel')}>
+            <TextInput className="w-full" value={form.name} onChange={(v) => { setF('name', v); if (nameError) setNameError('') }} placeholder={t('pages.booking.productManagement.namePlaceholder')} />
           </FormRow>
           {nameError && <p className="text-sm text-red-500 -mt-2">{nameError}</p>}
 
-          <FormRow label="介绍">
-            <Textarea className="w-full" rows={3} value={form.description} onChange={(v) => setF('description', v)} placeholder="服务内容简介" />
+          <FormRow label={t('pages.booking.productManagement.descriptionLabel')}>
+            <Textarea className="w-full" rows={3} value={form.description} onChange={(v) => setF('description', v)} placeholder={t('pages.booking.productManagement.descriptionPlaceholder')} />
           </FormRow>
 
-          <FormRow label="封面图片">
+          <FormRow label={t('pages.booking.productManagement.coverImageLabel')}>
             <ImageUpload url={imageUrl} size={100} maxMB={2} onPick={handlePickImage} onRemove={() => { setImageUrl(undefined); setImageFile(null) }} />
           </FormRow>
 
@@ -389,15 +393,15 @@ export default function ProductManagement() {
 
           {/* 时长 & 价格 */}
           <div className="grid grid-cols-2 gap-4">
-            <FormRow label="时长（分钟）">
-              <NumberInput className="w-full" value={form.durationMinutes} onChange={(v) => setF('durationMinutes', v)} min={5} suffix="分钟" />
+            <FormRow label={t('pages.booking.productManagement.durationLabel')}>
+              <NumberInput className="w-full" value={form.durationMinutes} onChange={(v) => setF('durationMinutes', v)} min={5} suffix={t('pages.booking.productManagement.durationSuffix')} />
             </FormRow>
-            <FormRow label="价格">
+            <FormRow label={t('pages.booking.productManagement.priceLabel')}>
               <DollarInput value={form.price} onChange={(v) => setF('price', v ?? 0)} placeholder="0.00" className="w-full" />
             </FormRow>
           </div>
 
-          <FormRow label="最大人数" hint="1 人为一对一，>1 为团课">
+          <FormRow label={t('pages.booking.productManagement.maxGroupSizeLabel')} hint={t('pages.booking.productManagement.maxGroupSizeHint')}>
             <NumberInput className="w-full" value={form.maxGroupSize} onChange={(v) => setF('maxGroupSize', v)} min={1} />
           </FormRow>
 
@@ -405,12 +409,12 @@ export default function ProductManagement() {
 
           {/* 人员 & 空间关联 */}
           <div className="grid grid-cols-2 gap-4">
-            <FormRow label="需要指定人员"><Switch checked={form.requiresPerson} onCheckedChange={(v) => setF('requiresPerson', v)} /></FormRow>
-            <FormRow label="需要空间"><Switch checked={form.requiresSpace} onCheckedChange={(v) => setF('requiresSpace', v)} /></FormRow>
+            <FormRow label={t('pages.booking.productManagement.requiresPersonLabel')}><Switch checked={form.requiresPerson} onCheckedChange={(v) => setF('requiresPerson', v)} /></FormRow>
+            <FormRow label={t('pages.booking.productManagement.requiresSpaceLabel')}><Switch checked={form.requiresSpace} onCheckedChange={(v) => setF('requiresSpace', v)} /></FormRow>
           </div>
 
           {form.requiresPerson && (
-            <FormRow label="关联人员" hint="留空价格表示使用服务默认价格">
+            <FormRow label={t('pages.booking.productManagement.linkedPersonLabel')} hint={t('pages.booking.productManagement.linkedPersonHint')}>
               <div className="w-full">
                 {/* 已添加的人员列表（含价格覆盖） */}
                 {personAssignments.length > 0 && (
@@ -421,7 +425,7 @@ export default function ProductManagement() {
                         <DollarInput
                           value={a.priceOverride}
                           onChange={(val) => setPersonAssignments(prev => prev.map(p => p.resourceId === a.resourceId ? { ...p, priceOverride: val } : p))}
-                          placeholder="默认价"
+                          placeholder={t('pages.booking.productManagement.defaultPricePlaceholder')}
                           className="w-36"
                         />
                         <button
@@ -439,7 +443,7 @@ export default function ProductManagement() {
                 {/* 添加人员下拉 */}
                 <SelectInput
                   className="w-full"
-                  placeholder="添加人员..."
+                  placeholder={t('pages.booking.productManagement.addPersonPlaceholder')}
                   value=""
                   onChange={(id) => {
                     if (!id) return
@@ -457,9 +461,9 @@ export default function ProductManagement() {
 
           {/* 押金 */}
           <div className="grid grid-cols-2 gap-4">
-            <FormRow label="启用押金"><Switch checked={form.depositEnabled} onCheckedChange={(v) => setF('depositEnabled', v)} /></FormRow>
+            <FormRow label={t('pages.booking.productManagement.depositEnabledLabel')}><Switch checked={form.depositEnabled} onCheckedChange={(v) => setF('depositEnabled', v)} /></FormRow>
             {form.depositEnabled && (
-              <FormRow label="押金金额">
+              <FormRow label={t('pages.booking.productManagement.depositAmountLabel')}>
                 <DollarInput value={form.depositAmount} onChange={(v) => setF('depositAmount', v ?? 0)} placeholder="0.00" className="w-full" />
               </FormRow>
             )}
@@ -471,9 +475,9 @@ export default function ProductManagement() {
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
-        title="确认删除该服务？"
+        title={t('pages.booking.productManagement.deleteConfirmTitle')}
         danger
-        confirmText="删除"
+        confirmText={t('pages.booking.productManagement.deleteConfirmBtn')}
         onConfirm={handleDelete}
       />
     </div>

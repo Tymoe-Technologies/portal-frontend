@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Trash2 } from 'lucide-react'
 import { httpService } from '../services/http'
 import { register, verifyEmail, resendVerificationCode, login, getOAuthToken, getOrganizations, createOrganization, type RegisterPayload, type UserTokenRequest, type CreateOrganizationPayload } from '../services/auth'
 import { SectionCard, Btn, TextInput, SelectInput, AlertBox, ConfirmDialog, toast } from '@/components/ui-kit'
 
 const ApiTest: React.FC = () => {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [clearingData, setClearingData] = useState(false)
@@ -32,7 +34,7 @@ const ApiTest: React.FC = () => {
           status: axiosError.response?.status,
           data: axiosError.response?.data,
           headers: axiosError.response?.headers,
-          note: "这可能是因为根路径 / 不在代理配置中"
+          note: t('pages.apiTest.result.rootNote')
         })
       }
     } finally {
@@ -65,9 +67,9 @@ const ApiTest: React.FC = () => {
       const testData = {
         email: `test${timestamp}@gmail.com`,
         password: "Password123!",
-        name: "张三",
+        name: "Test User",
         phone: "+8613812345678",
-        organizationName: "我的公司"
+        organizationName: "My Company"
       }
 
       const response = await httpService.post('/api/auth-service/v1/identity/register', testData)
@@ -163,7 +165,7 @@ const ApiTest: React.FC = () => {
       const payload: RegisterPayload = {
         email: `newapi${timestamp}@gmail.com`,
         password: "Password123!",
-        name: "新API测试用户",
+        name: "New API Test User",
         phone: "+8613812345678"
       }
 
@@ -183,7 +185,7 @@ const ApiTest: React.FC = () => {
 
   const testEmailVerification = async () => {
     if (!testEmail || !verificationCode) {
-      setError('请先填写邮箱和验证码')
+      setError(t('pages.apiTest.errors.emailAndCodeRequired'))
       return
     }
 
@@ -208,7 +210,7 @@ const ApiTest: React.FC = () => {
 
   const testResendCode = async () => {
     if (!testEmail) {
-      setError('请先填写邮箱')
+      setError(t('pages.apiTest.errors.emailRequired'))
       return
     }
 
@@ -233,7 +235,7 @@ const ApiTest: React.FC = () => {
 
   const testLoginAPI = async () => {
     if (!testEmail || !testPassword) {
-      setError('请先填写邮箱和密码')
+      setError(t('pages.apiTest.errors.emailAndPasswordRequired'))
       return
     }
 
@@ -258,7 +260,7 @@ const ApiTest: React.FC = () => {
 
   const testOAuthToken = async () => {
     if (!testEmail || !testPassword) {
-      setError('请先填写邮箱和密码')
+      setError(t('pages.apiTest.errors.emailAndPasswordRequired'))
       return
     }
 
@@ -310,7 +312,7 @@ const ApiTest: React.FC = () => {
 
   const testCreateOrganization = async () => {
     if (!orgName) {
-      setError('请先填写组织名称')
+      setError(t('pages.apiTest.errors.orgNameRequired'))
       return
     }
 
@@ -322,8 +324,14 @@ const ApiTest: React.FC = () => {
       const payload: CreateOrganizationPayload = {
         orgName: orgName,
         orgType: orgType as 'MAIN' | 'BRANCH' | 'FRANCHISE',
-        description: `测试${orgType === 'MAIN' ? '主店' : orgType === 'BRANCH' ? '分店' : '加盟店'}`,
-        location: '测试地址',
+        description: t('pages.apiTest.orgSection.testDescription', {
+          type: orgType === 'MAIN'
+            ? t('pages.apiTest.orgSection.typeMain')
+            : orgType === 'BRANCH'
+              ? t('pages.apiTest.orgSection.typeBranch')
+              : t('pages.apiTest.orgSection.typeFranchise')
+        }),
+        location: t('pages.apiTest.orgSection.testAddress'),
         phone: '+1234567890',
         email: 'test@example.com'
       }
@@ -375,7 +383,7 @@ const ApiTest: React.FC = () => {
     })
 
     setResult({
-      message: '✅ 认证状态已彻底清除！请重新测试注册。如果仍有问题，请刷新页面。',
+      message: t('pages.apiTest.authCleared'),
       clearedCookies: cookies.length
     })
     setError('')
@@ -402,9 +410,9 @@ const ApiTest: React.FC = () => {
 
       const [financeData, orderData] = await Promise.all([financeRes.json(), orderRes.json()])
       setResult({ finance: financeData, order: orderData })
-      toast.success('测试数据已清除')
+      toast.success(t('pages.apiTest.clearTestData.success'))
     } catch (err: any) {
-      toast.error(err.message || '清除失败')
+      toast.error(err.message || t('pages.apiTest.clearTestData.failure'))
     } finally {
       setClearingData(false)
       setClearConfirmOpen(false)
@@ -418,56 +426,56 @@ const ApiTest: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-4xl p-6">
-      <SectionCard title="新版用户管理API测试">
+      <SectionCard title={t('pages.apiTest.title')}>
         <div className="space-y-6">
           <div>
-            <h4 className="mb-3 text-base font-semibold text-slate-800">新版API端点测试</h4>
+            <h4 className="mb-3 text-base font-semibold text-slate-800">{t('pages.apiTest.newApiSection.heading')}</h4>
             <div className="flex flex-wrap gap-2">
-              <Btn variant="danger" onClick={clearAuthState} loading={loading}>🧹 清除认证状态</Btn>
-              <Btn variant="primary" onClick={testNewRegisterAPI} loading={loading}>🆕 测试新版注册API</Btn>
-              <Btn variant="primary" onClick={testLoginAPI} loading={loading}>🔑 测试登录API</Btn>
-              <Btn variant="primary" onClick={testOAuthToken} loading={loading}>🎫 测试OAuth Token</Btn>
+              <Btn variant="danger" onClick={clearAuthState} loading={loading}>{t('pages.apiTest.newApiSection.clearAuthState')}</Btn>
+              <Btn variant="primary" onClick={testNewRegisterAPI} loading={loading}>{t('pages.apiTest.newApiSection.testNewRegister')}</Btn>
+              <Btn variant="primary" onClick={testLoginAPI} loading={loading}>{t('pages.apiTest.newApiSection.testLogin')}</Btn>
+              <Btn variant="primary" onClick={testOAuthToken} loading={loading}>{t('pages.apiTest.newApiSection.testOAuthToken')}</Btn>
             </div>
             <div className="mt-4 rounded-lg bg-slate-100 p-3">
-              <span className="text-sm text-slate-500">💡 新版API测试：包含X-Product-Type请求头，支持完整的用户注册和登录流程</span>
+              <span className="text-sm text-slate-500">{t('pages.apiTest.newApiSection.hint')}</span>
             </div>
           </div>
 
           <div>
-            <h4 className="mb-3 text-base font-semibold text-slate-800">测试数据输入</h4>
+            <h4 className="mb-3 text-base font-semibold text-slate-800">{t('pages.apiTest.testDataSection.heading')}</h4>
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-slate-700">测试邮箱:</span>
-                <div className="w-72"><TextInput value={testEmail} onChange={setTestEmail} placeholder="输入测试邮箱" /></div>
+                <span className="font-medium text-slate-700">{t('pages.apiTest.testDataSection.emailLabel')}</span>
+                <div className="w-72"><TextInput value={testEmail} onChange={setTestEmail} placeholder={t('pages.apiTest.testDataSection.emailPlaceholder')} /></div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-medium text-slate-700">测试密码:</span>
-                <div className="w-72"><TextInput type="password" value={testPassword} onChange={setTestPassword} placeholder="输入测试密码" /></div>
+                <span className="font-medium text-slate-700">{t('pages.apiTest.testDataSection.passwordLabel')}</span>
+                <div className="w-72"><TextInput type="password" value={testPassword} onChange={setTestPassword} placeholder={t('pages.apiTest.testDataSection.passwordPlaceholder')} /></div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-medium text-slate-700">验证码:</span>
-                <div className="w-40"><TextInput value={verificationCode} onChange={setVerificationCode} placeholder="输入6位验证码" maxLength={6} /></div>
+                <span className="font-medium text-slate-700">{t('pages.apiTest.testDataSection.codeLabel')}</span>
+                <div className="w-40"><TextInput value={verificationCode} onChange={setVerificationCode} placeholder={t('pages.apiTest.testDataSection.codePlaceholder')} maxLength={6} /></div>
               </div>
             </div>
           </div>
 
           <div>
-            <h4 className="mb-3 text-base font-semibold text-slate-800">组织管理测试</h4>
+            <h4 className="mb-3 text-base font-semibold text-slate-800">{t('pages.apiTest.orgSection.heading')}</h4>
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-slate-700">组织名称:</span>
-                <div className="w-52"><TextInput value={orgName} onChange={setOrgName} placeholder="输入组织名称" /></div>
+                <span className="font-medium text-slate-700">{t('pages.apiTest.orgSection.nameLabel')}</span>
+                <div className="w-52"><TextInput value={orgName} onChange={setOrgName} placeholder={t('pages.apiTest.orgSection.namePlaceholder')} /></div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-medium text-slate-700">组织类型:</span>
+                <span className="font-medium text-slate-700">{t('pages.apiTest.orgSection.typeLabel')}</span>
                 <div className="w-40">
                   <SelectInput
                     value={orgType}
                     onChange={setOrgType}
                     options={[
-                      { value: 'MAIN', label: '主店' },
-                      { value: 'BRANCH', label: '分店' },
-                      { value: 'FRANCHISE', label: '加盟店' }
+                      { value: 'MAIN', label: t('pages.apiTest.orgSection.typeMain') },
+                      { value: 'BRANCH', label: t('pages.apiTest.orgSection.typeBranch') },
+                      { value: 'FRANCHISE', label: t('pages.apiTest.orgSection.typeFranchise') }
                     ]}
                   />
                 </div>
@@ -476,34 +484,34 @@ const ApiTest: React.FC = () => {
           </div>
 
           <div>
-            <h4 className="mb-3 text-base font-semibold text-slate-800">组织管理测试</h4>
+            <h4 className="mb-3 text-base font-semibold text-slate-800">{t('pages.apiTest.orgSection.heading')}</h4>
             <div className="flex flex-wrap gap-2">
-              <Btn variant="primary" onClick={testGetOrganizations} loading={loading}>🏢 获取组织列表</Btn>
-              <Btn variant="primary" onClick={testCreateOrganization} loading={loading}>➕ 创建组织</Btn>
+              <Btn variant="primary" onClick={testGetOrganizations} loading={loading}>{t('pages.apiTest.orgSection.getList')}</Btn>
+              <Btn variant="primary" onClick={testCreateOrganization} loading={loading}>{t('pages.apiTest.orgSection.create')}</Btn>
             </div>
           </div>
 
           <div>
-            <h4 className="mb-3 text-base font-semibold text-slate-800">验证码相关测试</h4>
+            <h4 className="mb-3 text-base font-semibold text-slate-800">{t('pages.apiTest.verificationSection.heading')}</h4>
             <div className="flex flex-wrap gap-2">
-              <Btn variant="primary" onClick={testEmailVerification} loading={loading}>📧 测试邮箱验证</Btn>
-              <Btn variant="primary" onClick={testResendCode} loading={loading}>🔄 重新发送验证码</Btn>
+              <Btn variant="primary" onClick={testEmailVerification} loading={loading}>{t('pages.apiTest.verificationSection.testEmailVerification')}</Btn>
+              <Btn variant="primary" onClick={testResendCode} loading={loading}>{t('pages.apiTest.verificationSection.resendCode')}</Btn>
             </div>
           </div>
 
           <div>
-            <h4 className="mb-3 text-base font-semibold text-slate-800">旧版API测试（对比用）</h4>
+            <h4 className="mb-3 text-base font-semibold text-slate-800">{t('pages.apiTest.legacySection.heading')}</h4>
             <div className="flex flex-wrap gap-2">
-              <Btn variant="primary" onClick={testCaptchaStatus} loading={loading}>✅ 测试验证码状态</Btn>
-              <Btn variant="danger" onClick={testRegisterEndpoint} loading={loading}>🔴 测试旧版注册API</Btn>
+              <Btn variant="primary" onClick={testCaptchaStatus} loading={loading}>{t('pages.apiTest.legacySection.testCaptchaStatus')}</Btn>
+              <Btn variant="danger" onClick={testRegisterEndpoint} loading={loading}>{t('pages.apiTest.legacySection.testRegister')}</Btn>
             </div>
           </div>
 
-          {error && <AlertBox type="error" title="错误信息" description={error} />}
+          {error && <AlertBox type="error" title={t('pages.apiTest.errors.errorTitle')} description={error} />}
 
           {result && (
             <div>
-              <h5 className="mb-2 text-sm font-semibold text-slate-800">响应结果:</h5>
+              <h5 className="mb-2 text-sm font-semibold text-slate-800">{t('pages.apiTest.result.heading')}</h5>
               <pre className="max-h-96 overflow-auto rounded bg-slate-100 p-4 text-xs text-slate-700">
                 {JSON.stringify(result, null, 2)}
               </pre>
@@ -512,19 +520,19 @@ const ApiTest: React.FC = () => {
 
           {/* ─── 开发工具：清除测试数据 ─── */}
           <div className="mt-6 rounded-lg border border-dashed border-red-400 bg-red-50 p-4">
-            <div className="mb-2 font-semibold text-red-500">⚠️ 开发工具 — 清除测试数据</div>
+            <div className="mb-2 font-semibold text-red-500">{t('pages.apiTest.clearTestData.title')}</div>
             <div className="space-y-3">
-              <span className="text-sm text-slate-500">清除当前商户在 Finance Service 和 Order Service 中的所有测试数据（仅开发环境可用）</span>
+              <span className="text-sm text-slate-500">{t('pages.apiTest.clearTestData.description')}</span>
               <div>
                 <Btn variant="danger" icon={<Trash2 size={16} />} loading={clearingData} onClick={() => setClearConfirmOpen(true)}>
-                  清除所有测试数据
+                  {t('pages.apiTest.clearTestData.button')}
                 </Btn>
               </div>
             </div>
           </div>
 
           <div className="mt-6">
-            <h5 className="mb-2 text-sm font-semibold text-slate-800">当前环境变量:</h5>
+            <h5 className="mb-2 text-sm font-semibold text-slate-800">{t('pages.apiTest.envVars.heading')}</h5>
             <div className="flex flex-col gap-1 text-sm text-slate-600">
               <span><strong>VITE_API_BASE:</strong> {import.meta.env.VITE_API_BASE}</span>
               <span><strong>VITE_AUTH_BASE:</strong> {import.meta.env.VITE_AUTH_BASE}</span>
@@ -538,9 +546,9 @@ const ApiTest: React.FC = () => {
       <ConfirmDialog
         open={clearConfirmOpen}
         onOpenChange={(o) => { if (!o && !clearingData) setClearConfirmOpen(false) }}
-        title="确认清除所有测试数据？"
-        description="此操作不可撤销，将删除所有礼品卡、支付记录、订单等数据。"
-        confirmText="确认删除"
+        title={t('pages.apiTest.clearTestData.confirmTitle')}
+        description={t('pages.apiTest.clearTestData.confirmDescription')}
+        confirmText={t('pages.apiTest.clearTestData.confirmButton')}
         danger
         loading={clearingData}
         onConfirm={handleClearTestData}

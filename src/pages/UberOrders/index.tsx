@@ -17,19 +17,20 @@ const STATUS_BADGE: Record<string, string> = {
   CANCELLED: 'bg-red-50 text-red-600 ring-red-200',
 }
 
-const STATUS_OPTIONS = [
-  { label: '全部状态', value: 'ALL' },
-  { label: '待处理', value: 'PENDING' },
-  { label: '已确认', value: 'CONFIRMED' },
-  { label: '准备中', value: 'PREPARING' },
-  { label: '已就绪', value: 'READY' },
-  { label: '已取货', value: 'PICKED_UP' },
-  { label: '已完成', value: 'COMPLETED' },
-  { label: '已取消', value: 'CANCELLED' },
+// 状态筛选下拉选项，需要在组件内传入 t 生成
+const getStatusOptions = (t: (key: string) => string) => [
+  { label: t('pages.uberOrders.statusOptions.all'), value: 'ALL' },
+  { label: t('pages.uberOrders.statusOptions.pending'), value: 'PENDING' },
+  { label: t('pages.uberOrders.statusOptions.confirmed'), value: 'CONFIRMED' },
+  { label: t('pages.uberOrders.statusOptions.preparing'), value: 'PREPARING' },
+  { label: t('pages.uberOrders.statusOptions.ready'), value: 'READY' },
+  { label: t('pages.uberOrders.statusOptions.pickedUp'), value: 'PICKED_UP' },
+  { label: t('pages.uberOrders.statusOptions.completed'), value: 'COMPLETED' },
+  { label: t('pages.uberOrders.statusOptions.cancelled'), value: 'CANCELLED' },
 ]
 
 const UberOrders: React.FC = () => {
-  useTranslation()
+  const { t } = useTranslation()
   const [orders, setOrders] = useState<Order[]>([])
   const [, setAllOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
@@ -62,8 +63,8 @@ const UberOrders: React.FC = () => {
         setOrders(data || [])
       }
     } catch (error) {
-      console.error('获取订单失败:', error)
-      toast.error('获取订单失败，请稍后重试')
+      console.error(t('pages.uberOrders.fetchOrdersError'), error)
+      toast.error(t('pages.uberOrders.fetchOrdersErrorToast'))
     } finally {
       setRefreshing(false)
     }
@@ -81,11 +82,11 @@ const UberOrders: React.FC = () => {
       setProcessingOrderId(orderId)
       setLoading(true)
       await orderService.acceptOrder(orderId)
-      toast.success('订单已接受')
+      toast.success(t('pages.uberOrders.acceptSuccess'))
       setOrders(orders.filter(o => o.id !== orderId))
     } catch (error) {
-      console.error('接受订单失败:', error)
-      toast.error('接受订单失败，请稍后重试')
+      console.error(t('pages.uberOrders.acceptError'), error)
+      toast.error(t('pages.uberOrders.acceptErrorToast'))
     } finally {
       setLoading(false)
       setProcessingOrderId(null)
@@ -97,11 +98,11 @@ const UberOrders: React.FC = () => {
       setProcessingOrderId(orderId)
       setLoading(true)
       await orderService.rejectOrder(orderId, 'Restaurant rejected')
-      toast.success('订单已拒绝')
+      toast.success(t('pages.uberOrders.rejectSuccess'))
       setOrders(orders.filter(o => o.id !== orderId))
     } catch (error) {
-      console.error('拒绝订单失败:', error)
-      toast.error('拒绝订单失败，请稍后重试')
+      console.error(t('pages.uberOrders.rejectError'), error)
+      toast.error(t('pages.uberOrders.rejectErrorToast'))
     } finally {
       setLoading(false)
       setProcessingOrderId(null)
@@ -116,15 +117,20 @@ const UberOrders: React.FC = () => {
     <div className="p-6 max-w-6xl mx-auto">
       {merchantId === 'unknown' && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <div className="font-semibold text-slate-800 mb-2">⚠️ 配置提示</div>
+          <div className="font-semibold text-slate-800 mb-2">{t('pages.uberOrders.configHint.title')}</div>
           <div className="text-sm text-slate-600">
-            <strong>merchantId</strong> 未正确设置。请确保：
+            <strong>merchantId</strong> {t('pages.uberOrders.configHint.notSetPrefix')}
             <ul className="list-disc ml-5 mt-1">
-              <li>已正确登录系统</li>
-              <li>组织已被选中</li>
-              <li>或在 localStorage 中设置 <code className="bg-slate-100 px-1 rounded">merchant_id</code> 或 <code className="bg-slate-100 px-1 rounded">merchantId</code></li>
+              <li>{t('pages.uberOrders.configHint.loggedIn')}</li>
+              <li>{t('pages.uberOrders.configHint.orgSelected')}</li>
+              <li>
+                {t('pages.uberOrders.configHint.setInStorage', {
+                  merchantIdKey: 'merchant_id',
+                  merchantIdKey2: 'merchantId',
+                })}
+              </li>
             </ul>
-            当前 merchantId: <code className="bg-slate-100 px-1 rounded">{merchantId}</code>
+            {t('pages.uberOrders.configHint.currentMerchantId')} <code className="bg-slate-100 px-1 rounded">{merchantId}</code>
           </div>
         </div>
       )}
@@ -132,25 +138,25 @@ const UberOrders: React.FC = () => {
       <SectionCard
         title={
           <span className="inline-flex items-center gap-2">
-            <span>🛵 Uber 订单管理</span>
+            <span>{t('pages.uberOrders.title')}</span>
             <span className={`text-xs px-1.5 py-0.5 rounded ring-1 ${viewMode === 'pending' ? 'bg-red-50 text-red-600 ring-red-200' : 'bg-blue-50 text-blue-600 ring-blue-200'}`}>{orders.length}</span>
           </span>
         }
         action={
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-              <button onClick={() => setViewMode('pending')} className={`px-3 py-1 rounded-md text-sm cursor-pointer ${viewMode === 'pending' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>待处理</button>
-              <button onClick={() => setViewMode('all')} className={`px-3 py-1 rounded-md text-sm cursor-pointer ${viewMode === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>全部订单</button>
+              <button onClick={() => setViewMode('pending')} className={`px-3 py-1 rounded-md text-sm cursor-pointer ${viewMode === 'pending' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{t('pages.uberOrders.viewMode.pending')}</button>
+              <button onClick={() => setViewMode('all')} className={`px-3 py-1 rounded-md text-sm cursor-pointer ${viewMode === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{t('pages.uberOrders.viewMode.all')}</button>
             </div>
             {viewMode === 'all' && (
-              <div className="w-32"><SelectInput className="w-full" value={statusFilter} onChange={(v) => setStatusFilter(v as OrderStatus | 'ALL')} options={STATUS_OPTIONS} /></div>
+              <div className="w-32"><SelectInput className="w-full" value={statusFilter} onChange={(v) => setStatusFilter(v as OrderStatus | 'ALL')} options={getStatusOptions(t)} /></div>
             )}
-            <Btn variant="primary" loading={refreshing} onClick={fetchOrders}>🔄 刷新</Btn>
+            <Btn variant="primary" loading={refreshing} onClick={fetchOrders}>{t('pages.uberOrders.refresh')}</Btn>
           </div>
         }
       >
         {orders.length === 0 ? (
-          <div className="py-12"><EmptyState title={refreshing ? '加载中...' : viewMode === 'pending' ? '暂无待处理订单' : '暂无订单'} /></div>
+          <div className="py-12"><EmptyState title={refreshing ? t('pages.uberOrders.emptyLoading') : viewMode === 'pending' ? t('pages.uberOrders.emptyPending') : t('pages.uberOrders.emptyAll')} /></div>
         ) : (
           <div className="relative">
             {loading && <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10"><Spinner className="w-6 h-6 text-slate-400" /></div>}
@@ -160,7 +166,7 @@ const UberOrders: React.FC = () => {
                   {/* 订单基本信息 */}
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <h5 className="text-base font-semibold text-slate-800 m-0">订单 #{order.displayId}</h5>
+                      <h5 className="text-base font-semibold text-slate-800 m-0">{t('pages.uberOrders.orderNumber', { displayId: order.displayId })}</h5>
                       {statusBadge(order.status)}
                     </div>
                     <div className="text-lg font-semibold text-slate-900">${order.totalAmount.toFixed(2)}</div>
@@ -170,17 +176,17 @@ const UberOrders: React.FC = () => {
 
                   {/* 顾客信息 */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 text-sm">
-                    <div className="flex gap-2"><span className="font-medium min-w-[48px] text-slate-500">顾客:</span><span className="text-slate-700 flex-1">{order.consumerName}</span></div>
-                    <div className="flex gap-2"><span className="font-medium min-w-[48px] text-slate-500">电话:</span><span className="text-slate-700 flex-1">{order.consumerPhone}</span></div>
+                    <div className="flex gap-2"><span className="font-medium min-w-[48px] text-slate-500">{t('pages.uberOrders.customer')}</span><span className="text-slate-700 flex-1">{order.consumerName}</span></div>
+                    <div className="flex gap-2"><span className="font-medium min-w-[48px] text-slate-500">{t('pages.uberOrders.phone')}</span><span className="text-slate-700 flex-1">{order.consumerPhone}</span></div>
                   </div>
 
                   {order.specialInstructions && (
-                    <div className="flex gap-2 mb-3 text-sm"><span className="font-medium min-w-[48px] text-slate-500">备注:</span><span className="text-slate-700 flex-1">{order.specialInstructions}</span></div>
+                    <div className="flex gap-2 mb-3 text-sm"><span className="font-medium min-w-[48px] text-slate-500">{t('pages.uberOrders.note')}</span><span className="text-slate-700 flex-1">{order.specialInstructions}</span></div>
                   )}
 
                   {/* 商品列表 */}
                   <div className="mb-3">
-                    <span className="font-semibold text-slate-700 text-sm">商品：</span>
+                    <span className="font-semibold text-slate-700 text-sm">{t('pages.uberOrders.items')}</span>
                     <ul className="mt-2 list-none">
                       {order.items.map((item) => (
                         <li key={item.id} className="mb-3 pb-2 border-b border-slate-100">
@@ -191,7 +197,7 @@ const UberOrders: React.FC = () => {
 
                           {item.modifiers && item.modifiers.length > 0 && (
                             <div className="ml-3 mt-2 mb-2 pl-3 border-l-2 border-green-500">
-                              <span className="text-green-600 text-xs font-medium">🎯 自定义选项：</span>
+                              <span className="text-green-600 text-xs font-medium">{t('pages.uberOrders.customOptions')}</span>
                               {item.modifiers.map((group, groupIndex) => (
                                 <div key={groupIndex} className="mt-1 text-xs">
                                   <div className="text-slate-500 font-medium">{group.title}:</div>
@@ -209,7 +215,7 @@ const UberOrders: React.FC = () => {
                           )}
 
                           {item.specialInstructions && (
-                            <div className="text-red-400 text-xs mt-1">📝 特殊说明: {item.specialInstructions}</div>
+                            <div className="text-red-400 text-xs mt-1">{t('pages.uberOrders.specialInstructions', { instructions: item.specialInstructions })}</div>
                           )}
                         </li>
                       ))}
@@ -222,11 +228,11 @@ const UberOrders: React.FC = () => {
                   <div className="flex justify-end gap-2">
                     {order.status === 'PENDING' ? (
                       <>
-                        <Btn variant="danger" loading={processingOrderId === order.id && loading} disabled={processingOrderId !== null && processingOrderId !== order.id} onClick={() => handleReject(order.id)}>❌ 拒绝</Btn>
-                        <Btn variant="primary" loading={processingOrderId === order.id && loading} disabled={processingOrderId !== null && processingOrderId !== order.id} onClick={() => handleAccept(order.id)}>✅ 接受</Btn>
+                        <Btn variant="danger" loading={processingOrderId === order.id && loading} disabled={processingOrderId !== null && processingOrderId !== order.id} onClick={() => handleReject(order.id)}>{t('pages.uberOrders.reject')}</Btn>
+                        <Btn variant="primary" loading={processingOrderId === order.id && loading} disabled={processingOrderId !== null && processingOrderId !== order.id} onClick={() => handleAccept(order.id)}>{t('pages.uberOrders.accept')}</Btn>
                       </>
                     ) : (
-                      <span className="text-xs text-slate-400">状态：{order.status}</span>
+                      <span className="text-xs text-slate-400">{t('pages.uberOrders.statusLabel', { status: order.status })}</span>
                     )}
                   </div>
                 </div>
@@ -238,13 +244,13 @@ const UberOrders: React.FC = () => {
 
       {/* 说明文字 */}
       <div className="mt-4">
-        <SectionCard title="ℹ️ 说明">
+        <SectionCard title={t('pages.uberOrders.infoTitle')}>
           <ul className="m-0 pl-5 list-disc text-sm text-slate-600 space-y-1">
-            <li><strong>待处理模式</strong>：显示所有待处理的订单，需要及时接受或拒绝</li>
-            <li><strong>全部订单模式</strong>：显示所有订单，可按状态筛选（待处理、已确认、准备中、已就绪、已取货、已完成、已取消）</li>
-            <li>页面每 5 秒自动刷新一次订单列表</li>
-            <li>超过 11.5 分钟的待处理订单将自动拒绝</li>
-            <li>只有待处理的订单可以进行接受或拒绝操作</li>
+            <li><strong>{t('pages.uberOrders.infoPendingMode')}</strong>：{t('pages.uberOrders.infoPendingModeDesc')}</li>
+            <li><strong>{t('pages.uberOrders.infoAllMode')}</strong>：{t('pages.uberOrders.infoAllModeDesc')}</li>
+            <li>{t('pages.uberOrders.infoAutoRefresh')}</li>
+            <li>{t('pages.uberOrders.infoAutoReject')}</li>
+            <li>{t('pages.uberOrders.infoActionsLimit')}</li>
           </ul>
         </SectionCard>
       </div>

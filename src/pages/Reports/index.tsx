@@ -1,33 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Download } from 'lucide-react'
 import { useAuthContext } from '@/auth/AuthProvider'
 import {
-  BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  type TooltipProps,
+  BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-
-// ─── shadcn 风格图表 tooltip（用于"营收趋势"）───────────────────────────────────
-// 参照 shadcn/ui chart 组件的观感重新实现：白卡片+阴影、色点+数值右对齐、更克制的圆角，
-// 不引入新依赖，仍是纯 recharts + Tailwind。
-function RevenueChartTooltip({ active, payload, label }: TooltipProps<number, string>) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md min-w-[9rem]">
-      <p className="text-xs text-slate-400 mb-1.5">{label}</p>
-      {payload.map((item) => (
-        <div key={item.dataKey} className="flex items-center justify-between gap-4 text-sm">
-          <span className="flex items-center gap-1.5 text-slate-600">
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
-            {item.name}
-          </span>
-          <span className="font-medium text-slate-900 tabular-nums">{money(Number(item.value ?? 0))}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
 import {
   PageHeader, SectionCard, Tabs, StatCard, Table, Column, SelectInput, DateRangePicker, Btn, AlertBox, Spinner, EmptyState, toast,
+  ChartTooltip,
 } from '@/components/ui-kit'
 import {
   getOrderStatistics, getRevenueStatistics, getItemStatistics, getTaxStatistics, getReconciliationStatistics,
@@ -71,14 +51,24 @@ function downloadReportCsv({ location, reportName, startInput, endInput, startTi
   URL.revokeObjectURL(url)
 }
 function ExportCsvBtn({ onExport }: { onExport: () => void }) {
+  const { t } = useTranslation()
   return (
-    <Btn variant="ghost" size="sm" icon={<Download className="w-3.5 h-3.5" />} onClick={onExport}>导出CSV</Btn>
+    <Btn variant="ghost" size="sm" icon={<Download className="w-3.5 h-3.5" />} onClick={onExport}>{t('pages.reports.exportCsv')}</Btn>
   )
 }
 
-const SOURCE_LABELS: Record<string, string> = { POS: '门店 POS', WEB: '线上小程序/网页', KIOSK: '自助点餐机', UBER_EATS: 'Uber Eats' }
-const groupKeyLabel = (key?: string) => (key ? (SOURCE_LABELS[key] ?? key) : '未分类')
-// CSV 导出用的英文分组标签（屏幕上的图表/表格仍用中文 groupKeyLabel，两者分开互不影响）
+// 屏幕上的图表/表格分组标签走 i18n（随语言切换），CSV 导出的英文标签固定不变（见 groupKeyLabelEn）
+function useGroupKeyLabel() {
+  const { t } = useTranslation()
+  const labels: Record<string, string> = {
+    POS: t('pages.reports.sourcePos'),
+    WEB: t('pages.reports.sourceWeb'),
+    KIOSK: t('pages.reports.sourceKiosk'),
+    UBER_EATS: t('pages.reports.sourceUberEats'),
+  }
+  return (key?: string) => (key ? (labels[key] ?? key) : t('pages.reports.unclassified'))
+}
+// CSV 导出用的英文分组标签（不随语言切换，导出文件表头/内容固定英文）
 const SOURCE_LABELS_EN: Record<string, string> = { POS: 'POS', WEB: 'Online/Web', KIOSK: 'Self-Service Kiosk', UBER_EATS: 'Uber Eats' }
 const groupKeyLabelEn = (key?: string) => (key ? (SOURCE_LABELS_EN[key] ?? key) : 'Unclassified')
 
@@ -114,6 +104,7 @@ function DateRangeBar({
   loading: boolean
   extra?: React.ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-wrap items-center gap-3 mb-4">
       <DateRangePicker
@@ -121,7 +112,7 @@ function DateRangeBar({
         showTime startTime={startTime} endTime={endTime} onTimeChange={onTimeChange}
       />
       {extra}
-      <Btn variant="secondary" size="sm" onClick={onSearch} loading={loading}>查询</Btn>
+      <Btn variant="secondary" size="sm" onClick={onSearch} loading={loading}>{t('pages.reports.search')}</Btn>
     </div>
   )
 }
@@ -137,6 +128,8 @@ interface RangeProps {
 }
 
 function SalesReportTab({ startInput, endInput, startTime, endTime, onRangeChange, onTimeChange, location }: RangeProps) {
+  const { t } = useTranslation()
+  const groupKeyLabel = useGroupKeyLabel()
   const [loading, setLoading] = useState(false)
   const [summary, setSummary] = useState<OrderStatistics | null>(null)
   const [revenue, setRevenue] = useState<RevenueStatistics | null>(null)
@@ -159,7 +152,7 @@ function SalesReportTab({ startInput, endInput, startTime, endTime, onRangeChang
       setHourly(h)
       setChannelData(c)
     } catch (e: any) {
-      toast.error(e?.message || '加载销售报表失败')
+      toast.error(e?.message || t('pages.reports.loadSalesFailed'))
     } finally {
       setLoading(false)
     }
@@ -173,19 +166,19 @@ function SalesReportTab({ startInput, endInput, startTime, endTime, onRangeChang
   }
 
   const chartData = useMemo(
-    () => (revenue?.rows ?? []).map((row) => ({ day: dayLabel(row.bucket), 营收: row.totalAmount })),
+    () => (revenue?.rows ?? []).map((row) => ({ day: dayLabel(row.bucket), revenue: row.totalAmount })),
     [revenue]
   )
 
   // 补齐 0-23 小时，缺失小时按 0 处理，柱状图连续不断档
   const hourChartData = useMemo(() => {
     const map = new Map((hourly?.rows ?? []).map((r) => [r.hour, r.totalAmount]))
-    return Array.from({ length: 24 }, (_, h) => ({ hour: `${h}:00`, 营收: map.get(h) ?? 0 }))
+    return Array.from({ length: 24 }, (_, h) => ({ hour: `${h}:00`, revenue: map.get(h) ?? 0 }))
   }, [hourly])
 
   const channelChartData = useMemo(
-    () => (channelData?.rows ?? []).map((r) => ({ name: groupKeyLabel(r.key), 营收: r.totalAmount })),
-    [channelData]
+    () => (channelData?.rows ?? []).map((r) => ({ name: groupKeyLabel(r.key), revenue: r.totalAmount })),
+    [channelData, groupKeyLabel]
   )
 
   const cancelled = summary?.ordersByStatus?.CANCELLED ?? 0
@@ -198,18 +191,18 @@ function SalesReportTab({ startInput, endInput, startTime, endTime, onRangeChang
       <DateRangeBar startInput={startInput} endInput={endInput} startTime={startTime} endTime={endTime} loading={loading}
         onChange={onRangeChange} onTimeChange={onTimeChange} onSearch={() => load()} />
       {summary?.storeTimezone && (
-        <p className="text-xs text-slate-400 mb-3">门店时区：{summary.storeTimezone}（已剔除已取消订单营收）</p>
+        <p className="text-xs text-slate-400 mb-3">{t('pages.reports.storeTimezoneLabel', { tz: summary.storeTimezone })}</p>
       )}
       {loading && !summary ? <Spinner /> : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <StatCard title="总营收（不含取消）" value={money(summary?.totalRevenue ?? 0)} />
-            <StatCard title="订单数（不含取消）" value={summary?.totalOrders ?? 0} />
-            <StatCard title="客单价" value={money(summary?.averageOrderValue ?? 0)} />
-            <StatCard title="取消率" value={`${cancelRate}%`} tone={Number(cancelRate) > 10 ? 'danger' : 'default'} />
+            <StatCard title={t('pages.reports.statRevenue')} value={money(summary?.totalRevenue ?? 0)} />
+            <StatCard title={t('pages.reports.statOrders')} value={summary?.totalOrders ?? 0} />
+            <StatCard title={t('pages.reports.statAvgOrder')} value={money(summary?.averageOrderValue ?? 0)} />
+            <StatCard title={t('pages.reports.statCancelRate')} value={`${cancelRate}%`} tone={Number(cancelRate) > 10 ? 'danger' : 'default'} />
           </div>
           <SectionCard
-            title="营收趋势（按天）"
+            title={t('pages.reports.revenueTrendTitle')}
             action={<ExportCsvBtn onExport={() => downloadReportCsv({
               location, reportName: 'Sales Report - Revenue Trend', startInput, endInput, startTime, endTime,
               headers: ['Date', 'Order Count', 'Revenue'],
@@ -235,9 +228,9 @@ function SalesReportTab({ startInput, endInput, startTime, endTime, onRangeChang
                     tickLine={false} axisLine={false} width={48}
                     tickFormatter={(v: number) => `$${v}`}
                   />
-                  <Tooltip content={<RevenueChartTooltip />} cursor={{ stroke: '#cbd5e1', strokeDasharray: '3 3' }} />
+                  <Tooltip content={ChartTooltip} cursor={{ stroke: '#cbd5e1', strokeDasharray: '3 3' }} />
                   <Area
-                    type="monotone" dataKey="营收" stroke="#0f172a" strokeWidth={2}
+                    type="monotone" dataKey="revenue" name={t('pages.reports.revenueSeriesLabel')} stroke="#0f172a" strokeWidth={2}
                     fill="url(#revenueFill)" activeDot={{ r: 4, strokeWidth: 0 }} dot={false}
                   />
                 </AreaChart>
@@ -247,21 +240,28 @@ function SalesReportTab({ startInput, endInput, startTime, endTime, onRangeChang
 
           <div className="mt-4">
             <SectionCard
-              title="分时段营收（一天中各小时累计，按门店时区）"
+              title={t('pages.reports.hourlyRevenueTitle')}
               action={<ExportCsvBtn onExport={() => downloadReportCsv({
                 location, reportName: 'Sales Report - Hourly Revenue', startInput, endInput, startTime, endTime,
                 headers: ['Hour', 'Revenue'],
-                rows: hourChartData.map((r) => [r.hour, r.营收]),
+                rows: hourChartData.map((r) => [r.hour, r.revenue]),
               })} />}
             >
               <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={hourChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="hour" tick={{ fontSize: 11 }} interval={1} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v: number) => money(v)} />
-                    <Bar dataKey="营收" fill="#0f172a" radius={[3, 3, 0, 0]} />
+                  <BarChart data={hourChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis
+                      dataKey="hour" tick={{ fontSize: 11, fill: '#94a3b8' }}
+                      tickLine={false} axisLine={false} interval={1} tickMargin={8}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: '#94a3b8' }}
+                      tickLine={false} axisLine={false} width={48}
+                      tickFormatter={(v: number) => `$${v}`}
+                    />
+                    <Tooltip content={ChartTooltip} cursor={{ fill: '#f1f5f9' }} />
+                    <Bar dataKey="revenue" name={t('pages.reports.revenueSeriesLabel')} fill="#0f172a" radius={[3, 3, 0, 0]} maxBarSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -270,13 +270,13 @@ function SalesReportTab({ startInput, endInput, startTime, endTime, onRangeChang
 
           <div className="mt-4">
             <SectionCard
-              title="渠道对比"
+              title={t('pages.reports.channelComparisonTitle')}
               action={(
                 <div className="flex items-center gap-2">
                   <SelectInput
                     value={channelGroupBy}
                     onChange={(v) => onChannelGroupByChange(v as 'source' | 'channel')}
-                    options={[{ label: '按终端来源', value: 'source' }, { label: '按销售渠道', value: 'channel' }]}
+                    options={[{ label: t('pages.reports.byTerminalSource'), value: 'source' }, { label: t('pages.reports.bySalesChannel'), value: 'channel' }]}
                   />
                   <ExportCsvBtn onExport={() => downloadReportCsv({
                     location, reportName: `Sales Report - Channel Comparison (${channelGroupBy === 'source' ? 'By Terminal Source' : 'By Sales Channel'})`, startInput, endInput, startTime, endTime,
@@ -287,16 +287,23 @@ function SalesReportTab({ startInput, endInput, startTime, endTime, onRangeChang
               )}
             >
               {channelChartData.length === 0 ? (
-                <EmptyState title="所选时间范围内暂无渠道数据" />
+                <EmptyState title={t('pages.reports.noChannelData')} />
               ) : (
                 <div style={{ height: Math.max(160, channelChartData.length * 44) }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={channelChartData} layout="vertical" margin={{ left: 16 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis type="number" tick={{ fontSize: 12 }} />
-                      <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12 }} />
-                      <Tooltip formatter={(v: number) => money(v)} />
-                      <Bar dataKey="营收" fill="#0f172a" radius={[0, 4, 4, 0]} />
+                    <BarChart data={channelChartData} layout="vertical" margin={{ top: 8, right: 8, left: 16, bottom: 0 }}>
+                      <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis
+                        type="number" tick={{ fontSize: 12, fill: '#94a3b8' }}
+                        tickLine={false} axisLine={false}
+                        tickFormatter={(v: number) => `$${v}`}
+                      />
+                      <YAxis
+                        type="category" dataKey="name" width={110}
+                        tick={{ fontSize: 12, fill: '#475569' }} tickLine={false} axisLine={false}
+                      />
+                      <Tooltip content={ChartTooltip} cursor={{ fill: '#f1f5f9' }} />
+                      <Bar dataKey="revenue" name={t('pages.reports.revenueSeriesLabel')} fill="#0f172a" radius={[0, 4, 4, 0]} maxBarSize={28} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -310,6 +317,7 @@ function SalesReportTab({ startInput, endInput, startTime, endTime, onRangeChang
 }
 
 function ItemAnalysisTab({ startInput, endInput, startTime, endTime, onRangeChange, onTimeChange, location }: RangeProps) {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<ItemStatistics | null>(null)
   const [page, setPage] = useState(1)
@@ -322,7 +330,7 @@ function ItemAnalysisTab({ startInput, endInput, startTime, endTime, onRangeChan
       setData(result)
       setPage(p)
     } catch (e: any) {
-      toast.error(e?.message || '加载商品分析失败')
+      toast.error(e?.message || t('pages.reports.loadItemsFailed'))
     } finally {
       setLoading(false)
     }
@@ -331,15 +339,15 @@ function ItemAnalysisTab({ startInput, endInput, startTime, endTime, onRangeChan
   useEffect(() => { load(1) }, [])
 
   const chartData = useMemo(
-    () => (data?.rows ?? []).slice(0, 10).map((r) => ({ name: r.itemName, 销售额: r.totalPrice })),
+    () => (data?.rows ?? []).slice(0, 10).map((r) => ({ name: r.itemName, salesAmount: r.totalPrice })),
     [data]
   )
 
   const columns: Column<typeof data extends null ? never : NonNullable<typeof data>['rows'][number]>[] = [
-    { key: 'itemName', title: '商品名称', render: (r) => r.itemName },
-    { key: 'quantity', title: '销量', align: 'right', render: (r) => r.quantity },
-    { key: 'totalPrice', title: '销售额', align: 'right', render: (r) => money(r.totalPrice) },
-    { key: 'discountAmount', title: '折扣金额', align: 'right', render: (r) => money(r.discountAmount) },
+    { key: 'itemName', title: t('pages.reports.colItemName'), render: (r) => r.itemName },
+    { key: 'quantity', title: t('pages.reports.colQuantity'), align: 'right', render: (r) => r.quantity },
+    { key: 'totalPrice', title: t('pages.reports.colSalesAmount'), align: 'right', render: (r) => money(r.totalPrice) },
+    { key: 'discountAmount', title: t('pages.reports.colDiscountAmount'), align: 'right', render: (r) => money(r.discountAmount) },
   ]
 
   return (
@@ -347,25 +355,32 @@ function ItemAnalysisTab({ startInput, endInput, startTime, endTime, onRangeChan
       <DateRangeBar startInput={startInput} endInput={endInput} startTime={startTime} endTime={endTime} loading={loading}
         onChange={onRangeChange} onTimeChange={onTimeChange} onSearch={() => load(1)} />
       {loading && !data ? <Spinner /> : !data || data.rows.length === 0 ? (
-        <EmptyState title="暂无商品销售数据" />
+        <EmptyState title={t('pages.reports.noItemData')} />
       ) : (
         <>
-          <SectionCard title="销售额 Top 10" bodyClassName="pt-2">
+          <SectionCard title={t('pages.reports.top10Title')} bodyClassName="pt-2">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} layout="vertical" margin={{ left: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} />
-                  <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v: number) => money(v)} />
-                  <Bar dataKey="销售额" fill="#0f172a" radius={[0, 4, 4, 0]} />
+                <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 8, left: 40, bottom: 0 }}>
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis
+                    type="number" tick={{ fontSize: 12, fill: '#94a3b8' }}
+                    tickLine={false} axisLine={false}
+                    tickFormatter={(v: number) => `$${v}`}
+                  />
+                  <YAxis
+                    type="category" dataKey="name" width={120}
+                    tick={{ fontSize: 12, fill: '#475569' }} tickLine={false} axisLine={false}
+                  />
+                  <Tooltip content={ChartTooltip} cursor={{ fill: '#f1f5f9' }} />
+                  <Bar dataKey="salesAmount" name={t('pages.reports.colSalesAmount')} fill="#0f172a" radius={[0, 4, 4, 0]} maxBarSize={28} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </SectionCard>
           <div className="mt-4">
             <SectionCard
-              title="商品销售明细"
+              title={t('pages.reports.itemDetailTitle')}
               action={<ExportCsvBtn onExport={() => downloadReportCsv({
                 location, reportName: 'Item Analysis Report', startInput, endInput, startTime, endTime,
                 headers: ['Item Name', 'Quantity Sold', 'Sales Amount', 'Discount Amount'],
@@ -374,9 +389,9 @@ function ItemAnalysisTab({ startInput, endInput, startTime, endTime, onRangeChan
             >
               <Table columns={columns} data={data.rows} rowKey={(r) => r.itemId} loading={loading} />
               <div className="flex items-center justify-end gap-2 mt-3">
-                <Btn variant="secondary" size="sm" disabled={page <= 1} onClick={() => load(page - 1)}>上一页</Btn>
-                <span className="text-xs text-slate-400">第 {page} 页 / 共 {data.total} 个商品</span>
-                <Btn variant="secondary" size="sm" disabled={page * data.pageSize >= data.total} onClick={() => load(page + 1)}>下一页</Btn>
+                <Btn variant="secondary" size="sm" disabled={page <= 1} onClick={() => load(page - 1)}>{t('pages.reports.prevPage')}</Btn>
+                <span className="text-xs text-slate-400">{t('pages.reports.pageInfo', { page, total: data.total })}</span>
+                <Btn variant="secondary" size="sm" disabled={page * data.pageSize >= data.total} onClick={() => load(page + 1)}>{t('pages.reports.nextPage')}</Btn>
               </div>
             </SectionCard>
           </div>
@@ -387,6 +402,7 @@ function ItemAnalysisTab({ startInput, endInput, startTime, endTime, onRangeChan
 }
 
 function TaxReportTab({ startInput, endInput, startTime, endTime, onRangeChange, onTimeChange, location }: RangeProps) {
+  const { t } = useTranslation()
   const [groupBy, setGroupBy] = useState<TaxGroupBy>('day')
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<TaxStatistics | null>(null)
@@ -398,7 +414,7 @@ function TaxReportTab({ startInput, endInput, startTime, endTime, onRangeChange,
       const result = await getTaxStatistics({ ...range, groupBy })
       setData(result)
     } catch (e: any) {
-      toast.error(e?.message || '加载税务报表失败')
+      toast.error(e?.message || t('pages.reports.loadTaxFailed'))
     } finally {
       setLoading(false)
     }
@@ -415,10 +431,10 @@ function TaxReportTab({ startInput, endInput, startTime, endTime, onRangeChange,
   }, [data])
 
   const columns: Column<TaxStatistics['rows'][number]>[] = [
-    { key: 'bucket', title: groupBy === 'day' ? '日期' : '分组', render: (r) => r.bucket ? dayLabel(r.bucket) : r.key },
-    { key: 'orderCount', title: '订单数', align: 'right', render: (r) => r.orderCount },
-    { key: 'taxableSales', title: '应税销售额', align: 'right', render: (r) => money(r.taxableSales) },
-    { key: 'taxCollected', title: '已收税额', align: 'right', render: (r) => money(r.taxCollected) },
+    { key: 'bucket', title: groupBy === 'day' ? t('pages.reports.colDate') : t('pages.reports.colGroup'), render: (r) => r.bucket ? dayLabel(r.bucket) : r.key },
+    { key: 'orderCount', title: t('pages.reports.colOrderCount'), align: 'right', render: (r) => r.orderCount },
+    { key: 'taxableSales', title: t('pages.reports.colTaxableSales'), align: 'right', render: (r) => money(r.taxableSales) },
+    { key: 'taxCollected', title: t('pages.reports.colTaxCollected'), align: 'right', render: (r) => money(r.taxCollected) },
   ]
 
   return (
@@ -430,20 +446,20 @@ function TaxReportTab({ startInput, endInput, startTime, endTime, onRangeChange,
           <SelectInput
             value={groupBy}
             onChange={(v) => setGroupBy(v as TaxGroupBy)}
-            options={[{ label: '按天', value: 'day' }, { label: '按来源', value: 'source' }, { label: '按渠道', value: 'channel' }]}
+            options={[{ label: t('pages.reports.groupByDay'), value: 'day' }, { label: t('pages.reports.groupBySource'), value: 'source' }, { label: t('pages.reports.groupByChannel'), value: 'channel' }]}
           />
         )}
       />
-      {data?.note && <AlertBox type="info" title="口径说明" description={data.note} />}
+      {data?.note && <AlertBox type="info" title={t('pages.reports.noteLabel')} description={data.note} />}
       <div className="grid grid-cols-2 gap-3 my-4">
-        <StatCard title="应税销售额合计" value={money(totals.taxableSales)} />
-        <StatCard title="已收税额合计" value={money(totals.taxCollected)} />
+        <StatCard title={t('pages.reports.taxableSalesTotal')} value={money(totals.taxableSales)} />
+        <StatCard title={t('pages.reports.taxCollectedTotal')} value={money(totals.taxCollected)} />
       </div>
       {loading && !data ? <Spinner /> : !data || data.rows.length === 0 ? (
-        <EmptyState title="所选时间范围内暂无税务数据" />
+        <EmptyState title={t('pages.reports.noTaxData')} />
       ) : (
         <SectionCard
-          title="明细"
+          title={t('pages.reports.taxDetailTitle')}
           action={<ExportCsvBtn onExport={() => downloadReportCsv({
             location, reportName: 'Tax Report', startInput, endInput, startTime, endTime,
             headers: ['Group', 'Order Count', 'Taxable Sales', 'Tax Collected'],
@@ -458,6 +474,7 @@ function TaxReportTab({ startInput, endInput, startTime, endTime, onRangeChange,
 }
 
 function ReconciliationTab({ startInput, endInput, startTime, endTime, onRangeChange, onTimeChange, location }: RangeProps) {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<ReconciliationStatistics | null>(null)
 
@@ -468,7 +485,7 @@ function ReconciliationTab({ startInput, endInput, startTime, endTime, onRangeCh
       const result = await getReconciliationStatistics(range)
       setData(result)
     } catch (e: any) {
-      toast.error(e?.message || '加载对账报表失败')
+      toast.error(e?.message || t('pages.reports.loadReconciliationFailed'))
     } finally {
       setLoading(false)
     }
@@ -477,25 +494,25 @@ function ReconciliationTab({ startInput, endInput, startTime, endTime, onRangeCh
   useEffect(() => { load() }, [])
 
   const columns: Column<ReconciliationStatistics['rows'][number]>[] = [
-    { key: 'paymentMethod', title: '支付方式', render: (r) => r.paymentMethod },
-    { key: 'paymentStatus', title: '支付状态', render: (r) => r.paymentStatus },
-    { key: 'settlementStatus', title: '结算状态', render: (r) => r.settlementStatus },
-    { key: 'orderCount', title: '订单数', align: 'right', render: (r) => r.orderCount },
-    { key: 'totalAmount', title: '订单总额', align: 'right', render: (r) => money(r.totalAmount) },
-    { key: 'tipAmount', title: '小费', align: 'right', render: (r) => money(r.tipAmount) },
+    { key: 'paymentMethod', title: t('pages.reports.colPaymentMethod'), render: (r) => r.paymentMethod },
+    { key: 'paymentStatus', title: t('pages.reports.colPaymentStatus'), render: (r) => r.paymentStatus },
+    { key: 'settlementStatus', title: t('pages.reports.colSettlementStatus'), render: (r) => r.settlementStatus },
+    { key: 'orderCount', title: t('pages.reports.colOrderCount'), align: 'right', render: (r) => r.orderCount },
+    { key: 'totalAmount', title: t('pages.reports.colTotalAmount'), align: 'right', render: (r) => money(r.totalAmount) },
+    { key: 'tipAmount', title: t('pages.reports.colTipAmount'), align: 'right', render: (r) => money(r.tipAmount) },
   ]
 
   return (
     <div>
       <DateRangeBar startInput={startInput} endInput={endInput} startTime={startTime} endTime={endTime} loading={loading}
         onChange={onRangeChange} onTimeChange={onTimeChange} onSearch={load} />
-      {data?.note && <AlertBox type="warning" title="口径说明" description={data.note} />}
+      {data?.note && <AlertBox type="warning" title={t('pages.reports.noteLabel')} description={data.note} />}
       {loading && !data ? <Spinner /> : !data || data.rows.length === 0 ? (
-        <EmptyState title="所选时间范围内暂无对账数据" />
+        <EmptyState title={t('pages.reports.noReconciliationData')} />
       ) : (
         <div className="mt-4">
           <SectionCard
-            title="按支付方式/状态汇总"
+            title={t('pages.reports.reconciliationSummaryTitle')}
             action={<ExportCsvBtn onExport={() => downloadReportCsv({
               location, reportName: 'Reconciliation Report', startInput, endInput, startTime, endTime,
               headers: ['Payment Method', 'Payment Status', 'Settlement Status', 'Order Count', 'Total Amount', 'Tip Amount'],
@@ -512,6 +529,7 @@ function ReconciliationTab({ startInput, endInput, startTime, endTime, onRangeCh
 }
 
 export default function Reports() {
+  const { t } = useTranslation()
   const [tab, setTab] = useState('sales')
   // 日期/时间范围提到父级共享，切换页签时保留用户选的区间，不随子组件卸载重置
   const [{ startInput, endInput, startTime, endTime }, setRange] = useState(defaultRange())
@@ -529,15 +547,15 @@ export default function Reports() {
 
   return (
     <div>
-      <PageHeader title="报表" description="销售、商品分析、税务与对账报表" />
+      <PageHeader title={t('pages.reports.pageTitle')} description={t('pages.reports.pageDesc')} />
       <Tabs
         value={tab}
         onChange={setTab}
         items={[
-          { key: 'sales', label: '销售报表' },
-          { key: 'items', label: '商品分析' },
-          { key: 'tax', label: '税务报表' },
-          { key: 'reconciliation', label: '对账报表' },
+          { key: 'sales', label: t('pages.reports.tabSales') },
+          { key: 'items', label: t('pages.reports.tabItems') },
+          { key: 'tax', label: t('pages.reports.tabTax') },
+          { key: 'reconciliation', label: t('pages.reports.tabReconciliation') },
         ]}
       />
       <div className="mt-5">

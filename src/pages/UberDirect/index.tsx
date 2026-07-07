@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import clsx from 'clsx'
+import { useTranslation } from 'react-i18next'
 import {
   Car, Plus, RotateCcw, CheckCircle2, ExternalLink, Pencil,
   AlertTriangle, MapPin, Settings, Phone, Mail, Gauge,
@@ -14,15 +15,17 @@ import {
   Modal, ConfirmDialog, Field, TextInput, Textarea, NumberInput, type Column,
 } from '@/components/ui-kit'
 
-// 配送状态 → 徽章样式
-const STATUS_VARIANT: Record<string, { variant: 'default' | 'blue' | 'green' | 'red' | 'gold'; label: string }> = {
-  pending:         { variant: 'default', label: '等待接单' },
-  pickup:          { variant: 'blue',    label: '前往取餐' },
-  pickup_complete: { variant: 'blue',    label: '已取餐' },
-  dropoff:         { variant: 'blue',    label: '配送中' },
-  delivered:       { variant: 'green',   label: '已送达' },
-  canceled:        { variant: 'red',     label: '已取消' },
-  returned:        { variant: 'gold',    label: '已退回' },
+// 配送状态 → 徽章样式（需要在组件内调用，因为 label 依赖 t()）
+function getStatusVariant(t: (key: string) => string): Record<string, { variant: 'default' | 'blue' | 'green' | 'red' | 'gold'; label: string }> {
+  return {
+    pending:         { variant: 'default', label: t('pages.uberDirect.status.pending') },
+    pickup:          { variant: 'blue',    label: t('pages.uberDirect.status.pickup') },
+    pickup_complete: { variant: 'blue',    label: t('pages.uberDirect.status.pickupComplete') },
+    dropoff:         { variant: 'blue',    label: t('pages.uberDirect.status.dropoff') },
+    delivered:       { variant: 'green',   label: t('pages.uberDirect.status.delivered') },
+    canceled:        { variant: 'red',     label: t('pages.uberDirect.status.canceled') },
+    returned:        { variant: 'gold',    label: t('pages.uberDirect.status.returned') },
+  }
 }
 
 const UBER_GREEN = '#06C167'
@@ -84,6 +87,7 @@ const emptyFeeRule = {
 }
 
 const UberDirectPage: React.FC = () => {
+  const { t } = useTranslation()
   const { user } = useAuthContext()
   const merchantId = localStorage.getItem('organization_id') || ''
 
@@ -206,7 +210,7 @@ const UberDirectPage: React.FC = () => {
       const data = await directService.listDeliveries(merchantId)
       setDeliveries(Array.isArray(data) ? data : [])
     } catch (e: any) {
-      notify('error', '获取配送列表失败：' + e.message)
+      notify('error', t('pages.uberDirect.loadDeliveriesFailed', { message: e.message }))
     } finally {
       setDeliveriesLoading(false)
     }
@@ -230,13 +234,13 @@ const UberDirectPage: React.FC = () => {
 
   const handleOnboard = async () => {
     const e: Record<string, string> = {}
-    if (!onboard.name) e.name = '请输入商家名称'
-    if (!onboard.email || !/^[^@]+@[^@]+\.[^@]+$/.test(onboard.email)) e.email = '请输入有效邮箱'
-    if (!onboard.phone) e.phone = '请输入联系电话'
-    if (!onboard.street1) e.street1 = '请输入街道地址'
-    if (!onboard.city) e.city = '请输入城市'
-    if (!onboard.state) e.state = '必填'
-    if (!onboard.zipcode) e.zipcode = '必填'
+    if (!onboard.name) e.name = t('pages.uberDirect.onboard.nameRequired')
+    if (!onboard.email || !/^[^@]+@[^@]+\.[^@]+$/.test(onboard.email)) e.email = t('pages.uberDirect.onboard.emailInvalid')
+    if (!onboard.phone) e.phone = t('pages.uberDirect.onboard.phoneRequired')
+    if (!onboard.street1) e.street1 = t('pages.uberDirect.onboard.streetRequired')
+    if (!onboard.city) e.city = t('pages.uberDirect.onboard.cityRequired')
+    if (!onboard.state) e.state = t('pages.uberDirect.onboard.stateRequired')
+    if (!onboard.zipcode) e.zipcode = t('pages.uberDirect.onboard.zipcodeRequired')
     setOnboardErr(e)
     if (Object.keys(e).length) return
 
@@ -249,7 +253,7 @@ const UberDirectPage: React.FC = () => {
       )
       setOrg(newOrg)
       setOnboardModal(false)
-      notify('success', '自配送已开通！')
+      notify('success', t('pages.uberDirect.onboard.success'))
 
       if (!isPickupInfoComplete(newOrg)) {
         setPickup({
@@ -260,7 +264,7 @@ const UberDirectPage: React.FC = () => {
         setPickupModal(true)
       }
     } catch (e: any) {
-      notify('error', '开通失败：' + e.message)
+      notify('error', t('pages.uberDirect.onboard.failed', { message: e.message }))
     } finally {
       setOnboardLoading(false)
     }
@@ -283,11 +287,11 @@ const UberDirectPage: React.FC = () => {
   const handleSavePickupInfo = async () => {
     if (!org) return
     const e: Record<string, string> = {}
-    if (!pickup.phone) e.phone = '请输入门店电话'
-    if (!pickup.pickupStreet) e.pickupStreet = '请输入街道地址'
-    if (!pickup.pickupCity) e.pickupCity = '请输入城市'
-    if (!pickup.pickupProvince) e.pickupProvince = '必填'
-    if (!pickup.pickupPostalCode) e.pickupPostalCode = '必填'
+    if (!pickup.phone) e.phone = t('pages.uberDirect.pickup.phoneRequired')
+    if (!pickup.pickupStreet) e.pickupStreet = t('pages.uberDirect.pickup.streetRequired')
+    if (!pickup.pickupCity) e.pickupCity = t('pages.uberDirect.pickup.cityRequired')
+    if (!pickup.pickupProvince) e.pickupProvince = t('pages.uberDirect.pickup.provinceRequired')
+    if (!pickup.pickupPostalCode) e.pickupPostalCode = t('pages.uberDirect.pickup.postalCodeRequired')
     setPickupErr(e)
     if (Object.keys(e).length) return
 
@@ -306,9 +310,9 @@ const UberDirectPage: React.FC = () => {
       })
       setOrg({ ...org, ...updated })
       setPickupModal(false)
-      notify('success', '取货信息已保存')
+      notify('success', t('pages.uberDirect.pickup.saveSuccess'))
     } catch (e: any) {
-      notify('error', '保存失败：' + e.message)
+      notify('error', t('pages.uberDirect.saveFailed', { message: e.message }))
     } finally {
       setPickupLoading(false)
     }
@@ -335,8 +339,8 @@ const UberDirectPage: React.FC = () => {
   const handleSaveFeeRule = async () => {
     if (!org) return
     const e: Record<string, string> = {}
-    if (feeRule.deliveryFeeRule === 'FLAT_FEE' && feeRule.deliveryFlatFee == null) e.deliveryFlatFee = '请输入配送费金额'
-    if (feeRule.deliveryFeeRule === 'MERCHANT_SUBSIDY' && feeRule.merchantSubsidyAmount == null) e.merchantSubsidyAmount = '请输入商家承担金额'
+    if (feeRule.deliveryFeeRule === 'FLAT_FEE' && feeRule.deliveryFlatFee == null) e.deliveryFlatFee = t('pages.uberDirect.feeRule.flatFeeRequired')
+    if (feeRule.deliveryFeeRule === 'MERCHANT_SUBSIDY' && feeRule.merchantSubsidyAmount == null) e.merchantSubsidyAmount = t('pages.uberDirect.feeRule.subsidyRequired')
     setFeeRuleErr(e)
     if (Object.keys(e).length) return
 
@@ -363,13 +367,13 @@ const UberDirectPage: React.FC = () => {
       await updateOnlineOrderConfig(merchantId, {
         minOrderAmount: updates.minOrderAmount ?? null,
         deliveryRadius: newDeliveryRadius,
-      }).catch(() => notify('warning', '配送设置已保存，但同步到点单配置失败，请稍后重试'))
+      }).catch(() => notify('warning', t('pages.uberDirect.feeRule.syncFailed')))
       setDeliveryRadius(newDeliveryRadius)
 
       setFeeRuleModal(false)
-      notify('success', '配送设置已保存')
+      notify('success', t('pages.uberDirect.feeRule.saveSuccess'))
     } catch (e: any) {
-      notify('error', '保存失败：' + e.message)
+      notify('error', t('pages.uberDirect.saveFailed', { message: e.message }))
     } finally {
       setFeeRuleLoading(false)
     }
@@ -381,10 +385,10 @@ const UberDirectPage: React.FC = () => {
 
   const handleCreateDelivery = async () => {
     const e: Record<string, string> = {}
-    if (!create.pickupAddress) e.pickupAddress = '请输入取餐地址'
-    if (!create.dropoffAddress) e.dropoffAddress = '请输入送达地址'
-    if (!create.dropoffName) e.dropoffName = '请输入收件人'
-    if (!create.dropoffPhone) e.dropoffPhone = '请输入联系电话'
+    if (!create.pickupAddress) e.pickupAddress = t('pages.uberDirect.create.pickupAddressRequired')
+    if (!create.dropoffAddress) e.dropoffAddress = t('pages.uberDirect.create.dropoffAddressRequired')
+    if (!create.dropoffName) e.dropoffName = t('pages.uberDirect.create.dropoffNameRequired')
+    if (!create.dropoffPhone) e.dropoffPhone = t('pages.uberDirect.create.dropoffPhoneRequired')
     setCreateErr(e)
     if (Object.keys(e).length) return
 
@@ -400,14 +404,14 @@ const UberDirectPage: React.FC = () => {
         dropoffName: create.dropoffName,
         dropoffPhone: create.dropoffPhone,
         dropoffNotes: create.dropoffNotes,
-        manifestItems: [{ name: create.itemName || '餐品', quantity: Number(create.itemQty) || 1, size: 'small', price: 1000 }],
+        manifestItems: [{ name: create.itemName || t('pages.uberDirect.create.defaultItemName'), quantity: Number(create.itemQty) || 1, size: 'small', price: 1000 }],
       }
       await directService.createDelivery(params)
-      notify('success', '配送单创建成功！')
+      notify('success', t('pages.uberDirect.create.success'))
       setCreateModal(false)
       fetchDeliveries()
     } catch (e: any) {
-      notify('error', '创建失败：' + e.message)
+      notify('error', t('pages.uberDirect.create.failed', { message: e.message }))
     } finally {
       setCreateLoading(false)
     }
@@ -416,27 +420,29 @@ const UberDirectPage: React.FC = () => {
   const handleCancel = async (deliveryId: string) => {
     try {
       await directService.cancelDelivery(deliveryId)
-      notify('success', '配送单已取消')
+      notify('success', t('pages.uberDirect.cancel.success'))
       fetchDeliveries()
     } catch (e: any) {
-      notify('error', '取消失败：' + e.message)
+      notify('error', t('pages.uberDirect.cancel.failed', { message: e.message }))
     } finally {
       setCancelTarget(null)
     }
   }
 
+  const statusVariant = getStatusVariant(t)
+
   const columns: Column<DirectDelivery>[] = [
-    { key: 'id', title: '配送单 ID', width: 200, render: r => <span className="font-mono text-xs text-slate-600">{r.id}</span> },
+    { key: 'id', title: t('pages.uberDirect.columns.id'), width: 200, render: r => <span className="font-mono text-xs text-slate-600">{r.id}</span> },
     {
-      key: 'status', title: '状态', width: 100,
+      key: 'status', title: t('pages.uberDirect.columns.status'), width: 100,
       render: r => {
-        const cfg = STATUS_VARIANT[r.status] ?? { variant: 'default' as const, label: r.status }
+        const cfg = statusVariant[r.status] ?? { variant: 'default' as const, label: r.status }
         return <Badge variant={cfg.variant}>{cfg.label}</Badge>
       },
     },
-    { key: 'pickup', title: '取餐地址', render: r => <span className="text-slate-600 line-clamp-1 max-w-[180px] inline-block align-middle">{r.pickup?.address}</span> },
+    { key: 'pickup', title: t('pages.uberDirect.columns.pickupAddress'), render: r => <span className="text-slate-600 line-clamp-1 max-w-[180px] inline-block align-middle">{r.pickup?.address}</span> },
     {
-      key: 'dropoff', title: '送达地址',
+      key: 'dropoff', title: t('pages.uberDirect.columns.dropoffAddress'),
       render: r => (
         <div>
           <div className="font-medium text-slate-800">{r.dropoff?.name}</div>
@@ -444,19 +450,19 @@ const UberDirectPage: React.FC = () => {
         </div>
       ),
     },
-    { key: 'fee', title: '配送费', width: 90, render: r => r.fee ? `${r.currency?.toUpperCase()} ${(r.fee / 100).toFixed(2)}` : '-' },
-    { key: 'eta', title: '预计送达', width: 110, render: r => r.dropoff_eta ? new Date(r.dropoff_eta).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '-' },
+    { key: 'fee', title: t('pages.uberDirect.columns.fee'), width: 90, render: r => r.fee ? `${r.currency?.toUpperCase()} ${(r.fee / 100).toFixed(2)}` : '-' },
+    { key: 'eta', title: t('pages.uberDirect.columns.eta'), width: 110, render: r => r.dropoff_eta ? new Date(r.dropoff_eta).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '-' },
     {
-      key: 'action', title: '操作', width: 120,
+      key: 'action', title: t('pages.uberDirect.columns.action'), width: 120,
       render: r => (
         <div className="flex items-center gap-1">
           {r.tracking_url && (
-            <a href={r.tracking_url} target="_blank" rel="noreferrer" title="追踪配送" className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+            <a href={r.tracking_url} target="_blank" rel="noreferrer" title={t('pages.uberDirect.trackTooltip')} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
               <ExternalLink className="w-4 h-4" />
             </a>
           )}
           {['pending', 'pickup'].includes(r.status) && (
-            <Btn variant="ghost" size="sm" onClick={() => setCancelTarget(r.id)}>取消</Btn>
+            <Btn variant="ghost" size="sm" onClick={() => setCancelTarget(r.id)}>{t('pages.uberDirect.cancelLabel')}</Btn>
           )}
         </div>
       ),
@@ -472,7 +478,7 @@ const UberDirectPage: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto px-6 py-6">
       <PageHeader
-        title={<span className="inline-flex items-center gap-2"><Car className="w-6 h-6" style={{ color: UBER_GREEN }} />自配送</span>}
+        title={<span className="inline-flex items-center gap-2"><Car className="w-6 h-6" style={{ color: UBER_GREEN }} />{t('pages.uberDirect.header.title')}</span>}
       />
 
       <div className="space-y-4">
@@ -482,9 +488,9 @@ const UberDirectPage: React.FC = () => {
           <SectionCard>
             <EmptyState
               icon={<Car className="w-12 h-12" style={{ color: UBER_GREEN }} />}
-              title="还未开通自配送服务"
-              description="开通后可调用骑手，实现自主配送"
-              action={<Btn variant="primary" onClick={openOnboardModal}>开通自配送</Btn>}
+              title={t('pages.uberDirect.header.emptyTitle')}
+              description={t('pages.uberDirect.header.emptyDesc')}
+              action={<Btn variant="primary" onClick={openOnboardModal}>{t('pages.uberDirect.header.onboardAction')}</Btn>}
             />
           </SectionCard>
         ) : (
@@ -492,9 +498,9 @@ const UberDirectPage: React.FC = () => {
             {!isPickupInfoComplete(org) && (
               <AlertBox
                 type="warning"
-                title="取货信息不完整"
-                description="请补全门店取货地址和联系电话，否则无法自动创建配送单。"
-                action={<Btn variant="primary" size="sm" onClick={openPickupModal}>立即补全</Btn>}
+                title={t('pages.uberDirect.header.incompleteTitle')}
+                description={t('pages.uberDirect.header.incompleteDesc')}
+                action={<Btn variant="primary" size="sm" onClick={openPickupModal}>{t('pages.uberDirect.header.completeNow')}</Btn>}
               />
             )}
 
@@ -503,53 +509,53 @@ const UberDirectPage: React.FC = () => {
               <SectionCard
                 title={
                   <span className="inline-flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />门店信息
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />{t('pages.uberDirect.storeInfo.title')}
                     <Badge variant="green">{org.name}</Badge>
                   </span>
                 }
-                action={<Btn variant="secondary" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={openPickupModal}>编辑</Btn>}
+                action={<Btn variant="secondary" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={openPickupModal}>{t('pages.uberDirect.storeInfo.editBtn')}</Btn>}
               >
                 <div className="space-y-3">
-                  <InfoLine icon={<MapPin className="w-4 h-4" />} label="取货地址">
-                    {pickupAddressDisplay ?? <span className="text-red-500">未配置</span>}
+                  <InfoLine icon={<MapPin className="w-4 h-4" />} label={t('pages.uberDirect.storeInfo.pickupAddressLabel')}>
+                    {pickupAddressDisplay ?? <span className="text-red-500">{t('pages.uberDirect.storeInfo.notConfigured')}</span>}
                   </InfoLine>
-                  <InfoLine icon={<Phone className="w-4 h-4" />} label="联系电话">
-                    {org.phone ?? <span className="text-red-500">未配置</span>}
+                  <InfoLine icon={<Phone className="w-4 h-4" />} label={t('pages.uberDirect.storeInfo.phoneLabel')}>
+                    {org.phone ?? <span className="text-red-500">{t('pages.uberDirect.storeInfo.notConfigured')}</span>}
                   </InfoLine>
-                  <InfoLine icon={<Mail className="w-4 h-4" />} label="联系邮箱">{org.email}</InfoLine>
+                  <InfoLine icon={<Mail className="w-4 h-4" />} label={t('pages.uberDirect.storeInfo.emailLabel')}>{org.email}</InfoLine>
                   {org.pickupNotes && (
-                    <InfoLine icon={<span className="w-4" />} label="取货指引">{org.pickupNotes}</InfoLine>
+                    <InfoLine icon={<span className="w-4" />} label={t('pages.uberDirect.storeInfo.pickupNotesLabel')}>{org.pickupNotes}</InfoLine>
                   )}
                 </div>
               </SectionCard>
 
               {/* 配送设置 */}
               <SectionCard
-                title={<span className="inline-flex items-center gap-2"><Gauge className="w-4 h-4 text-slate-400" />配送设置</span>}
-                action={<Btn variant="secondary" size="sm" icon={<Settings className="w-3.5 h-3.5" />} onClick={openFeeRuleModal}>编辑</Btn>}
+                title={<span className="inline-flex items-center gap-2"><Gauge className="w-4 h-4 text-slate-400" />{t('pages.uberDirect.deliverySettings.title')}</span>}
+                action={<Btn variant="secondary" size="sm" icon={<Settings className="w-3.5 h-3.5" />} onClick={openFeeRuleModal}>{t('pages.uberDirect.deliverySettings.editBtn')}</Btn>}
               >
                 <div className="space-y-3">
                   <div>
-                    <div className="text-xs text-slate-400 mb-1">计费方式</div>
+                    <div className="text-xs text-slate-400 mb-1">{t('pages.uberDirect.deliverySettings.billingMethodLabel')}</div>
                     <div className="flex flex-wrap gap-1.5">
                       {org.deliveryFeeRule === 'FLAT_FEE'
-                        ? <Badge variant="blue">固定 ${((org.deliveryFlatFee || 0) / 100).toFixed(2)}</Badge>
+                        ? <Badge variant="blue">{t('pages.uberDirect.deliverySettings.flatFeeBadge', { amount: ((org.deliveryFlatFee || 0) / 100).toFixed(2) })}</Badge>
                         : org.deliveryFeeRule === 'FREE'
-                        ? <Badge variant="green">全场免费</Badge>
+                        ? <Badge variant="green">{t('pages.uberDirect.deliverySettings.freeAllBadge')}</Badge>
                         : org.deliveryFeeRule === 'MERCHANT_SUBSIDY'
-                        ? <Badge variant="blue">商家补贴 ${((org.merchantSubsidyAmount || 0) / 100).toFixed(2)}</Badge>
-                        : <Badge variant="gold">顾客支付实时报价</Badge>}
-                      {org.deliveryFreeAbove ? <Badge variant="green">满 ${(org.deliveryFreeAbove / 100).toFixed(2)} 免运</Badge> : null}
+                        ? <Badge variant="blue">{t('pages.uberDirect.deliverySettings.subsidyBadge', { amount: ((org.merchantSubsidyAmount || 0) / 100).toFixed(2) })}</Badge>
+                        : <Badge variant="gold">{t('pages.uberDirect.deliverySettings.realtimeBadge')}</Badge>}
+                      {org.deliveryFreeAbove ? <Badge variant="green">{t('pages.uberDirect.deliverySettings.freeAboveBadge', { amount: (org.deliveryFreeAbove / 100).toFixed(2) })}</Badge> : null}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <div className="text-xs text-slate-400">起送金额</div>
-                      <div className="text-sm font-medium text-slate-800 mt-0.5">{org.minOrderAmount ? `$${(org.minOrderAmount / 100).toFixed(2)}` : '不限'}</div>
+                      <div className="text-xs text-slate-400">{t('pages.uberDirect.deliverySettings.minOrderLabel')}</div>
+                      <div className="text-sm font-medium text-slate-800 mt-0.5">{org.minOrderAmount ? `$${(org.minOrderAmount / 100).toFixed(2)}` : t('pages.uberDirect.deliverySettings.unlimited')}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400">配送半径</div>
-                      <div className="text-sm font-medium text-slate-800 mt-0.5">{deliveryRadius ? `${deliveryRadius} 公里` : '不限'}</div>
+                      <div className="text-xs text-slate-400">{t('pages.uberDirect.deliverySettings.radiusLabel')}</div>
+                      <div className="text-sm font-medium text-slate-800 mt-0.5">{deliveryRadius ? t('pages.uberDirect.deliverySettings.radiusValue', { radius: deliveryRadius }) : t('pages.uberDirect.deliverySettings.unlimited')}</div>
                     </div>
                   </div>
                 </div>
@@ -558,17 +564,17 @@ const UberDirectPage: React.FC = () => {
 
             {/* 配送单管理 */}
             <SectionCard
-              title={<span className="inline-flex items-center gap-2"><Car className="w-4 h-4 text-slate-400" />配送单管理</span>}
+              title={<span className="inline-flex items-center gap-2"><Car className="w-4 h-4 text-slate-400" />{t('pages.uberDirect.deliveryManagement.title')}</span>}
               action={
                 <div className="flex items-center gap-2">
-                  <Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={deliveriesLoading} onClick={fetchDeliveries}>刷新</Btn>
-                  <Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreateModal}>新建配送</Btn>
+                  <Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={deliveriesLoading} onClick={fetchDeliveries}>{t('pages.uberDirect.deliveryManagement.refreshBtn')}</Btn>
+                  <Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreateModal}>{t('pages.uberDirect.deliveryManagement.newDeliveryBtn')}</Btn>
                 </div>
               }
               bodyClassName="p-0"
             >
               <div className="p-4">
-                <Table columns={columns} data={deliveries} rowKey={r => r.id} loading={deliveriesLoading} empty="暂无配送单" />
+                <Table columns={columns} data={deliveries} rowKey={r => r.id} loading={deliveriesLoading} empty={t('pages.uberDirect.deliveryManagement.empty')} />
               </div>
             </SectionCard>
           </>
@@ -579,22 +585,22 @@ const UberDirectPage: React.FC = () => {
       <Modal
         open={onboardModal}
         onOpenChange={v => !v && setOnboardModal(false)}
-        title="开通自配送"
-        footer={<><Btn variant="secondary" onClick={() => setOnboardModal(false)}>取消</Btn><Btn variant="primary" loading={onboardLoading} onClick={handleOnboard}>确认开通</Btn></>}
+        title={t('pages.uberDirect.onboardModal.title')}
+        footer={<><Btn variant="secondary" onClick={() => setOnboardModal(false)}>{t('pages.uberDirect.cancelLabel')}</Btn><Btn variant="primary" loading={onboardLoading} onClick={handleOnboard}>{t('pages.uberDirect.onboardModal.confirm')}</Btn></>}
       >
         <div className="space-y-4">
-          <Field label="商家名称" required error={onboardErr.name}><TextInput value={onboard.name} onChange={v => oset({ name: v })} placeholder="如：My Restaurant" /></Field>
-          <Field label="联系邮箱" required error={onboardErr.email}><TextInput value={onboard.email} onChange={v => oset({ email: v })} placeholder="merchant@example.com" /></Field>
-          <Field label="联系电话" required error={onboardErr.phone}><TextInput value={onboard.phone} onChange={v => oset({ phone: v })} placeholder="+16041234567" /></Field>
-          <p className="text-xs font-medium text-slate-400 pt-1">门店取货地址（必填，骑手取餐地点）</p>
-          <Field label="街道地址" required error={onboardErr.street1}><TextInput value={onboard.street1} onChange={v => oset({ street1: v })} placeholder="800 Robson St" /></Field>
+          <Field label={t('pages.uberDirect.onboardModal.nameLabel')} required error={onboardErr.name}><TextInput value={onboard.name} onChange={v => oset({ name: v })} placeholder={t('pages.uberDirect.onboardModal.namePlaceholder')} /></Field>
+          <Field label={t('pages.uberDirect.onboardModal.emailLabel')} required error={onboardErr.email}><TextInput value={onboard.email} onChange={v => oset({ email: v })} placeholder="merchant@example.com" /></Field>
+          <Field label={t('pages.uberDirect.onboardModal.phoneLabel')} required error={onboardErr.phone}><TextInput value={onboard.phone} onChange={v => oset({ phone: v })} placeholder="+16041234567" /></Field>
+          <p className="text-xs font-medium text-slate-400 pt-1">{t('pages.uberDirect.onboardModal.pickupSectionHint')}</p>
+          <Field label={t('pages.uberDirect.onboardModal.streetLabel')} required error={onboardErr.street1}><TextInput value={onboard.street1} onChange={v => oset({ street1: v })} placeholder="800 Robson St" /></Field>
           <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2"><Field label="城市" required error={onboardErr.city}><TextInput value={onboard.city} onChange={v => oset({ city: v })} placeholder="Vancouver" /></Field></div>
-            <Field label="省/州" required error={onboardErr.state}><TextInput value={onboard.state} onChange={v => oset({ state: v })} placeholder="BC" /></Field>
+            <div className="col-span-2"><Field label={t('pages.uberDirect.onboardModal.cityLabel')} required error={onboardErr.city}><TextInput value={onboard.city} onChange={v => oset({ city: v })} placeholder="Vancouver" /></Field></div>
+            <Field label={t('pages.uberDirect.onboardModal.stateLabel')} required error={onboardErr.state}><TextInput value={onboard.state} onChange={v => oset({ state: v })} placeholder="BC" /></Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="邮政编码" required error={onboardErr.zipcode}><TextInput value={onboard.zipcode} onChange={v => oset({ zipcode: v })} placeholder="V6Z 3B7" /></Field>
-            <Field label="国家代码"><TextInput value={onboard.country_iso2} onChange={v => oset({ country_iso2: v })} placeholder="CA" /></Field>
+            <Field label={t('pages.uberDirect.onboardModal.zipcodeLabel')} required error={onboardErr.zipcode}><TextInput value={onboard.zipcode} onChange={v => oset({ zipcode: v })} placeholder="V6Z 3B7" /></Field>
+            <Field label={t('pages.uberDirect.onboardModal.countryLabel')}><TextInput value={onboard.country_iso2} onChange={v => oset({ country_iso2: v })} placeholder="CA" /></Field>
           </div>
         </div>
       </Modal>
@@ -603,22 +609,22 @@ const UberDirectPage: React.FC = () => {
       <Modal
         open={pickupModal}
         onOpenChange={v => { if (!v && org && isPickupInfoComplete(org)) setPickupModal(false) }}
-        title={<span className="inline-flex items-center gap-2"><MapPin className="w-4 h-4" style={{ color: UBER_GREEN }} />门店取货信息</span>}
-        footer={<Btn variant="primary" loading={pickupLoading} onClick={handleSavePickupInfo} className="w-full">保存取货信息</Btn>}
+        title={<span className="inline-flex items-center gap-2"><MapPin className="w-4 h-4" style={{ color: UBER_GREEN }} />{t('pages.uberDirect.pickupModal.title')}</span>}
+        footer={<Btn variant="primary" loading={pickupLoading} onClick={handleSavePickupInfo} className="w-full">{t('pages.uberDirect.pickupModal.save')}</Btn>}
       >
         <div className="space-y-4">
-          <AlertBox type="info" title="骑手会根据以下地址前来取餐，请确保地址准确。" />
-          <Field label="门店电话" required error={pickupErr.phone} hint="骑手到达时会拨打此号码"><TextInput value={pickup.phone} onChange={v => pset({ phone: v })} placeholder="+16041234567" /></Field>
-          <Field label="街道地址" required error={pickupErr.pickupStreet}><TextInput value={pickup.pickupStreet} onChange={v => pset({ pickupStreet: v })} placeholder="800 Robson St" /></Field>
+          <AlertBox type="info" title={t('pages.uberDirect.pickupModal.hint')} />
+          <Field label={t('pages.uberDirect.pickupModal.phoneLabel')} required error={pickupErr.phone} hint={t('pages.uberDirect.pickupModal.phoneHint')}><TextInput value={pickup.phone} onChange={v => pset({ phone: v })} placeholder="+16041234567" /></Field>
+          <Field label={t('pages.uberDirect.pickupModal.streetLabel')} required error={pickupErr.pickupStreet}><TextInput value={pickup.pickupStreet} onChange={v => pset({ pickupStreet: v })} placeholder="800 Robson St" /></Field>
           <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2"><Field label="城市" required error={pickupErr.pickupCity}><TextInput value={pickup.pickupCity} onChange={v => pset({ pickupCity: v })} placeholder="Vancouver" /></Field></div>
-            <Field label="省/州" required error={pickupErr.pickupProvince}><TextInput value={pickup.pickupProvince} onChange={v => pset({ pickupProvince: v })} placeholder="BC" /></Field>
+            <div className="col-span-2"><Field label={t('pages.uberDirect.pickupModal.cityLabel')} required error={pickupErr.pickupCity}><TextInput value={pickup.pickupCity} onChange={v => pset({ pickupCity: v })} placeholder="Vancouver" /></Field></div>
+            <Field label={t('pages.uberDirect.pickupModal.stateLabel')} required error={pickupErr.pickupProvince}><TextInput value={pickup.pickupProvince} onChange={v => pset({ pickupProvince: v })} placeholder="BC" /></Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="邮政编码" required error={pickupErr.pickupPostalCode}><TextInput value={pickup.pickupPostalCode} onChange={v => pset({ pickupPostalCode: v })} placeholder="V6Z 3B7" /></Field>
-            <Field label="国家代码"><TextInput value={pickup.pickupCountry} onChange={v => pset({ pickupCountry: v })} placeholder="CA" /></Field>
+            <Field label={t('pages.uberDirect.pickupModal.zipcodeLabel')} required error={pickupErr.pickupPostalCode}><TextInput value={pickup.pickupPostalCode} onChange={v => pset({ pickupPostalCode: v })} placeholder="V6Z 3B7" /></Field>
+            <Field label={t('pages.uberDirect.pickupModal.countryLabel')}><TextInput value={pickup.pickupCountry} onChange={v => pset({ pickupCountry: v })} placeholder="CA" /></Field>
           </div>
-          <Field label="取货指引（可选）"><Textarea value={pickup.pickupNotes} onChange={v => pset({ pickupNotes: v })} rows={2} placeholder="如：从后门进入，到前台取餐" /></Field>
+          <Field label={t('pages.uberDirect.pickupModal.notesLabel')}><Textarea value={pickup.pickupNotes} onChange={v => pset({ pickupNotes: v })} rows={2} placeholder={t('pages.uberDirect.pickupModal.notesPlaceholder')} /></Field>
         </div>
       </Modal>
 
@@ -626,28 +632,28 @@ const UberDirectPage: React.FC = () => {
       <Modal
         open={createModal}
         onOpenChange={v => !v && setCreateModal(false)}
-        title="新建配送单"
+        title={t('pages.uberDirect.createModal.title')}
         size="lg"
-        footer={<><Btn variant="secondary" onClick={() => setCreateModal(false)}>取消</Btn><Btn variant="primary" loading={createLoading} onClick={handleCreateDelivery}>创建配送单</Btn></>}
+        footer={<><Btn variant="secondary" onClick={() => setCreateModal(false)}>{t('pages.uberDirect.cancelLabel')}</Btn><Btn variant="primary" loading={createLoading} onClick={handleCreateDelivery}>{t('pages.uberDirect.createModal.confirm')}</Btn></>}
       >
         <div className="space-y-4">
-          <p className="text-xs font-medium text-slate-400">取餐信息</p>
-          <Field label="取餐地址" required error={createErr.pickupAddress}><TextInput value={create.pickupAddress} onChange={v => cset({ pickupAddress: v })} placeholder="425 Market St, San Francisco, CA 94105" /></Field>
+          <p className="text-xs font-medium text-slate-400">{t('pages.uberDirect.createModal.pickupSectionTitle')}</p>
+          <Field label={t('pages.uberDirect.createModal.pickupAddressLabel')} required error={createErr.pickupAddress}><TextInput value={create.pickupAddress} onChange={v => cset({ pickupAddress: v })} placeholder="425 Market St, San Francisco, CA 94105" /></Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="取餐联系人"><TextInput value={create.pickupName} onChange={v => cset({ pickupName: v })} placeholder="商家名称" /></Field>
-            <Field label="联系电话"><TextInput value={create.pickupPhone} onChange={v => cset({ pickupPhone: v })} placeholder="+14155551234" /></Field>
+            <Field label={t('pages.uberDirect.createModal.pickupContactLabel')}><TextInput value={create.pickupName} onChange={v => cset({ pickupName: v })} placeholder={t('pages.uberDirect.createModal.pickupContactPlaceholder')} /></Field>
+            <Field label={t('pages.uberDirect.createModal.pickupPhoneLabel')}><TextInput value={create.pickupPhone} onChange={v => cset({ pickupPhone: v })} placeholder="+14155551234" /></Field>
           </div>
-          <p className="text-xs font-medium text-slate-400 pt-1">送达信息</p>
-          <Field label="送达地址" required error={createErr.dropoffAddress}><TextInput value={create.dropoffAddress} onChange={v => cset({ dropoffAddress: v })} placeholder="201 Mission St, San Francisco, CA 94105" /></Field>
+          <p className="text-xs font-medium text-slate-400 pt-1">{t('pages.uberDirect.createModal.dropoffSectionTitle')}</p>
+          <Field label={t('pages.uberDirect.createModal.dropoffAddressLabel')} required error={createErr.dropoffAddress}><TextInput value={create.dropoffAddress} onChange={v => cset({ dropoffAddress: v })} placeholder="201 Mission St, San Francisco, CA 94105" /></Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="收件人姓名" required error={createErr.dropoffName}><TextInput value={create.dropoffName} onChange={v => cset({ dropoffName: v })} placeholder="顾客姓名" /></Field>
-            <Field label="联系电话" required error={createErr.dropoffPhone}><TextInput value={create.dropoffPhone} onChange={v => cset({ dropoffPhone: v })} placeholder="+14155555678" /></Field>
+            <Field label={t('pages.uberDirect.createModal.dropoffNameLabel')} required error={createErr.dropoffName}><TextInput value={create.dropoffName} onChange={v => cset({ dropoffName: v })} placeholder={t('pages.uberDirect.createModal.dropoffNamePlaceholder')} /></Field>
+            <Field label={t('pages.uberDirect.createModal.dropoffPhoneLabel')} required error={createErr.dropoffPhone}><TextInput value={create.dropoffPhone} onChange={v => cset({ dropoffPhone: v })} placeholder="+14155555678" /></Field>
           </div>
-          <Field label="备注"><Textarea value={create.dropoffNotes} onChange={v => cset({ dropoffNotes: v })} rows={2} placeholder="门牌号、楼层等信息" /></Field>
-          <p className="text-xs font-medium text-slate-400 pt-1">货物信息</p>
+          <Field label={t('pages.uberDirect.createModal.notesLabel')}><Textarea value={create.dropoffNotes} onChange={v => cset({ dropoffNotes: v })} rows={2} placeholder={t('pages.uberDirect.createModal.notesPlaceholder')} /></Field>
+          <p className="text-xs font-medium text-slate-400 pt-1">{t('pages.uberDirect.createModal.itemSectionTitle')}</p>
           <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2"><Field label="货物描述"><TextInput value={create.itemName} onChange={v => cset({ itemName: v })} placeholder="餐品" /></Field></div>
-            <Field label="数量"><NumberInput value={create.itemQty} onChange={v => cset({ itemQty: v })} min={1} className="w-full" /></Field>
+            <div className="col-span-2"><Field label={t('pages.uberDirect.createModal.itemDescLabel')}><TextInput value={create.itemName} onChange={v => cset({ itemName: v })} placeholder={t('pages.uberDirect.createModal.itemDescPlaceholder')} /></Field></div>
+            <Field label={t('pages.uberDirect.createModal.itemQtyLabel')}><NumberInput value={create.itemQty} onChange={v => cset({ itemQty: v })} min={1} className="w-full" /></Field>
           </div>
         </div>
       </Modal>
@@ -656,47 +662,47 @@ const UberDirectPage: React.FC = () => {
       <Modal
         open={feeRuleModal}
         onOpenChange={v => !v && setFeeRuleModal(false)}
-        title={<span className="inline-flex items-center gap-2"><Settings className="w-4 h-4" style={{ color: UBER_GREEN }} />配送设置</span>}
-        footer={<><Btn variant="secondary" onClick={() => setFeeRuleModal(false)}>取消</Btn><Btn variant="primary" loading={feeRuleLoading} onClick={handleSaveFeeRule}>保存配送设置</Btn></>}
+        title={<span className="inline-flex items-center gap-2"><Settings className="w-4 h-4" style={{ color: UBER_GREEN }} />{t('pages.uberDirect.feeRuleModal.title')}</span>}
+        footer={<><Btn variant="secondary" onClick={() => setFeeRuleModal(false)}>{t('pages.uberDirect.cancelLabel')}</Btn><Btn variant="primary" loading={feeRuleLoading} onClick={handleSaveFeeRule}>{t('pages.uberDirect.feeRuleModal.save')}</Btn></>}
       >
         <div className="space-y-4">
-          <AlertBox type="info" title="配置向顾客收取的配送费规则及配送限制" />
+          <AlertBox type="info" title={t('pages.uberDirect.feeRuleModal.hint')} />
 
           <div>
-            <p className="text-sm font-medium text-slate-700 mb-2">计费方式</p>
+            <p className="text-sm font-medium text-slate-700 mb-2">{t('pages.uberDirect.feeRuleModal.billingMethodLabel')}</p>
             <RadioCards
               value={feeRule.deliveryFeeRule}
               onChange={v => fset({ deliveryFeeRule: v as DeliveryFeeRule })}
               options={[
-                { value: 'REALTIME', title: '顾客支付实时报价', desc: '每次下单时获取实时配送报价，费用按实际距离计算' },
-                { value: 'FLAT_FEE', title: '顾客支付固定金额', desc: '无论距离远近，向顾客收取统一固定配送费' },
-                { value: 'MERCHANT_SUBSIDY', title: '商家补贴固定金额', desc: '商家承担固定金额，顾客支付实时报价超出的部分（不足则免费）' },
-                { value: 'FREE', title: '全场免费配送', desc: '所有订单均不向顾客收取配送费' },
+                { value: 'REALTIME', title: t('pages.uberDirect.feeRuleModal.realtimeTitle'), desc: t('pages.uberDirect.feeRuleModal.realtimeDesc') },
+                { value: 'FLAT_FEE', title: t('pages.uberDirect.feeRuleModal.flatFeeTitle'), desc: t('pages.uberDirect.feeRuleModal.flatFeeDesc') },
+                { value: 'MERCHANT_SUBSIDY', title: t('pages.uberDirect.feeRuleModal.subsidyTitle'), desc: t('pages.uberDirect.feeRuleModal.subsidyDesc') },
+                { value: 'FREE', title: t('pages.uberDirect.feeRuleModal.freeTitle'), desc: t('pages.uberDirect.feeRuleModal.freeDesc') },
               ]}
             />
           </div>
 
           {feeRule.deliveryFeeRule === 'FLAT_FEE' && (
-            <Field label="固定配送费" required error={feeRuleErr.deliveryFlatFee}>
+            <Field label={t('pages.uberDirect.feeRuleModal.flatFeeFieldLabel')} required error={feeRuleErr.deliveryFlatFee}>
               <NumberInput value={feeRule.deliveryFlatFee ?? NaN} onChange={v => fset({ deliveryFlatFee: v })} min={0} suffix="$" className="w-full" />
             </Field>
           )}
           {feeRule.deliveryFeeRule === 'MERCHANT_SUBSIDY' && (
-            <Field label="商家承担金额" required error={feeRuleErr.merchantSubsidyAmount} hint="从实时报价中扣除此金额后向顾客收取，若报价不足则顾客免费">
+            <Field label={t('pages.uberDirect.feeRuleModal.subsidyFieldLabel')} required error={feeRuleErr.merchantSubsidyAmount} hint={t('pages.uberDirect.feeRuleModal.subsidyFieldHint')}>
               <NumberInput value={feeRule.merchantSubsidyAmount ?? NaN} onChange={v => fset({ merchantSubsidyAmount: v })} min={0} suffix="$" className="w-full" />
             </Field>
           )}
 
           {feeRule.deliveryFeeRule !== 'FREE' && (
-            <Field label="满额免运金额（可选）" hint="订单小计达到此金额时，顾客免运费。留空表示不启用">
+            <Field label={t('pages.uberDirect.feeRuleModal.freeAboveFieldLabel')} hint={t('pages.uberDirect.feeRuleModal.freeAboveFieldHint')}>
               <NumberInput value={feeRule.deliveryFreeAbove ?? NaN} onChange={v => fset({ deliveryFreeAbove: v })} min={0} suffix="$" className="w-full" />
             </Field>
           )}
 
-          <Field label="起送金额" hint="低于此金额的订单不允许配送，留空表示不限">
+          <Field label={t('pages.uberDirect.feeRuleModal.minOrderFieldLabel')} hint={t('pages.uberDirect.feeRuleModal.minOrderFieldHint')}>
             <NumberInput value={feeRule.minOrderAmount ?? NaN} onChange={v => fset({ minOrderAmount: v })} min={0} suffix="$" className="w-full" />
           </Field>
-          <Field label="配送半径（公里）" hint="超出范围的地址无法下配送单，留空表示不限">
+          <Field label={t('pages.uberDirect.feeRuleModal.radiusFieldLabel')} hint={t('pages.uberDirect.feeRuleModal.radiusFieldHint')}>
             <NumberInput value={feeRule.deliveryRadius ?? NaN} onChange={v => fset({ deliveryRadius: v })} min={0} suffix="km" className="w-full" />
           </Field>
         </div>
@@ -706,10 +712,10 @@ const UberDirectPage: React.FC = () => {
       <ConfirmDialog
         open={!!cancelTarget}
         onOpenChange={v => !v && setCancelTarget(null)}
-        title="确认取消配送？"
-        description="取消后无法恢复，可能产生取消费用。"
-        confirmText="确认取消"
-        cancelText="返回"
+        title={t('pages.uberDirect.cancelConfirm.title')}
+        description={t('pages.uberDirect.cancelConfirm.desc')}
+        confirmText={t('pages.uberDirect.cancelConfirm.confirm')}
+        cancelText={t('pages.uberDirect.cancelConfirm.back')}
         danger
         onConfirm={() => cancelTarget && handleCancel(cancelTarget)}
       />

@@ -212,6 +212,8 @@ const Login: React.FC = () => {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState<string>('')
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false)
   const [forgotPasswordMessage, setForgotPasswordMessage] = useState<string>('')
+  // 显式记录消息是成功还是失败，不再靠字符串里含不含"成功"这种关键词猜（换语言就会误判）
+  const [forgotPasswordIsSuccess, setForgotPasswordIsSuccess] = useState(false)
 
   // 表单字段（受控）
   const [email, setEmail] = useState('')
@@ -264,7 +266,7 @@ const Login: React.FC = () => {
       const loginResponse = await login(payload, 'beverage')
 
       if (!loginResponse.success) {
-        setError('登录失败，请检查邮箱和密码')
+        setError(t('auth.login.loginFailedCheckCredentials'))
         return
       }
 
@@ -287,20 +289,20 @@ const Login: React.FC = () => {
         const from = (location.state as any)?.from || '/'
         navigate(from, { replace: true })
       } else {
-        setError('登录成功但未收到访问令牌，请重试')
+        setError(t('auth.login.noAccessToken'))
       }
     } catch (error: any) {
       console.error('Login error:', error)
       if (error?.response?.data?.detail) setError(error.response.data.detail)
-      else setError('邮箱或密码错误，请重试')
+      else setError(t('auth.login.invalidCredentials'))
     } finally {
       setLoading(false)
     }
   }
 
   const handleForgotPassword = async () => {
-    if (!fpEmail) { setForgotPasswordMessage(t('auth.login.emailRequired')); return }
-    if (!EMAIL_RE.test(fpEmail)) { setForgotPasswordMessage(t('auth.login.emailInvalid')); return }
+    if (!fpEmail) { setForgotPasswordMessage(t('auth.login.emailRequired')); setForgotPasswordIsSuccess(false); return }
+    if (!EMAIL_RE.test(fpEmail)) { setForgotPasswordMessage(t('auth.login.emailInvalid')); setForgotPasswordIsSuccess(false); return }
     setForgotPasswordLoading(true)
     setForgotPasswordMessage('')
     try {
@@ -309,42 +311,49 @@ const Login: React.FC = () => {
         setForgotPasswordEmail(fpEmail)
         setForgotPasswordStep('reset')
         setForgotPasswordMessage(response.message || t('auth.forgotPassword.emailSent'))
+        setForgotPasswordIsSuccess(true)
       } else {
-        setForgotPasswordMessage('发送失败，请稍后重试')
+        setForgotPasswordMessage(t('auth.forgotPassword.sendFailed'))
+        setForgotPasswordIsSuccess(false)
       }
     } catch (error: any) {
       if (error?.response?.data?.detail) setForgotPasswordMessage(error.response.data.detail)
       else if (error instanceof Error) setForgotPasswordMessage(error.message)
-      else setForgotPasswordMessage('发送失败，请稍后重试')
+      else setForgotPasswordMessage(t('auth.forgotPassword.sendFailed'))
+      setForgotPasswordIsSuccess(false)
     } finally {
       setForgotPasswordLoading(false)
     }
   }
 
   const handleResetPassword = async () => {
-    if (!rsCode || rsCode.length !== 6) { setForgotPasswordMessage('验证码为6位数字'); return }
-    if (!rsNew || rsNew.length < 8) { setForgotPasswordMessage('密码至少8位'); return }
-    if (rsNew !== rsConfirm) { setForgotPasswordMessage('两次输入的密码不一致'); return }
+    if (!rsCode || rsCode.length !== 6) { setForgotPasswordMessage(t('auth.forgotPassword.codeMustBe6Digits')); setForgotPasswordIsSuccess(false); return }
+    if (!rsNew || rsNew.length < 8) { setForgotPasswordMessage(t('auth.forgotPassword.passwordMinLength8')); setForgotPasswordIsSuccess(false); return }
+    if (rsNew !== rsConfirm) { setForgotPasswordMessage(t('auth.forgotPassword.passwordMismatch')); setForgotPasswordIsSuccess(false); return }
     setForgotPasswordLoading(true)
     setForgotPasswordMessage('')
     try {
       const response = await resetPassword(forgotPasswordEmail, rsCode, rsNew)
       if (response.success) {
-        setForgotPasswordMessage(response.message || '密码重置成功，请使用新密码登录')
+        setForgotPasswordMessage(response.message || t('auth.forgotPassword.resetSuccess'))
+        setForgotPasswordIsSuccess(true)
         setTimeout(() => {
           setShowForgotPassword(false)
           setForgotPasswordStep('email')
           setForgotPasswordEmail('')
           setForgotPasswordMessage('')
+          setForgotPasswordIsSuccess(false)
           setRsCode(''); setRsNew(''); setRsConfirm('')
         }, 2000)
       } else {
-        setForgotPasswordMessage('密码重置失败，请重试')
+        setForgotPasswordMessage(t('auth.forgotPassword.resetFailed'))
+        setForgotPasswordIsSuccess(false)
       }
     } catch (error: any) {
       if (error?.response?.data?.detail) setForgotPasswordMessage(error.response.data.detail)
       else if (error instanceof Error) setForgotPasswordMessage(error.message)
-      else setForgotPasswordMessage('密码重置失败，请重试')
+      else setForgotPasswordMessage(t('auth.forgotPassword.resetFailed'))
+      setForgotPasswordIsSuccess(false)
     } finally {
       setForgotPasswordLoading(false)
     }
@@ -354,11 +363,10 @@ const Login: React.FC = () => {
   const handleCaptchaError = () => { setCaptchaToken(''); setError(t('auth.login.captchaFailed')) }
 
   if (showForgotPassword) {
-    const fpSuccess = forgotPasswordMessage.includes('发送') || forgotPasswordMessage.includes('已发送') || forgotPasswordMessage.includes('成功')
     return (
       <Shell
-        heading={forgotPasswordStep === 'email' ? t('auth.forgotPassword.title') : '重置密码'}
-        sub={forgotPasswordStep === 'email' ? t('auth.forgotPassword.description') : `验证码已发送到 ${forgotPasswordEmail}`}
+        heading={forgotPasswordStep === 'email' ? t('auth.forgotPassword.title') : t('auth.forgotPassword.resetButton')}
+        sub={forgotPasswordStep === 'email' ? t('auth.forgotPassword.description') : t('auth.forgotPassword.codeSentTo', { email: forgotPasswordEmail })}
       >
         {forgotPasswordStep === 'email' ? (
           <div className="space-y-5">
@@ -366,7 +374,7 @@ const Login: React.FC = () => {
               <FieldLabel>{t('auth.login.email')}</FieldLabel>
               <IconInput icon={<Mail className="h-4 w-4" />} value={fpEmail} onChange={setFpEmail} placeholder={t('auth.login.emailPlaceholder')} />
             </div>
-            {forgotPasswordMessage && <AlertBox type={fpSuccess ? 'success' : 'error'} title={forgotPasswordMessage} />}
+            {forgotPasswordMessage && <AlertBox type={forgotPasswordIsSuccess ? 'success' : 'error'} title={forgotPasswordMessage} />}
             <Btn variant="primary" className={submitBtn} loading={forgotPasswordLoading} onClick={handleForgotPassword}>
               {t('auth.forgotPassword.sendButton')}
             </Btn>
@@ -375,22 +383,22 @@ const Login: React.FC = () => {
         ) : (
           <div className="space-y-5">
             <div>
-              <FieldLabel>验证码</FieldLabel>
-              <IconInput icon={<KeyRound className="h-4 w-4" />} value={rsCode} onChange={setRsCode} placeholder="请输入6位验证码" maxLength={6} />
+              <FieldLabel>{t('auth.forgotPassword.codeLabel')}</FieldLabel>
+              <IconInput icon={<KeyRound className="h-4 w-4" />} value={rsCode} onChange={setRsCode} placeholder={t('auth.forgotPassword.codePlaceholder')} maxLength={6} />
             </div>
             <div>
-              <FieldLabel>新密码</FieldLabel>
-              <IconInput icon={<Lock className="h-4 w-4" />} revealable value={rsNew} onChange={setRsNew} placeholder="请输入新密码" />
+              <FieldLabel>{t('auth.forgotPassword.newPasswordLabel')}</FieldLabel>
+              <IconInput icon={<Lock className="h-4 w-4" />} revealable value={rsNew} onChange={setRsNew} placeholder={t('auth.forgotPassword.newPasswordPlaceholder')} />
             </div>
             <div>
-              <FieldLabel>确认密码</FieldLabel>
-              <IconInput icon={<Lock className="h-4 w-4" />} revealable value={rsConfirm} onChange={setRsConfirm} placeholder="请再次输入新密码" />
+              <FieldLabel>{t('auth.forgotPassword.confirmPasswordLabel')}</FieldLabel>
+              <IconInput icon={<Lock className="h-4 w-4" />} revealable value={rsConfirm} onChange={setRsConfirm} placeholder={t('auth.forgotPassword.confirmPasswordPlaceholder')} />
             </div>
-            {forgotPasswordMessage && <AlertBox type={forgotPasswordMessage.includes('成功') ? 'success' : 'error'} title={forgotPasswordMessage} />}
-            <Btn variant="primary" className={submitBtn} loading={forgotPasswordLoading} onClick={handleResetPassword}>重置密码</Btn>
+            {forgotPasswordMessage && <AlertBox type={forgotPasswordIsSuccess ? 'success' : 'error'} title={forgotPasswordMessage} />}
+            <Btn variant="primary" className={submitBtn} loading={forgotPasswordLoading} onClick={handleResetPassword}>{t('auth.forgotPassword.resetButton')}</Btn>
             <div className="flex justify-between">
-              <Btn variant="link" onClick={() => { setForgotPasswordStep('email'); setForgotPasswordMessage('') }}>返回上一步</Btn>
-              <Btn variant="link" onClick={() => { setShowForgotPassword(false); setForgotPasswordStep('email'); setForgotPasswordMessage('') }}>返回登录</Btn>
+              <Btn variant="link" onClick={() => { setForgotPasswordStep('email'); setForgotPasswordMessage('') }}>{t('auth.forgotPassword.backStep')}</Btn>
+              <Btn variant="link" onClick={() => { setShowForgotPassword(false); setForgotPasswordStep('email'); setForgotPasswordMessage('') }}>{t('auth.forgotPassword.backToLogin')}</Btn>
             </div>
           </div>
         )}
@@ -449,7 +457,7 @@ const Login: React.FC = () => {
         {/* 分隔线 */}
         <div className="flex items-center gap-3 py-1 text-xs text-slate-400">
           <span className="h-px flex-1 bg-slate-200" />
-          {t('common.or') || '或'}
+          {t('common.or')}
           <span className="h-px flex-1 bg-slate-200" />
         </div>
 

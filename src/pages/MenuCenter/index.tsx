@@ -253,7 +253,7 @@ const ComboItemsInput: React.FC<{
                       className="w-full text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-2 focus:outline-slate-900" />
                   </div>
                   <div className="col-span-2">
-                    <div className="text-xs text-slate-400 mb-1">额外费用</div>
+                    <div className="text-xs text-slate-400 mb-1">{t('pages.menuCenter.extraFeeLabel')}</div>
                     <input type="number" min={0} step={0.01}
                       value={comboItem.additionalPrice ? fromMinorUnit(comboItem.additionalPrice) : 0}
                       onChange={(e) => handleUpdateItem(comboItem.itemId, { additionalPrice: toMinorUnit(Number(e.target.value) || 0) })}
@@ -571,7 +571,7 @@ const MenuCenter: React.FC = () => {
       // 静默加载分类，不显示成功消息
     } catch (error) {
       console.error('Failed to load categories:', error)
-      UI.toast.error('加载分类失败')
+      UI.toast.error(t('pages.menuCenter.loadCategoriesFailed'))
       setCategories([]) // 确保出错时也设置为空数组
     } finally {
       setLoading(prev => ({ ...prev, categories: false }))
@@ -587,7 +587,7 @@ const MenuCenter: React.FC = () => {
       // 静默加载属性类型，不显示成功消息
     } catch (error) {
       console.error('Failed to load attribute types:', error)
-      UI.toast.error('加载属性类型失败')
+      UI.toast.error(t('pages.menuCenter.loadAttributeTypesFailed'))
       setAttributeTypes([])
     } finally {
       setLoading(prev => ({ ...prev, attributes: false }))
@@ -604,7 +604,7 @@ const MenuCenter: React.FC = () => {
       }))
     } catch (error) {
       console.error('Failed to load attribute options:', error)
-      UI.toast.error('加载属性选项失败')
+      UI.toast.error(t('pages.menuCenter.loadAttributeOptionsFailed'))
     }
   }
 
@@ -627,7 +627,7 @@ const MenuCenter: React.FC = () => {
       setAddons(adaptedAddons)
     } catch (error) {
       console.error('Failed to load addons:', error)
-      UI.toast.error('加载加料失败')
+      UI.toast.error(t('pages.menuCenter.loadAddonsFailed'))
       setAddons([])
     }
   }
@@ -661,7 +661,7 @@ const MenuCenter: React.FC = () => {
       }))
     } catch (error) {
       console.error('Failed to load item addons:', error)
-      UI.toast.error('加载商品加料失败')
+      UI.toast.error(t('pages.menuCenter.loadItemAddonsFailed'))
     }
   }
 
@@ -674,7 +674,7 @@ const MenuCenter: React.FC = () => {
       console.log('✅ Loaded modifier groups:', groups)
     } catch (error) {
       console.error('Failed to load modifier groups:', error)
-      UI.toast.error('加载自定义选项组失败')
+      UI.toast.error(t('pages.menuCenter.loadModifierGroupsFailed'))
       setModifierGroups([])
     } finally {
       setLoading(prev => ({ ...prev, modifiers: false }))
@@ -693,7 +693,7 @@ const MenuCenter: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to load modifier options:', error)
-      UI.toast.error('加载自定义选项失败')
+      UI.toast.error(t('pages.menuCenter.loadModifierOptionsFailed'))
     }
   }
 
@@ -716,7 +716,7 @@ const MenuCenter: React.FC = () => {
       setCombos(response.data || [])
     } catch (error) {
       console.error('Failed to load combos:', error)
-      UI.toast.error('加载组合商品失败')
+      UI.toast.error(t('pages.menuCenter.loadCombosFailed'))
       setCombos([])
     } finally {
       setLoading(prev => ({ ...prev, combos: false }))
@@ -805,8 +805,8 @@ const MenuCenter: React.FC = () => {
   const handleSaveCombo = async () => {
     const err: { name?: string; categoryId?: string; basePrice?: string } = {}
     if (!cbName.trim()) err.name = t('pages.menuCenter.comboNameRequired')
-    if (!cbCategoryId) err.categoryId = '请选择分类'
-    if (comboType === 'selection' && (cbBasePrice == null || Number.isNaN(cbBasePrice))) err.basePrice = '请填写套餐价格'
+    if (!cbCategoryId) err.categoryId = t('pages.menuCenter.pleaseSelectCategory')
+    if (comboType === 'selection' && (cbBasePrice == null || Number.isNaN(cbBasePrice))) err.basePrice = t('pages.menuCenter.pleaseEnterComboPrice')
     setCbErr(err)
     if (Object.keys(err).length) return
 
@@ -815,20 +815,20 @@ const MenuCenter: React.FC = () => {
       // 可选套餐：验证分组配置
       if (comboType === 'selection') {
         if (comboItemGroups.length === 0) {
-          UI.toast.error('可选套餐至少需要一个分组');
+          UI.toast.error(t('pages.menuCenter.selectionComboNeedsGroup'));
           setLoading(prev => ({ ...prev, creating: false }));
           return;
         }
         const hasEmptyGroupName = comboItemGroups.some(g => !g.name || g.name.trim() === '');
         if (hasEmptyGroupName) {
-          UI.toast.error('所有分组必须有名称');
+          UI.toast.error(t('pages.menuCenter.allGroupsNeedName'));
           setLoading(prev => ({ ...prev, creating: false }));
           return;
         }
         comboItemGroups.forEach(group => {
           const groupItems = cbComboItems.filter(ci => ci.groupId === group.id);
           if (groupItems.length === 0) {
-            throw new Error(`分组 "${group.name}" 中没有商品，请添加商品`);
+            throw new Error(t('pages.menuCenter.groupNoItemsError', { name: group.name }));
           }
         });
       }
@@ -860,7 +860,7 @@ const MenuCenter: React.FC = () => {
             await itemManagementService.uploadComboImage(newCombo.id, comboImageFile)
           } catch (imgError) {
             console.error('Image upload after create failed:', imgError)
-            UI.toast.warning('套餐已保存，但图片上传失败，请在编辑时重新上传')
+            UI.toast.warning(t('pages.menuCenter.comboSavedImageUploadFailed'))
           }
         }
         setComboImageFile(null)
@@ -945,7 +945,7 @@ const MenuCenter: React.FC = () => {
       // 静默加载商品，不显示加载消息
     } catch (error) {
       console.error('Failed to load items:', error)
-      UI.toast.error('加载商品失败')
+      UI.toast.error(t('pages.menuCenter.loadItemsFailed'))
       setItems([]) // 确保出错时也设置为空数组
     } finally {
       setLoading(prev => ({ ...prev, items: false }))
@@ -1001,7 +1001,7 @@ const MenuCenter: React.FC = () => {
           ...(name_i18n && { name_i18n }) as any,
         }
         await itemManagementService.updateCategory(editingCategory.id, updatePayload)
-        UI.toast.success('分类更新成功')
+        UI.toast.success(t('pages.menuCenter.categoryUpdateSuccess'))
       } else {
         const createPayload: CreateCategoryPayload = {
           name: catName,
@@ -1009,7 +1009,7 @@ const MenuCenter: React.FC = () => {
           ...(name_i18n && { name_i18n }) as any,
         }
         const newCategory = await itemManagementService.createCategory(createPayload)
-        UI.toast.success('分类创建成功')
+        UI.toast.success(t('pages.menuCenter.categoryCreateSuccess'))
         setSelectedCategoryId(newCategory.id)
       }
 
@@ -1017,7 +1017,7 @@ const MenuCenter: React.FC = () => {
       loadCategories()
     } catch (error) {
       console.error('Failed to save category:', error)
-      UI.toast.error(editingCategory ? '更新分类失败' : '创建分类失败')
+      UI.toast.error(editingCategory ? t('pages.menuCenter.categoryUpdateFailed') : t('pages.menuCenter.categoryCreateFailed'))
     } finally {
       setLoading(prev => ({ ...prev, creating: false }))
     }
@@ -1026,7 +1026,7 @@ const MenuCenter: React.FC = () => {
   // 创建商品
   const handleCreateItem = async () => {
     if (!selectedCategoryId) {
-      UI.toast.warning('请先选择一个分类')
+      UI.toast.warning(t('pages.menuCenter.pleaseSelectCategoryFirst'))
       return
     }
     
@@ -1137,7 +1137,7 @@ const MenuCenter: React.FC = () => {
   // 上传图片
   const handleImageUpload = async (file: File) => {
     if (!editingItem) {
-      UI.toast.warning('请先保存商品，然后再上传图片')
+      UI.toast.warning(t('pages.menuCenter.pleaseSaveItemFirst'))
       return false
     }
 
@@ -1146,12 +1146,12 @@ const MenuCenter: React.FC = () => {
       const result = await itemManagementService.uploadItemImage(editingItem.id, file)
       setPreviewImageUrl(result.image.url)
       setEditingItem({ ...editingItem, imageUrl: result.image.url })
-      UI.toast.success('图片上传成功')
+      UI.toast.success(t('pages.menuCenter.itemImageUploadSuccess'))
       loadItems() // 刷新列表
       loadAllItems() // 刷新全部商品
     } catch (error: any) {
       console.error('Image upload failed:', error)
-      UI.toast.error(error?.response?.data?.error || '图片上传失败')
+      UI.toast.error(error?.response?.data?.error || t('pages.menuCenter.itemImageUploadFailed'))
     } finally {
       setImageUploading(false)
     }
@@ -1165,12 +1165,12 @@ const MenuCenter: React.FC = () => {
       await itemManagementService.deleteItemImage(editingItem.id)
       setPreviewImageUrl(undefined)
       setEditingItem({ ...editingItem, imageUrl: undefined })
-      UI.toast.success('图片删除成功')
+      UI.toast.success(t('pages.menuCenter.itemImageDeleteSuccess'))
       loadItems()
       loadAllItems()
     } catch (error: any) {
       console.error('Image delete failed:', error)
-      UI.toast.error(error?.response?.data?.error || '图片删除失败')
+      UI.toast.error(error?.response?.data?.error || t('pages.menuCenter.itemImageDeleteFailed'))
     }
   }
 
@@ -1199,32 +1199,32 @@ const MenuCenter: React.FC = () => {
     try {
       // 验证必要字段
       if (!values.name?.trim()) {
-        UI.toast.error('商品名称不能为空')
+        UI.toast.error(t('pages.menuCenter.itemNameEmpty'))
         return
       }
 
       if (typeof values.basePrice !== 'number' || isNaN(values.basePrice)) {
-        UI.toast.error('请输入有效的商品售价')
+        UI.toast.error(t('pages.menuCenter.pleaseEnterValidPrice'))
         return
       }
 
       // 确定使用的分类ID
       const categoryId = values.categoryId || selectedCategoryId
       if (!categoryId) {
-        UI.toast.error('请选择商品分类')
+        UI.toast.error(t('pages.menuCenter.pleaseSelectItemCategory'))
         return
       }
 
       // 验证分类ID是有效的UUID
       if (!isValidUUID(categoryId)) {
-        UI.toast.error('分类ID格式无效')
+        UI.toast.error(t('pages.menuCenter.invalidCategoryIdFormat'))
         return
       }
 
       // 验证分类是否存在
       const categoryExists = categories.some(cat => cat.id === categoryId)
       if (!categoryExists) {
-        UI.toast.error('所选分类不存在，请重新选择')
+        UI.toast.error(t('pages.menuCenter.categoryNotExist'))
         return
       }
 
@@ -1232,7 +1232,7 @@ const MenuCenter: React.FC = () => {
       if (values.cost !== undefined && values.cost !== null && values.cost !== '') {
         const costNumber = Number(values.cost)
         if (isNaN(costNumber) || costNumber < 0) {
-          UI.toast.error('成本价格必须是有效的非负数字')
+          UI.toast.error(t('pages.menuCenter.costPriceInvalid'))
           return
         }
       }
@@ -1325,7 +1325,7 @@ const MenuCenter: React.FC = () => {
           }
         }
         
-        UI.toast.success('商品更新成功')
+        UI.toast.success(t('pages.menuCenter.itemUpdateSuccess'))
       } else {
         // 主店创建商品（BRAND 或 STORE_EXCLUSIVE）
         const scope = values.scope || 'BRAND'
@@ -1389,14 +1389,14 @@ const MenuCenter: React.FC = () => {
           }
         }
         
-        UI.toast.success('商品创建成功')
+        UI.toast.success(t('pages.menuCenter.itemCreateSuccess'))
       }
       
       setItemModalVisible(false)
       loadItems()
     } catch (error) {
       console.error('Failed to save item:', error)
-      UI.toast.error(editingItem ? '更新商品失败' : '创建商品失败')
+      UI.toast.error(editingItem ? t('pages.menuCenter.itemUpdateFailed') : t('pages.menuCenter.itemCreateFailed'))
     } finally {
       setLoading(prev => ({ ...prev, creating: false }))
     }
@@ -1472,11 +1472,11 @@ const MenuCenter: React.FC = () => {
       if (editingAttributeType) {
         await itemManagementService.updateAttributeType(editingAttributeType.id, attributeTypePayload)
         attributeTypeId = editingAttributeType.id
-        UI.toast.success('属性类型更新成功')
+        UI.toast.success(t('pages.menuCenter.attrTypeUpdateSuccess'))
       } else {
         const createdType = await itemManagementService.createAttributeType(attributeTypePayload)
         attributeTypeId = createdType.id
-        UI.toast.success('属性类型创建成功')
+        UI.toast.success(t('pages.menuCenter.attrTypeCreateSuccess'))
       }
 
       // 创建或更新选项
@@ -1602,11 +1602,11 @@ const MenuCenter: React.FC = () => {
         maxSelections: payload.maxQuantity || 1
       }
       await itemManagementService.addModifierGroupToItem(itemId, modifierPayload)
-      UI.toast.success('添加加料成功')
+      UI.toast.success(t('pages.menuCenter.addAddonSuccess'))
       loadItemAddons(itemId)
     } catch (error) {
       console.error('Failed to add item addon:', error)
-      UI.toast.error('添加加料失败')
+      UI.toast.error(t('pages.menuCenter.addAddonFailed'))
     }
   }
 
@@ -1616,11 +1616,11 @@ const MenuCenter: React.FC = () => {
     try {
       // addonId 实际上是 modifierGroupId
       await itemManagementService.removeModifierGroupFromItem(itemId, addonId)
-      UI.toast.success('移除加料成功')
+      UI.toast.success(t('pages.menuCenter.removeAddonSuccess'))
       loadItemAddons(itemId)
     } catch (error) {
       console.error('Failed to remove item addon:', error)
-      UI.toast.error('移除加料失败')
+      UI.toast.error(t('pages.menuCenter.removeAddonFailed'))
     }
   }
 
@@ -1647,7 +1647,7 @@ const MenuCenter: React.FC = () => {
           <span className="flex items-center gap-1.5 min-w-0">
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${category.level === 0 ? 'bg-slate-900' : 'bg-slate-400'}`} />
             <span className="truncate">{category.name}</span>
-            {category.isSystem && <UI.Badge>系统</UI.Badge>}
+            {category.isSystem && <UI.Badge>{t('pages.menuCenter.systemBadge')}</UI.Badge>}
           </span>
           {isMain && (
             <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
@@ -1706,7 +1706,7 @@ const MenuCenter: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto px-6 py-6">
       <UI.PageHeader
-        title={<span className="inline-flex items-center gap-2">{t('pages.menuCenter.title')}{!isMain && <UI.Badge variant="blue">{currentOrg?.orgType === 'FRANCHISE' ? '加盟店' : '分店'}</UI.Badge>}</span>}
+        title={<span className="inline-flex items-center gap-2">{t('pages.menuCenter.title')}{!isMain && <UI.Badge variant="blue">{currentOrg?.orgType === 'FRANCHISE' ? t('pages.menuCenter.franchiseBadge') : t('pages.menuCenter.branchBadge')}</UI.Badge>}</span>}
         description={t('pages.menuCenter.systemDescription')}
       />
 
@@ -1716,8 +1716,8 @@ const MenuCenter: React.FC = () => {
         items={[
           { key: 'products', label: t('pages.menuCenter.menuManagement') },
           { key: 'combos', label: t('pages.menuCenter.comboManagement') },
-          { key: 'supplies', label: '耗材管理' },
-          ...(isMain ? [{ key: 'locale-settings', label: '语言设置' }] : []),
+          { key: 'supplies', label: t('pages.menuCenter.suppliesManagement') },
+          ...(isMain ? [{ key: 'locale-settings', label: t('pages.menuCenter.localeSettings') }] : []),
         ]}
       />
 
@@ -1729,7 +1729,7 @@ const MenuCenter: React.FC = () => {
             onChange={(k) => setProductsTab(k as any)}
             items={[
               { key: 'items', label: t('pages.menuCenter.itemList') },
-              { key: 'modifiers', label: '自定义选项组' },
+              { key: 'modifiers', label: t('pages.menuCenter.customOptionGroupsTab') },
             ]}
           />
           <div className="mt-4">
@@ -1778,7 +1778,7 @@ const MenuCenter: React.FC = () => {
                 </p>
 
                 {categoryItems.length === 0 ? (
-                  <UI.EmptyState title={t('pages.menuCenter.emptyItems')} action={isMain ? <UI.Btn variant="primary" onClick={handleCreateItem}>创建第一个商品</UI.Btn> : undefined} />
+                  <UI.EmptyState title={t('pages.menuCenter.emptyItems')} action={isMain ? <UI.Btn variant="primary" onClick={handleCreateItem}>{t('pages.menuCenter.createFirstItemBtn')}</UI.Btn> : undefined} />
                 ) : (
                   <div className="divide-y divide-slate-100">
                     {categoryItems.map(item => (
@@ -1788,7 +1788,7 @@ const MenuCenter: React.FC = () => {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-slate-800">{item.name}</span>
                             <UI.Badge variant={item.isActive ? 'green' : 'red'}>{item.isActive ? t('pages.menuCenter.active') : t('pages.menuCenter.inactive')}</UI.Badge>
-                            {item.scope === 'STORE_EXCLUSIVE' && <UI.Badge variant="gold">专属</UI.Badge>}
+                            {item.scope === 'STORE_EXCLUSIVE' && <UI.Badge variant="gold">{t('pages.menuCenter.storeExclusiveBadge')}</UI.Badge>}
                           </div>
                           {/* 描述 + 价格 */}
                           {item.description && <p className="text-sm text-slate-500 mt-1">{item.description}</p>}
@@ -1796,8 +1796,8 @@ const MenuCenter: React.FC = () => {
                             <span className="font-medium text-slate-700">{t('pages.menuCenter.salePrice')}: {formatPrice(item.basePrice)}</span>
                             {!isMain && storeConfigs.get(item.id)?.priceOverride != null && (
                               <>
-                                <UI.Badge variant="gold">已改价</UI.Badge>
-                                <span className="font-medium text-amber-600">本店售价: {Number(storeConfigs.get(item.id)!.priceOverride!).toFixed(2)}</span>
+                                <UI.Badge variant="gold">{t('pages.menuCenter.priceChangedBadge')}</UI.Badge>
+                                <span className="font-medium text-amber-600">{t('pages.menuCenter.storePriceLabel', { price: Number(storeConfigs.get(item.id)!.priceOverride!).toFixed(2) })}</span>
                               </>
                             )}
                             {item.cost && <span className="text-slate-400">{t('pages.menuCenter.cost')}: {formatPrice(item.cost)}</span>}
@@ -1821,7 +1821,7 @@ const MenuCenter: React.FC = () => {
                           {/* 加料 */}
                           {itemAddons[item.id] && itemAddons[item.id].length > 0 && (
                             <div className="flex items-center gap-1 flex-wrap mt-1.5">
-                              <span className="text-xs text-slate-400">加料配置:</span>
+                              <span className="text-xs text-slate-400">{t('pages.menuCenter.addonConfigLabel')}</span>
                               {itemAddons[item.id].map((itemAddon, index) => {
                                 const addon = itemAddon.addon || addons.find(a => a.id === itemAddon.addonId)
                                 if (!addon) return null
@@ -1832,7 +1832,7 @@ const MenuCenter: React.FC = () => {
                           {/* 自定义字段 */}
                           {item.customFields && Object.keys(item.customFields).length > 0 && (
                             <div className="flex items-center gap-1 flex-wrap mt-1.5">
-                              <span className="text-xs text-slate-400">自定义:</span>
+                              <span className="text-xs text-slate-400">{t('pages.menuCenter.customFieldLabel')}</span>
                               {Object.entries(item.customFields).map(([key, value]) => (
                                 <UI.Badge key={key} variant="blue">{key}: {String(value)}</UI.Badge>
                               ))}
@@ -1844,7 +1844,7 @@ const MenuCenter: React.FC = () => {
                           {isMain ? (
                             <>
                               <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditItem(item)}>{t('pages.menuCenter.edit')}</UI.Btn>
-                              <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>可售范围</UI.Btn>
+                              <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>{t('pages.menuCenter.saleRange')}</UI.Btn>
                               <button title={t('pages.menuCenter.delete')} onClick={() => setItemDeleteTarget(item)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                             </>
                           ) : (
@@ -1861,8 +1861,8 @@ const MenuCenter: React.FC = () => {
                                   })
                                 }}
                               />
-                              <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => { setPriceOverrideTarget(item); setPriceOverrideValue(storeConfigs.get(item.id)?.priceOverride ?? NaN) }}>改价</UI.Btn>
-                              <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>可售范围</UI.Btn>
+                              <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => { setPriceOverrideTarget(item); setPriceOverrideValue(storeConfigs.get(item.id)?.priceOverride ?? NaN) }}>{t('pages.menuCenter.changePriceBtn')}</UI.Btn>
+                              <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>{t('pages.menuCenter.saleRange')}</UI.Btn>
                             </>
                           )}
                         </div>
@@ -1888,7 +1888,7 @@ const MenuCenter: React.FC = () => {
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <UI.Badge variant="gold">{t('pages.menuCenter.comboTag')}</UI.Badge>
-                                {combo.itemGroups && combo.itemGroups.length > 0 ? <UI.Badge variant="gold">可选套餐</UI.Badge> : <UI.Badge variant="blue">固定套餐</UI.Badge>}
+                                {combo.itemGroups && combo.itemGroups.length > 0 ? <UI.Badge variant="gold">{t('pages.menuCenter.selectableComboBadge')}</UI.Badge> : <UI.Badge variant="blue">{t('pages.menuCenter.fixedComboBadge')}</UI.Badge>}
                                 <span className="font-medium text-slate-800">{combo.name}</span>
                                 {!combo.isActive && <UI.Badge variant="red">{t('pages.menuCenter.deactivated')}</UI.Badge>}
                               </div>
@@ -1897,21 +1897,21 @@ const MenuCenter: React.FC = () => {
                                 <div className="flex items-center gap-1 flex-wrap mt-1.5">
                                   <span className="text-xs text-slate-400">{t('pages.menuCenter.includedItems')}:</span>
                                   {combo.comboItems.map((comboItem, index) => (
-                                    <UI.Badge key={index} variant="blue">{allItems.find(i => i.id === comboItem.itemId)?.name || comboItem.item?.name || '未知'} ×{comboItem.quantity}</UI.Badge>
+                                    <UI.Badge key={index} variant="blue">{allItems.find(i => i.id === comboItem.itemId)?.name || comboItem.item?.name || t('pages.menuCenter.unknownItem')} ×{comboItem.quantity}</UI.Badge>
                                   ))}
                                 </div>
                               )}
                               {combo.itemGroups && combo.itemGroups.length > 0 && (
                                 <div className="mt-1.5 space-y-1">
-                                  <span className="text-xs text-slate-400">套餐分组:</span>
+                                  <span className="text-xs text-slate-400">{t('pages.menuCenter.comboGroupsLabel')}</span>
                                   {combo.itemGroups.map((group, index) => {
                                     const groupItems = (combo.comboItems || []).filter(item => item.groupId === group.id)
-                                    const selectionText = group.selectionType === 'single' ? '单选' : `${groupItems.length}选${group.maxSelections || 1}`
+                                    const selectionText = group.selectionType === 'single' ? t('pages.menuCenter.singleSelect') : t('pages.menuCenter.multiSelectFormat', { count: groupItems.length, max: group.maxSelections || 1 })
                                     return (
                                       <div key={index} className="flex items-center gap-1 flex-wrap">
                                         <UI.Badge variant="blue">{group.name} ({selectionText})</UI.Badge>
                                         {groupItems.map((item, idx) => (
-                                          <UI.Badge key={idx}>{allItems.find(i => i.id === item.itemId)?.name || '未知'}{item.additionalPrice ? ` +${(item.additionalPrice / 100).toFixed(2)}` : ''}</UI.Badge>
+                                          <UI.Badge key={idx}>{allItems.find(i => i.id === item.itemId)?.name || t('pages.menuCenter.unknownItem')}{item.additionalPrice ? ` +${(item.additionalPrice / 100).toFixed(2)}` : ''}</UI.Badge>
                                         ))}
                                       </div>
                                     )
@@ -1983,8 +1983,8 @@ const MenuCenter: React.FC = () => {
                         <div className="flex flex-col gap-1 items-start">
                           <span className="font-medium text-slate-800">{record.name}</span>
                           {record.itemGroups && record.itemGroups.length > 0
-                            ? <UI.Badge variant="gold">可选套餐</UI.Badge>
-                            : <UI.Badge variant="blue">固定套餐</UI.Badge>}
+                            ? <UI.Badge variant="gold">{t('pages.menuCenter.selectableComboBadge')}</UI.Badge>
+                            : <UI.Badge variant="blue">{t('pages.menuCenter.fixedComboBadge')}</UI.Badge>}
                         </div>
                       ),
                     },
@@ -1996,14 +1996,14 @@ const MenuCenter: React.FC = () => {
                             <div className="flex flex-col gap-1">
                               {record.itemGroups.map((group, index) => {
                                 const groupItems = (record.comboItems || []).filter(item => item.groupId === group.id)
-                                const selectionText = group.selectionType === 'single' ? '单选' : `${groupItems.length}选${group.maxSelections || 1}`
+                                const selectionText = group.selectionType === 'single' ? t('pages.menuCenter.singleSelect') : t('pages.menuCenter.multiSelectFormat', { count: groupItems.length, max: group.maxSelections || 1 })
                                 return (
                                   <div key={index} className="flex flex-wrap items-center gap-1">
                                     <UI.Badge variant="blue">{group.name} ({selectionText})</UI.Badge>
                                     {groupItems.slice(0, 3).map((item, idx) => (
-                                      <UI.Badge key={idx}>{allItems.find(i => i.id === item.itemId)?.name || '未知'}{item.additionalPrice ? ` +${(item.additionalPrice / 100).toFixed(2)}` : ''}</UI.Badge>
+                                      <UI.Badge key={idx}>{allItems.find(i => i.id === item.itemId)?.name || t('pages.menuCenter.unknownItem')}{item.additionalPrice ? ` +${(item.additionalPrice / 100).toFixed(2)}` : ''}</UI.Badge>
                                     ))}
-                                    {groupItems.length > 3 && <span className="text-xs text-slate-400">等{groupItems.length}项</span>}
+                                    {groupItems.length > 3 && <span className="text-xs text-slate-400">{t('pages.menuCenter.andMoreItems', { count: groupItems.length })}</span>}
                                   </div>
                                 )
                               })}
@@ -2011,28 +2011,28 @@ const MenuCenter: React.FC = () => {
                           )
                         }
                         const items = record.comboItems || []
-                        if (items.length === 0) return <span className="text-slate-400">暂无商品</span>
+                        if (items.length === 0) return <span className="text-slate-400">{t('pages.menuCenter.noItemsYet')}</span>
                         return (
                           <div className="flex flex-wrap gap-1">
                             {items.map((comboItem, index) => (
-                              <UI.Badge key={index} variant="blue">{allItems.find(i => i.id === comboItem.itemId)?.name || comboItem.item?.name || '未知商品'} ×{comboItem.quantity || 1}</UI.Badge>
+                              <UI.Badge key={index} variant="blue">{allItems.find(i => i.id === comboItem.itemId)?.name || comboItem.item?.name || t('pages.menuCenter.unknownItemFull')} ×{comboItem.quantity || 1}</UI.Badge>
                             ))}
                           </div>
                         )
                       },
                     },
-                    { key: 'category', title: '分类', width: 100, render: (r: Combo) => (r as any).category?.name || '-' },
-                    { key: 'basePrice', title: '原价', width: 100, render: (r: Combo) => <span className="text-slate-700">{formatPrice(r.basePrice)}</span> },
+                    { key: 'category', title: t('pages.menuCenter.colCategory'), width: 100, render: (r: Combo) => (r as any).category?.name || '-' },
+                    { key: 'basePrice', title: t('pages.menuCenter.colOriginalPrice'), width: 100, render: (r: Combo) => <span className="text-slate-700">{formatPrice(r.basePrice)}</span> },
                     {
-                      key: 'discount', title: '折扣', width: 100,
+                      key: 'discount', title: t('pages.menuCenter.colDiscount'), width: 100,
                       render: (r: Combo) => {
                         const discount = Number(r.discount) || 0
-                        if (discount === 0) return <span className="text-slate-400">无</span>
+                        if (discount === 0) return <span className="text-slate-400">{t('pages.menuCenter.noDiscount')}</span>
                         return <span className="text-red-600">{r.discountType === 'percentage' ? `-${discount}%` : `-${formatPrice(discount)}`}</span>
                       },
                     },
                     {
-                      key: 'finalPrice', title: '售价', width: 100,
+                      key: 'finalPrice', title: t('pages.menuCenter.colSalePrice'), width: 100,
                       render: (r: Combo) => {
                         const basePrice = Number(r.basePrice) || 0
                         const discount = Number(r.discount) || 0
@@ -2074,12 +2074,12 @@ const MenuCenter: React.FC = () => {
         }
       >
         <div className="space-y-4">
-          <UI.Field label={`${t('pages.menuCenter.categoryName')}（English，默认）`} required error={catErr}>
+          <UI.Field label={`${t('pages.menuCenter.categoryName')}${t('pages.menuCenter.englishDefaultSuffix')}`} required error={catErr}>
             <UI.TextInput value={catName} onChange={setCatName} placeholder={t('pages.menuCenter.categoryNamePlaceholder')} maxLength={50} />
           </UI.Field>
           {additionalLocales.map(locale => (
-            <UI.Field key={locale} label={`分类名称（${LOCALE_LABELS[locale] ?? locale}）`}>
-              <UI.TextInput value={catNameI18n[locale] ?? ''} onChange={(v) => setCatNameI18n(prev => ({ ...prev, [locale]: v }))} placeholder={`${LOCALE_LABELS[locale] ?? locale} 译名（可选）`} maxLength={50} />
+            <UI.Field key={locale} label={t('pages.menuCenter.categoryNameLocaleLabel', { locale: LOCALE_LABELS[locale] ?? locale })}>
+              <UI.TextInput value={catNameI18n[locale] ?? ''} onChange={(v) => setCatNameI18n(prev => ({ ...prev, [locale]: v }))} placeholder={t('pages.menuCenter.localeTranslationPlaceholder', { locale: LOCALE_LABELS[locale] ?? locale })} maxLength={50} />
             </UI.Field>
           ))}
 
@@ -2133,7 +2133,7 @@ const MenuCenter: React.FC = () => {
           onChange={(k) => setItemModalTab(k as 'basic' | 'modifiers')}
           items={[
             { key: 'basic', label: t('pages.menuCenter.basicInfo') },
-            { key: 'modifiers', label: '自定义选项配置' },
+            { key: 'modifiers', label: t('pages.menuCenter.customOptionConfigTab') },
           ]}
         />
 
@@ -2142,13 +2142,13 @@ const MenuCenter: React.FC = () => {
             <div className="flex flex-col lg:flex-row gap-5">
               {/* 左：图片 */}
               <div className="shrink-0">
-                <div className="text-sm font-medium text-slate-700 mb-1.5">图片</div>
+                <div className="text-sm font-medium text-slate-700 mb-1.5">{t('pages.menuCenter.imageLabel')}</div>
                 {editingItem ? (
                   <UI.ImageUpload url={previewImageUrl} loading={imageUploading} onPick={handleImageUpload} onRemove={handleImageDelete} hint="JPG / PNG / WebP，≤5MB" />
                 ) : (
                   <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-slate-400" style={{ width: 120, height: 120 }}>
                     <ImageIcon className="w-6 h-6" />
-                    <span className="text-[11px] mt-1.5 text-center px-2">保存后可上传</span>
+                    <span className="text-[11px] mt-1.5 text-center px-2">{t('pages.menuCenter.saveToUpload')}</span>
                   </div>
                 )}
               </div>
@@ -2156,22 +2156,22 @@ const MenuCenter: React.FC = () => {
               {/* 中：名称 + 简介（多语言） */}
               <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-3">
-                  <UI.Field label="名称（English，默认）" required>
+                  <UI.Field label={`${t('pages.menuCenter.itemName')}${t('pages.menuCenter.englishDefaultSuffix')}`} required>
                     <UI.TextInput value={itName} onChange={setItName} placeholder={t('pages.menuCenter.itemNamePlaceholder')} maxLength={100} />
                   </UI.Field>
                   {additionalLocales.map(locale => (
-                    <UI.Field key={locale} label={`名称（${LOCALE_LABELS[locale] ?? locale}）`}>
-                      <UI.TextInput value={itNameI18n[locale] ?? ''} onChange={(v) => setItNameI18n(prev => ({ ...prev, [locale]: v }))} placeholder="可选" maxLength={100} />
+                    <UI.Field key={locale} label={t('pages.menuCenter.nameLocaleLabel', { locale: LOCALE_LABELS[locale] ?? locale })}>
+                      <UI.TextInput value={itNameI18n[locale] ?? ''} onChange={(v) => setItNameI18n(prev => ({ ...prev, [locale]: v }))} placeholder={t('pages.menuCenter.optional')} maxLength={100} />
                     </UI.Field>
                   ))}
                 </div>
                 <div className="space-y-3">
-                  <UI.Field label="简介（English，默认）">
+                  <UI.Field label={`${t('pages.menuCenter.itemDescription')}${t('pages.menuCenter.englishDefaultSuffix')}`}>
                     <UI.Textarea value={itDescription} onChange={setItDescription} rows={2} placeholder={t('pages.menuCenter.itemDescriptionPlaceholder')} />
                   </UI.Field>
                   {additionalLocales.map(locale => (
-                    <UI.Field key={locale} label={`简介（${LOCALE_LABELS[locale] ?? locale}）`}>
-                      <UI.Textarea value={itDescriptionI18n[locale] ?? ''} onChange={(v) => setItDescriptionI18n(prev => ({ ...prev, [locale]: v }))} rows={2} placeholder="可选" />
+                    <UI.Field key={locale} label={t('pages.menuCenter.introLocaleLabel', { locale: LOCALE_LABELS[locale] ?? locale })}>
+                      <UI.Textarea value={itDescriptionI18n[locale] ?? ''} onChange={(v) => setItDescriptionI18n(prev => ({ ...prev, [locale]: v }))} rows={2} placeholder={t('pages.menuCenter.optional')} />
                     </UI.Field>
                   ))}
                 </div>
@@ -2204,26 +2204,26 @@ const MenuCenter: React.FC = () => {
                 </div>
                 {isMain && (
                   <>
-                    <UI.Field label="商品范围">
+                    <UI.Field label={t('pages.menuCenter.itemScopeLabel')}>
                       <UI.SelectInput
                         value={itScope}
                         onChange={(v) => setItScope(String(v))}
                         className="w-full"
                         options={[
-                          { label: '品牌商品（全部门店）', value: 'BRAND' },
-                          { label: '店铺专属', value: 'STORE_EXCLUSIVE' },
+                          { label: t('pages.menuCenter.brandItemOption'), value: 'BRAND' },
+                          { label: t('pages.menuCenter.storeExclusiveOption'), value: 'STORE_EXCLUSIVE' },
                         ]}
                       />
                     </UI.Field>
                     {itScope === 'STORE_EXCLUSIVE' && (
-                      <UI.Field label="可见门店">
+                      <UI.Field label={t('pages.menuCenter.visibleStoresLabel')}>
                         <div className="space-y-1.5 max-h-40 overflow-y-auto sidebar-scroll rounded-lg border border-slate-200 p-2">
                           {organizations.map((o: any) => (
                             <UI.Checkbox
                               key={o.id}
                               checked={itVisibleStoreIds.includes(o.id)}
                               onCheckedChange={(c) => setItVisibleStoreIds(prev => c ? [...prev, o.id] : prev.filter(id => id !== o.id))}
-                              label={`${o.orgName}${o.orgType === 'MAIN' ? ' (主店)' : o.orgType === 'FRANCHISE' ? ' (加盟)' : ' (分店)'}`}
+                              label={`${o.orgName}${o.orgType === 'MAIN' ? t('pages.menuCenter.mainStoreSuffix') : o.orgType === 'FRANCHISE' ? t('pages.menuCenter.franchiseSuffix') : t('pages.menuCenter.branchSuffix')}`}
                             />
                           ))}
                         </div>
@@ -2341,10 +2341,10 @@ const MenuCenter: React.FC = () => {
             <p className="font-medium text-blue-800">{t('pages.menuCenter.fillExample')}</p>
             <p className="text-slate-600 mt-1">{t('pages.menuCenter.iceOptionExample')}</p>
             <ul className="list-disc pl-5 mt-1 text-xs text-slate-500 space-y-0.5">
-              <li>选项值: <code className="font-mono">normal_ice</code> → 显示名称: 正常冰</li>
-              <li>选项值: <code className="font-mono">light_ice</code> → 显示名称: 少冰</li>
-              <li>选项值: <code className="font-mono">more_ice</code> → 显示名称: 多冰</li>
-              <li>选项值: <code className="font-mono">no_ice</code> → 显示名称: 去冰</li>
+              <li>{t('pages.menuCenter.optionValueColonLabel')} <code className="font-mono">normal_ice</code> → {t('pages.menuCenter.displayNameColonLabel')} {t('pages.menuCenter.iceNormalExample')}</li>
+              <li>{t('pages.menuCenter.optionValueColonLabel')} <code className="font-mono">light_ice</code> → {t('pages.menuCenter.displayNameColonLabel')} {t('pages.menuCenter.iceLightExample')}</li>
+              <li>{t('pages.menuCenter.optionValueColonLabel')} <code className="font-mono">more_ice</code> → {t('pages.menuCenter.displayNameColonLabel')} {t('pages.menuCenter.iceMoreExample')}</li>
+              <li>{t('pages.menuCenter.optionValueColonLabel')} <code className="font-mono">no_ice</code> → {t('pages.menuCenter.displayNameColonLabel')} {t('pages.menuCenter.iceNoneExample')}</li>
             </ul>
           </div>
 
@@ -2374,8 +2374,8 @@ const MenuCenter: React.FC = () => {
         size="lg"
         footer={
           <>
-            <UI.Btn variant="secondary" onClick={() => setComboModalVisible(false)}>取消</UI.Btn>
-            <UI.Btn variant="primary" loading={loading.creating} onClick={handleSaveCombo}>{editingCombo ? '更新' : '创建'}</UI.Btn>
+            <UI.Btn variant="secondary" onClick={() => setComboModalVisible(false)}>{t('pages.menuCenter.cancel')}</UI.Btn>
+            <UI.Btn variant="primary" loading={loading.creating} onClick={handleSaveCombo}>{editingCombo ? t('pages.menuCenter.update') : t('pages.menuCenter.create')}</UI.Btn>
           </>
         }
       >
@@ -2384,26 +2384,26 @@ const MenuCenter: React.FC = () => {
             <UI.Field label={t('pages.menuCenter.comboName')} required error={cbErr.name}>
               <UI.TextInput value={cbName} onChange={setCbName} placeholder={t('pages.menuCenter.comboNamePlaceholder')} maxLength={100} />
             </UI.Field>
-            <UI.Field label="所属分类" required error={cbErr.categoryId}>
+            <UI.Field label={t('pages.menuCenter.belongsToCategoryLabel')} required error={cbErr.categoryId}>
               <UI.SelectInput
                 value={cbCategoryId ?? ''}
                 onChange={(v) => setCbCategoryId(v || undefined)}
                 className="w-full"
                 options={[
-                  { label: '请选择分类', value: '' },
+                  { label: t('pages.menuCenter.pleaseSelectCategoryOption'), value: '' },
                   ...flatCategories.map(cat => ({ label: (cat.level && cat.level > 0 ? '　└─ ' : '') + cat.name, value: cat.id })),
                 ]}
               />
             </UI.Field>
           </div>
 
-          <UI.Field label="描述">
+          <UI.Field label={t('pages.menuCenter.descriptionLabel')}>
             <UI.Textarea value={cbDescription} onChange={setCbDescription} rows={3} placeholder={t('pages.menuCenter.comboDescriptionPlaceholder')} />
           </UI.Field>
 
           {/* 套餐图片上传 */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">套餐图片</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('pages.menuCenter.comboImageLabel')}</label>
             <ComboImageUpload
               comboId={editingCombo?.id}
               imageUrl={comboImageUrl}
@@ -2419,9 +2419,9 @@ const MenuCenter: React.FC = () => {
 
           {/* 套餐类型 */}
           <div>
-            <div className="text-sm font-medium text-slate-700 mb-1.5">套餐类型</div>
+            <div className="text-sm font-medium text-slate-700 mb-1.5">{t('pages.menuCenter.comboTypeLabel')}</div>
             <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
-              {([['fixed', '固定套餐'], ['selection', '可选套餐']] as const).map(([v, label]) => (
+              {([['fixed', t('pages.menuCenter.fixedComboOption')], ['selection', t('pages.menuCenter.selectionComboOption')]] as const).map(([v, label]) => (
                 <button
                   key={v}
                   disabled={!!editingCombo}
@@ -2438,8 +2438,8 @@ const MenuCenter: React.FC = () => {
             </div>
             <div className="text-xs mt-1.5">
               {editingCombo
-                ? <span className="text-red-500">⚠️ 套餐创建后不能修改类型</span>
-                : <span className="text-slate-400">{comboType === 'fixed' ? '包含固定商品，价格由各商品自动汇总' : '顾客从各分组中自行选择，套餐价格手动设定'}</span>}
+                ? <span className="text-red-500">{t('pages.menuCenter.comboTypeLockedWarning')}</span>
+                : <span className="text-slate-400">{comboType === 'fixed' ? t('pages.menuCenter.fixedComboHint') : t('pages.menuCenter.selectionComboHint')}</span>}
             </div>
           </div>
 
@@ -2466,21 +2466,21 @@ const MenuCenter: React.FC = () => {
                 return (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between rounded-lg bg-blue-50 border border-blue-200 px-4 py-3">
-                      <span className="text-sm text-slate-500">商品总价（自动计算）</span>
+                      <span className="text-sm text-slate-500">{t('pages.menuCenter.itemsTotalPriceAuto')}</span>
                       <span className="text-lg font-semibold text-blue-700">${basePrice.toFixed(2)}</span>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500 mb-2">折扣设置（可选）</p>
+                      <p className="text-sm text-slate-500 mb-2">{t('pages.menuCenter.discountSettingsOptional')}</p>
                       <div className="grid grid-cols-2 gap-3">
-                        <UI.Field label="折扣类型">
+                        <UI.Field label={t('pages.menuCenter.discountTypeLabel')}>
                           <UI.SelectInput
                             value={cbDiscountType}
                             onChange={(v) => { setCbDiscountType(v); setCbDiscount(0) }}
                             className="w-full"
-                            options={[{ label: '固定金额', value: 'fixed' }, { label: '百分比', value: 'percentage' }]}
+                            options={[{ label: t('pages.menuCenter.fixedAmountOption'), value: 'fixed' }, { label: t('pages.menuCenter.percentageOption'), value: 'percentage' }]}
                           />
                         </UI.Field>
-                        <UI.Field label={cbDiscountType === 'percentage' ? '折扣 (%)' : '折扣 ($)'}>
+                        <UI.Field label={cbDiscountType === 'percentage' ? t('pages.menuCenter.discountPercentLabel') : t('pages.menuCenter.discountAmountLabel')}>
                           <UI.NumberInput value={cbDiscount} onChange={setCbDiscount} min={0} max={cbDiscountType === 'percentage' ? 100 : undefined} className="w-full" />
                         </UI.Field>
                       </div>
@@ -2488,9 +2488,9 @@ const MenuCenter: React.FC = () => {
                     {basePrice > 0 && (
                       <div className="flex items-center justify-between rounded-lg bg-emerald-50 border-2 border-emerald-500 px-4 py-3">
                         <div>
-                          <span className="text-base font-semibold text-slate-800">最终售价</span>
+                          <span className="text-base font-semibold text-slate-800">{t('pages.menuCenter.finalPriceLabel')}</span>
                           {discountAmount > 0 && (
-                            <div className="text-xs text-slate-500 mt-0.5">原价 ${basePrice.toFixed(2)} - 折扣 {cbDiscountType === 'percentage' ? `${discount}%` : `$${discount.toFixed(2)}`}</div>
+                            <div className="text-xs text-slate-500 mt-0.5">{t('pages.menuCenter.originalPriceMinusDiscount', { base: basePrice.toFixed(2), discount: cbDiscountType === 'percentage' ? `${discount}%` : `$${discount.toFixed(2)}` })}</div>
                           )}
                         </div>
                         <span className="text-2xl font-bold text-emerald-600">${finalPrice.toFixed(2)}</span>
@@ -2509,7 +2509,7 @@ const MenuCenter: React.FC = () => {
                 onComboItemsChange={setCbComboItems}
                 allItems={allItems}
               />
-              <UI.Field label="套餐价格" required error={cbErr.basePrice} hint="顾客选择分组商品后，各选项的额外费用将在此价格基础上累加">
+              <UI.Field label={t('pages.menuCenter.comboPriceLabel')} required error={cbErr.basePrice} hint={t('pages.menuCenter.comboPriceHint')}>
                 <div className="w-52">
                   <UI.NumberInput value={cbBasePrice} onChange={setCbBasePrice} min={0} className="w-full" />
                 </div>
@@ -2526,10 +2526,10 @@ const MenuCenter: React.FC = () => {
       <UI.Modal
         open={!!priceOverrideTarget}
         onOpenChange={(v) => !v && setPriceOverrideTarget(null)}
-        title={priceOverrideTarget ? `改价 — ${priceOverrideTarget.name}` : '改价'}
+        title={priceOverrideTarget ? t('pages.menuCenter.changePriceModalTitle', { name: priceOverrideTarget.name }) : t('pages.menuCenter.changePriceModalTitleDefault')}
         footer={
           <>
-            <UI.Btn variant="secondary" onClick={() => setPriceOverrideTarget(null)}>取消</UI.Btn>
+            <UI.Btn variant="secondary" onClick={() => setPriceOverrideTarget(null)}>{t('pages.menuCenter.cancel')}</UI.Btn>
             <UI.Btn variant="primary" onClick={async () => {
               if (!priceOverrideTarget) return
               await storeMenuService.upsertStoreMenuConfig(priceOverrideTarget.id, {
@@ -2537,13 +2537,13 @@ const MenuCenter: React.FC = () => {
                 isAvailable: storeConfigs.get(priceOverrideTarget.id)?.isAvailable ?? true,
               })
               await loadStoreConfigs()
-              UI.toast.success('价格已更新')
+              UI.toast.success(t('pages.menuCenter.priceUpdatedSuccess'))
               setPriceOverrideTarget(null)
-            }}>保存</UI.Btn>
+            }}>{t('common.save')}</UI.Btn>
           </>
         }
       >
-        <UI.Field label="本店售价（元）" hint={priceOverrideTarget ? `品牌定价 ${formatPrice(priceOverrideTarget.basePrice)}，留空恢复默认` : undefined}>
+        <UI.Field label={t('pages.menuCenter.storePriceInYuanLabel')} hint={priceOverrideTarget ? t('pages.menuCenter.brandPriceHint', { price: formatPrice(priceOverrideTarget.basePrice) }) : undefined}>
           <UI.NumberInput value={priceOverrideValue} onChange={setPriceOverrideValue} min={0} className="w-full" />
         </UI.Field>
       </UI.Modal>

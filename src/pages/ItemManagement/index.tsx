@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Pencil, Trash2, Search, RotateCw, Image as ImageIcon } from 'lucide-react'
 import { useAuthContext } from '../../auth/AuthProvider'
 import {
@@ -27,6 +28,7 @@ interface ItemFormData {
 const EMPTY_FORM: ItemFormData = { name: '', description: '', basePrice: 0, categoryId: '', isActive: true }
 
 const ItemManagement: React.FC = () => {
+  const { t } = useTranslation()
   const { isAuthenticated } = useAuthContext()
 
   const [loading, setLoading] = useState(false)
@@ -66,7 +68,7 @@ const ItemManagement: React.FC = () => {
       setPagination(prev => ({ ...prev, total: response.total }))
     } catch (error) {
       console.error('Failed to load items:', error)
-      toast.error('加载商品列表失败')
+      toast.error(t('pages.itemManagement.loadItemsFailed'))
     } finally {
       setLoading(false)
     }
@@ -78,7 +80,7 @@ const ItemManagement: React.FC = () => {
       setCategories(categoryList)
     } catch (error) {
       console.error('Failed to load categories:', error)
-      toast.error('加载分类列表失败')
+      toast.error(t('pages.itemManagement.loadCategoriesFailed'))
     }
   }
 
@@ -89,10 +91,10 @@ const ItemManagement: React.FC = () => {
         const results = await itemManagementService.searchItems(searchQuery)
         setItems(results)
         setPagination(prev => ({ ...prev, total: results.length }))
-        toast.success(`找到 ${results.length} 个匹配的商品`)
+        toast.success(t('pages.itemManagement.foundMatchingCount', { count: results.length }))
       } catch (error) {
         console.error('Failed to search items:', error)
-        toast.error('搜索商品失败')
+        toast.error(t('pages.itemManagement.searchFailed'))
       } finally {
         setLoading(false)
       }
@@ -127,7 +129,7 @@ const ItemManagement: React.FC = () => {
 
   const handleImageUpload = async (file: File) => {
     if (!editingItem) {
-      toast.warning('请先保存商品，然后再上传图片')
+      toast.warning(t('pages.itemManagement.pleaseSaveFirst'))
       return
     }
     setImageUploading(true)
@@ -135,11 +137,11 @@ const ItemManagement: React.FC = () => {
       const result = await itemManagementService.uploadItemImage(editingItem.id, file as any)
       setPreviewImageUrl(result.image.url)
       setEditingItem({ ...editingItem, imageUrl: result.image.url })
-      toast.success('图片上传成功')
+      toast.success(t('pages.itemManagement.imageUploadSuccess'))
       loadItems()
     } catch (error: any) {
       console.error('Image upload failed:', error)
-      toast.error(error?.response?.data?.error || '图片上传失败')
+      toast.error(error?.response?.data?.error || t('pages.itemManagement.imageUploadFailed'))
     } finally {
       setImageUploading(false)
     }
@@ -148,18 +150,18 @@ const ItemManagement: React.FC = () => {
   const handleImageDelete = () => {
     if (!editingItem) return
     setConfirm({
-      title: '确认删除图片',
-      description: '确定要删除这张商品图片吗？',
+      title: t('pages.itemManagement.confirmDeleteImageTitle'),
+      description: t('pages.itemManagement.confirmDeleteImageDesc'),
       onConfirm: async () => {
         try {
           await itemManagementService.deleteItemImage(editingItem.id)
           setPreviewImageUrl(undefined)
           setEditingItem({ ...editingItem, imageUrl: undefined })
-          toast.success('图片删除成功')
+          toast.success(t('pages.itemManagement.imageDeleteSuccess'))
           setConfirm(null)
           loadItems()
         } catch (error: any) {
-          toast.error(error?.response?.data?.error || '图片删除失败')
+          toast.error(error?.response?.data?.error || t('pages.itemManagement.imageDeleteFailed'))
         }
       },
     })
@@ -167,23 +169,23 @@ const ItemManagement: React.FC = () => {
 
   const handleDelete = (id: string) => {
     setConfirm({
-      title: '确认删除',
-      description: '确定要删除这个商品吗？此操作不可恢复。',
+      title: t('pages.itemManagement.confirmDeleteTitle'),
+      description: t('pages.itemManagement.confirmDeleteDesc'),
       onConfirm: async () => {
         try {
           await itemManagementService.deleteItem(id)
-          toast.success('商品删除成功')
+          toast.success(t('pages.itemManagement.itemDeleteSuccess'))
           setConfirm(null)
           loadItems()
         } catch (error) {
-          toast.error('删除商品失败')
+          toast.error(t('pages.itemManagement.itemDeleteFailed'))
         }
       },
     })
   }
 
   const handleSubmit = async () => {
-    if (!form.name.trim()) { setNameError('请输入商品名称'); return }
+    if (!form.name.trim()) { setNameError(t('pages.itemManagement.pleaseEnterName')); return }
     setNameError('')
     try {
       if (editingItem) {
@@ -192,54 +194,54 @@ const ItemManagement: React.FC = () => {
           categoryId: form.categoryId || undefined, isActive: form.isActive,
         }
         await itemManagementService.updateItem(editingItem.id, updatePayload)
-        toast.success('商品更新成功')
+        toast.success(t('pages.itemManagement.itemUpdateSuccess'))
       } else {
         const createPayload: CreateItemPayload = {
           name: form.name, description: form.description, basePrice: form.basePrice,
           categoryId: form.categoryId || '', isActive: form.isActive,
         }
         await itemManagementService.createItem(createPayload)
-        toast.success('商品创建成功')
+        toast.success(t('pages.itemManagement.itemCreateSuccess'))
       }
       setModalVisible(false)
       loadItems()
     } catch (error) {
       console.error('Failed to save item:', error)
-      toast.error(editingItem ? '更新商品失败' : '创建商品失败')
+      toast.error(editingItem ? t('pages.itemManagement.updateFailed') : t('pages.itemManagement.createFailed'))
     }
   }
 
   const columns: Column<Item>[] = [
     {
-      key: 'imageUrl', title: '图片', width: 80,
+      key: 'imageUrl', title: t('pages.itemManagement.colImage'), width: 80,
       render: (r) => r.imageUrl
-        ? <img src={r.imageUrl} alt="商品图片" className="w-[50px] h-[50px] object-cover rounded" />
+        ? <img src={r.imageUrl} alt={t('pages.itemManagement.colImage')} className="w-[50px] h-[50px] object-cover rounded" />
         : <div className="w-[50px] h-[50px] bg-slate-100 rounded flex items-center justify-center"><ImageIcon className="w-5 h-5 text-slate-300" /></div>,
     },
-    { key: 'name', title: '商品名称', width: 200, render: (r) => r.name },
-    { key: 'description', title: '描述', width: 250, render: (r) => <span className="block max-w-[250px] truncate">{r.description}</span> },
-    { key: 'basePrice', title: '价格', width: 120, render: (r) => formatPrice(r.basePrice) },
-    { key: 'category', title: '分类', width: 150, render: (r: any) => r.category?.name || '-' },
+    { key: 'name', title: t('pages.itemManagement.colName'), width: 200, render: (r) => r.name },
+    { key: 'description', title: t('pages.itemManagement.colDescription'), width: 250, render: (r) => <span className="block max-w-[250px] truncate">{r.description}</span> },
+    { key: 'basePrice', title: t('pages.itemManagement.colPrice'), width: 120, render: (r) => formatPrice(r.basePrice) },
+    { key: 'category', title: t('pages.itemManagement.colCategory'), width: 150, render: (r: any) => r.category?.name || '-' },
     {
-      key: 'isActive', title: '状态', width: 100,
-      render: (r) => <span className={`inline-flex items-center text-xs px-1.5 py-0.5 rounded ring-1 ${r.isActive ? 'bg-green-50 text-green-600 ring-green-200' : 'bg-red-50 text-red-600 ring-red-200'}`}>{r.isActive ? '活跃' : '停用'}</span>,
+      key: 'isActive', title: t('pages.itemManagement.colStatus'), width: 100,
+      render: (r) => <span className={`inline-flex items-center text-xs px-1.5 py-0.5 rounded ring-1 ${r.isActive ? 'bg-green-50 text-green-600 ring-green-200' : 'bg-red-50 text-red-600 ring-red-200'}`}>{r.isActive ? t('pages.itemManagement.statusActive') : t('pages.itemManagement.statusInactive')}</span>,
     },
-    { key: 'createdAt', title: '创建时间', width: 180, render: (r: any) => (r.createdAt ? new Date(r.createdAt).toLocaleString() : '-') },
+    { key: 'createdAt', title: t('pages.itemManagement.colCreatedAt'), width: 180, render: (r: any) => (r.createdAt ? new Date(r.createdAt).toLocaleString() : '-') },
     {
-      key: 'actions', title: '操作', width: 150,
+      key: 'actions', title: t('pages.itemManagement.colActions'), width: 150,
       render: (r) => (
         <div className="flex items-center gap-1">
-          <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEdit(r)}>编辑</Btn>
-          <Btn variant="link" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => handleDelete(r.id)}>删除</Btn>
+          <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEdit(r)}>{t('pages.itemManagement.editBtn')}</Btn>
+          <Btn variant="link" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => handleDelete(r.id)}>{t('pages.itemManagement.deleteBtn')}</Btn>
         </div>
       ),
     },
   ]
 
-  const categoryOptions = [{ label: '（无分类）', value: '' }, ...categories.map(cat => ({ label: cat.name, value: cat.id }))]
+  const categoryOptions = [{ label: t('pages.itemManagement.noCategoryOption'), value: '' }, ...categories.map(cat => ({ label: cat.name, value: cat.id }))]
 
   if (!isAuthenticated) {
-    return <div className="p-6 text-center"><span className="text-slate-600">请先登录以使用商品管理功能</span></div>
+    return <div className="p-6 text-center"><span className="text-slate-600">{t('pages.itemManagement.pleaseLoginFirst')}</span></div>
   }
 
   const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.pageSize))
@@ -249,7 +251,7 @@ const ItemManagement: React.FC = () => {
   return (
     <div className="p-6">
       <SectionCard>
-        <h2 className="text-2xl font-semibold text-slate-900 mb-4">商品管理</h2>
+        <h2 className="text-2xl font-semibold text-slate-900 mb-4">{t('pages.itemManagement.pageTitle')}</h2>
 
         {/* 搜索和操作栏 */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -257,18 +259,18 @@ const ItemManagement: React.FC = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
-                placeholder="搜索商品名称..."
+                placeholder={t('pages.itemManagement.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
                 className="w-full text-sm bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
               />
             </div>
-            <Btn variant="secondary" onClick={handleSearch}>搜索</Btn>
+            <Btn variant="secondary" onClick={handleSearch}>{t('pages.itemManagement.searchBtn')}</Btn>
           </div>
           <div className="flex gap-2">
-            <Btn variant="secondary" icon={<RotateCw className="w-3.5 h-3.5" />} loading={loading} onClick={loadItems}>刷新</Btn>
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreate}>添加商品</Btn>
+            <Btn variant="secondary" icon={<RotateCw className="w-3.5 h-3.5" />} loading={loading} onClick={loadItems}>{t('common.refresh')}</Btn>
+            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreate}>{t('pages.itemManagement.addItemBtn')}</Btn>
           </div>
         </div>
 
@@ -277,44 +279,48 @@ const ItemManagement: React.FC = () => {
 
         {/* 分页 */}
         <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
-          <span>第 {rangeStart}-{rangeEnd} 条，共 {pagination.total} 条</span>
+          <span>{t('pages.itemManagement.paginationInfo', { start: rangeStart, end: rangeEnd, total: pagination.total })}</span>
           <div className="flex items-center gap-2">
             <div className="w-28">
               <SelectInput value={String(pagination.pageSize)} onChange={(v) => setPagination(prev => ({ ...prev, current: 1, pageSize: Number(v) }))}
-                options={[{ label: '10 条/页', value: '10' }, { label: '20 条/页', value: '20' }, { label: '50 条/页', value: '50' }]} />
+                options={[
+                  { label: t('pages.itemManagement.perPage10'), value: '10' },
+                  { label: t('pages.itemManagement.perPage20'), value: '20' },
+                  { label: t('pages.itemManagement.perPage50'), value: '50' },
+                ]} />
             </div>
-            <Btn variant="secondary" size="sm" disabled={pagination.current <= 1} onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}>上一页</Btn>
+            <Btn variant="secondary" size="sm" disabled={pagination.current <= 1} onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}>{t('pages.itemManagement.prevPage')}</Btn>
             <span>{pagination.current} / {totalPages}</span>
-            <Btn variant="secondary" size="sm" disabled={pagination.current >= totalPages} onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}>下一页</Btn>
+            <Btn variant="secondary" size="sm" disabled={pagination.current >= totalPages} onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}>{t('pages.itemManagement.nextPage')}</Btn>
           </div>
         </div>
       </SectionCard>
 
       {/* 创建/编辑商品模态框 */}
       <Modal
-        title={editingItem ? '编辑商品' : '创建商品'}
+        title={editingItem ? t('pages.itemManagement.editItemModalTitle') : t('pages.itemManagement.createItemModalTitle')}
         open={modalVisible}
         onOpenChange={(o) => !o && setModalVisible(false)}
         size="md"
         footer={
           <div className="flex justify-end gap-2">
-            <Btn variant="secondary" onClick={() => setModalVisible(false)}>取消</Btn>
-            <Btn variant="primary" onClick={handleSubmit}>{editingItem ? '更新' : '创建'}</Btn>
+            <Btn variant="secondary" onClick={() => setModalVisible(false)}>{t('common.cancel')}</Btn>
+            <Btn variant="primary" onClick={handleSubmit}>{editingItem ? t('pages.itemManagement.updateBtn') : t('common.create')}</Btn>
           </div>
         }
       >
         <div className="space-y-4">
-          <FormRow label="商品名称">
-            <TextInput className="w-full" value={form.name} onChange={(v) => { setF('name', v); if (nameError) setNameError('') }} placeholder="请输入商品名称" />
+          <FormRow label={t('pages.itemManagement.itemNameLabel')}>
+            <TextInput className="w-full" value={form.name} onChange={(v) => { setF('name', v); if (nameError) setNameError('') }} placeholder={t('pages.itemManagement.itemNamePlaceholder')} />
           </FormRow>
           {nameError && <p className="text-sm text-red-500 -mt-2">{nameError}</p>}
 
-          <FormRow label="商品描述">
-            <Textarea className="w-full" rows={3} value={form.description} onChange={(v) => setF('description', v)} placeholder="请输入商品描述" />
+          <FormRow label={t('pages.itemManagement.itemDescLabel')}>
+            <Textarea className="w-full" rows={3} value={form.description} onChange={(v) => setF('description', v)} placeholder={t('pages.itemManagement.itemDescPlaceholder')} />
           </FormRow>
 
           <div className="grid grid-cols-2 gap-4">
-            <FormRow label="价格">
+            <FormRow label={t('pages.itemManagement.priceLabel')}>
               <div className="relative w-full">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{getCurrencySymbol()}</span>
                 <input type="number" min={0} step={0.01} value={form.basePrice}
@@ -323,31 +329,31 @@ const ItemManagement: React.FC = () => {
                   className="w-full text-sm bg-white border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0" />
               </div>
             </FormRow>
-            <FormRow label="状态">
+            <FormRow label={t('pages.itemManagement.statusLabel')}>
               <div className="w-full"><SelectInput className="w-full" value={form.isActive ? 'true' : 'false'} onChange={(v) => setF('isActive', v === 'true')}
-                options={[{ label: '活跃', value: 'true' }, { label: '停用', value: 'false' }]} /></div>
+                options={[{ label: t('pages.itemManagement.statusActive'), value: 'true' }, { label: t('pages.itemManagement.statusInactive'), value: 'false' }]} /></div>
             </FormRow>
           </div>
 
-          <FormRow label="商品分类">
-            <div className="w-full"><SelectInput className="w-full" value={form.categoryId} onChange={(v) => setF('categoryId', String(v))} options={categoryOptions} placeholder="请选择分类" /></div>
+          <FormRow label={t('pages.itemManagement.itemCategoryLabel')}>
+            <div className="w-full"><SelectInput className="w-full" value={form.categoryId} onChange={(v) => setF('categoryId', String(v))} options={categoryOptions} placeholder={t('pages.itemManagement.categoryPlaceholder')} /></div>
           </FormRow>
 
           {/* 图片上传 - 仅在编辑模式显示 */}
           {editingItem ? (
-            <FormRow label="商品图片">
+            <FormRow label={t('pages.itemManagement.itemImageLabel')}>
               <div className="flex items-start gap-4">
                 <ImageUpload url={previewImageUrl} loading={imageUploading} size={120} maxMB={5}
                   onPick={handleImageUpload} onRemove={handleImageDelete} />
                 <div className="text-xs text-slate-400 space-y-0.5">
-                  <div>支持 JPG、PNG、WebP 格式</div>
-                  <div>图片大小不超过 5MB</div>
-                  <div>建议尺寸 800x800 像素</div>
+                  <div>{t('pages.itemManagement.imageFormatHint')}</div>
+                  <div>{t('pages.itemManagement.imageSizeHint')}</div>
+                  <div>{t('pages.itemManagement.imageDimensionHint')}</div>
                 </div>
               </div>
             </FormRow>
           ) : (
-            <div className="px-4 py-3 bg-slate-50 rounded-md text-[13px] text-slate-500">💡 提示：保存商品后可以上传图片</div>
+            <div className="px-4 py-3 bg-slate-50 rounded-md text-[13px] text-slate-500">{t('pages.itemManagement.saveFirstHint')}</div>
           )}
         </div>
       </Modal>
@@ -359,7 +365,7 @@ const ItemManagement: React.FC = () => {
         title={confirm?.title ?? ''}
         description={confirm?.description}
         danger
-        confirmText="删除"
+        confirmText={t('pages.itemManagement.deleteBtn')}
         onConfirm={() => confirm?.onConfirm()}
       />
     </div>

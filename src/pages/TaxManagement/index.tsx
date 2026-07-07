@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, RotateCcw, Pencil, Trash2, Store as StoreIcon, LayoutGrid } from 'lucide-react'
 import { useAuthContext } from '../../auth/AuthProvider'
 import { getOrganization } from '../../services/auth'
@@ -26,28 +27,35 @@ function parseAddressToRegion(address: string): string | null {
   return null
 }
 
-function getRegionDisplayName(regionCode: string): string {
+function useRegionDisplayName() {
+  const { t } = useTranslation()
   const names: Record<string, string> = {
-    'CA-BC': '加拿大 - 不列颠哥伦比亚省',
-    'CA-ON': '加拿大 - 安大略省',
-    'CA-QC': '加拿大 - 魁北克省',
-    'US-CA': '美国 - 加利福尼亚州',
-    'US-NY': '美国 - 纽约州',
-    'US-TX': '美国 - 德克萨斯州',
+    'CA-BC': t('pages.taxManagement.regionCaBc'),
+    'CA-ON': t('pages.taxManagement.regionCaOn'),
+    'CA-QC': t('pages.taxManagement.regionCaQc'),
+    'US-CA': t('pages.taxManagement.regionUsCa'),
+    'US-NY': t('pages.taxManagement.regionUsNy'),
+    'US-TX': t('pages.taxManagement.regionUsTx'),
   }
-  return names[regionCode] || regionCode
+  return (regionCode: string) => names[regionCode] || regionCode
 }
 
 // 商品条目渲染（供 Transfer 使用）
-const renderStoreItem = (item: StoreItem) => (
-  <>
-    <span className="truncate">{item.name}</span>
-    {item.isLocal && <Badge variant="blue">本店</Badge>}
-    <span className="text-xs text-slate-400 ml-auto shrink-0">${(item.basePrice / 100).toFixed(2)}</span>
-  </>
-)
+function useRenderStoreItem() {
+  const { t } = useTranslation()
+  return (item: StoreItem) => (
+    <>
+      <span className="truncate">{item.name}</span>
+      {item.isLocal && <Badge variant="blue">{t('pages.taxManagement.localBadge')}</Badge>}
+      <span className="text-xs text-slate-400 ml-auto shrink-0">${(item.basePrice / 100).toFixed(2)}</span>
+    </>
+  )
+}
 
 const TaxManagement: React.FC = () => {
+  const { t } = useTranslation()
+  const getRegionDisplayName = useRegionDisplayName()
+  const renderStoreItem = useRenderStoreItem()
   const { organizations } = useAuthContext()
   const tenantId = localStorage.getItem('organization_id') || ''
 
@@ -103,7 +111,7 @@ const TaxManagement: React.FC = () => {
     const init = async () => {
       setLoading(true)
       try {
-        if (!tenantId) { notify('warning', '请先选择一个组织'); setLoading(false); return }
+        if (!tenantId) { notify('warning', t('pages.taxManagement.selectOrgFirst')); setLoading(false); return }
         let location = ''
         const currentOrg = organizations.find(org => org.id === tenantId)
         if (currentOrg?.location) location = currentOrg.location
@@ -115,7 +123,7 @@ const TaxManagement: React.FC = () => {
         setRegionCode(region)
         await loadTaxRates(region)
       } catch (error: any) {
-        notify('error', `初始化失败: ${error.message}`)
+        notify('error', t('pages.taxManagement.initFailed', { message: error.message }))
       } finally {
         setLoading(false)
       }
@@ -139,7 +147,7 @@ const TaxManagement: React.FC = () => {
     try {
       setAllItems(await getStoreAvailableItems())
     } catch {
-      notify('error', '加载商品列表失败')
+      notify('error', t('pages.taxManagement.loadItemsFailed'))
     } finally {
       setLoadingItems(false)
     }
@@ -148,16 +156,16 @@ const TaxManagement: React.FC = () => {
   // 创建税种
   const handleCreateTaxRate = async () => {
     const e: Record<string, string> = {}
-    if (!createName.trim()) e.name = '请输入税种名称'
-    if (Number.isNaN(createRate)) e.rate = '请输入税率'
-    else if (createRate < 0 || createRate > 100) e.rate = '税率必须在 0-100 之间'
+    if (!createName.trim()) e.name = t('pages.taxManagement.pleaseEnterTaxName')
+    if (Number.isNaN(createRate)) e.rate = t('pages.taxManagement.pleaseEnterTaxRate')
+    else if (createRate < 0 || createRate > 100) e.rate = t('pages.taxManagement.taxRateRange')
     setCreateErr(e)
     if (Object.keys(e).length) return
 
     setCreating(true)
     try {
       const result = await createStoreTaxRate({ name: createName, rate: createRate / 100, regionCode })
-      notify('success', '税种创建成功')
+      notify('success', t('pages.taxManagement.taxCreateSuccess'))
       setCreateOpen(false)
       setNewTaxRateId(result.id)
       setNewTaxRateName(createName)
@@ -168,7 +176,7 @@ const TaxManagement: React.FC = () => {
       setApplyModalVisible(true)
       await loadTaxRates(regionCode)
     } catch (error: any) {
-      notify('error', `创建失败: ${error.message}`)
+      notify('error', t('pages.taxManagement.taxCreateFailed', { message: error.message }))
     } finally {
       setCreating(false)
     }
@@ -181,17 +189,17 @@ const TaxManagement: React.FC = () => {
     try {
       if (applyScope === 'all') {
         const itemIds = allItems.map(i => i.id)
-        if (itemIds.length === 0) { notify('warning', '没有找到商品'); setApplyModalVisible(false); return }
+        if (itemIds.length === 0) { notify('warning', t('pages.taxManagement.noItemsFound')); setApplyModalVisible(false); return }
         const result = await batchAssignStoreItemTaxRate(itemIds, newTaxRateId)
-        notify('success', `已将「${newTaxRateName}」应用到 ${result.succeeded} 个商品`)
+        notify('success', t('pages.taxManagement.appliedToCount', { name: newTaxRateName, count: result.succeeded }))
       } else {
-        if (selectedItemIds.length === 0) { notify('warning', '请选择至少一个商品'); return }
+        if (selectedItemIds.length === 0) { notify('warning', t('pages.taxManagement.selectAtLeastOneItem')); return }
         const result = await batchAssignStoreItemTaxRate(selectedItemIds, newTaxRateId)
-        notify('success', `已将「${newTaxRateName}」应用到 ${result.succeeded} 个商品`)
+        notify('success', t('pages.taxManagement.appliedToCount', { name: newTaxRateName, count: result.succeeded }))
       }
       setApplyModalVisible(false)
     } catch (error: any) {
-      notify('error', `应用失败: ${error.message}`)
+      notify('error', t('pages.taxManagement.applyFailed', { message: error.message }))
     } finally {
       setApplyingScope(false)
     }
@@ -199,7 +207,7 @@ const TaxManagement: React.FC = () => {
 
   const handleSkipApply = () => {
     setApplyModalVisible(false)
-    notify('info', '您可以稍后在税种列表中点击「应用到全部」或「管理商品」应用')
+    notify('info', t('pages.taxManagement.skipApplyHint'))
   }
 
   // 管理关联商品
@@ -216,7 +224,7 @@ const TaxManagement: React.FC = () => {
       setAllItems(storeItems)
       setManageSelectedItemIds(linked.map(i => i.id))
     } catch (error: any) {
-      notify('error', `加载商品数据失败: ${error.message}`)
+      notify('error', t('pages.taxManagement.loadItemDataFailed', { message: error.message }))
     } finally {
       setLoadingLinkedItems(false)
     }
@@ -231,10 +239,10 @@ const TaxManagement: React.FC = () => {
       const itemsToAdd = manageSelectedItemIds.filter(id => !originalItemIds.includes(id))
       if (itemsToRemove.length > 0) await batchRemoveStoreItemTaxRate(itemsToRemove)
       if (itemsToAdd.length > 0) await batchAssignStoreItemTaxRate(itemsToAdd, managingTaxRate.id)
-      notify('success', `已更新「${managingTaxRate.name}」的商品关联`)
+      notify('success', t('pages.taxManagement.updatedItemAssignments', { name: managingTaxRate.name }))
       setManageItemsModalVisible(false)
     } catch (error: any) {
-      notify('error', `保存失败: ${error.message}`)
+      notify('error', t('pages.taxManagement.saveWithMsgFailed', { message: error.message }))
     } finally {
       setSavingItems(false)
     }
@@ -244,10 +252,10 @@ const TaxManagement: React.FC = () => {
     setDeleting(true)
     try {
       await deleteStoreTaxRate(taxRate.id)
-      notify('success', `税种「${taxRate.name}」已删除`)
+      notify('success', t('pages.taxManagement.taxDeleted', { name: taxRate.name }))
       await loadTaxRates(regionCode)
     } catch (error: any) {
-      notify('error', `删除失败: ${error.message}`)
+      notify('error', t('pages.taxManagement.deleteWithMsgFailed', { message: error.message }))
     } finally {
       setDeleting(false)
       setDeleteTarget(null)
@@ -264,20 +272,20 @@ const TaxManagement: React.FC = () => {
   const handleSaveEdit = async () => {
     if (!editing) return
     const e: Record<string, string> = {}
-    if (!editName.trim()) e.name = '请输入税种名称'
-    if (Number.isNaN(editRate)) e.rate = '请输入税率'
-    else if (editRate < 0 || editRate > 100) e.rate = '税率必须在 0-100 之间'
+    if (!editName.trim()) e.name = t('pages.taxManagement.pleaseEnterTaxName')
+    if (Number.isNaN(editRate)) e.rate = t('pages.taxManagement.pleaseEnterTaxRate')
+    else if (editRate < 0 || editRate > 100) e.rate = t('pages.taxManagement.taxRateRange')
     setEditErr(e)
     if (Object.keys(e).length) return
 
     setUpdating(true)
     try {
       await updateStoreTaxRate(editing.id, { name: editName, rate: editRate / 100 })
-      notify('success', '税种更新成功')
+      notify('success', t('pages.taxManagement.taxUpdateSuccess'))
       setEditing(null)
       await loadTaxRates(regionCode)
     } catch (error: any) {
-      notify('error', `更新失败: ${error.message}`)
+      notify('error', t('pages.taxManagement.updateFailed', { message: error.message }))
     } finally {
       setUpdating(false)
     }
@@ -289,12 +297,12 @@ const TaxManagement: React.FC = () => {
     try {
       const items = await getStoreAvailableItems()
       const itemIds = items.map(i => i.id)
-      if (itemIds.length === 0) { notify('warning', '没有找到商品'); return }
+      if (itemIds.length === 0) { notify('warning', t('pages.taxManagement.noItemsFound')); return }
       const result = await batchAssignStoreItemTaxRate(itemIds, taxRate.id)
-      if (result.failed > 0) notify('warning', `应用完成: 成功 ${result.succeeded} 个, 失败 ${result.failed} 个`)
-      else notify('success', `成功将「${taxRate.name}」应用到 ${result.succeeded} 个商品`)
+      if (result.failed > 0) notify('warning', t('pages.taxManagement.applyCompletePartial', { succeeded: result.succeeded, failed: result.failed }))
+      else notify('success', t('pages.taxManagement.applySuccessCount', { name: taxRate.name, count: result.succeeded }))
     } catch (error: any) {
-      notify('error', `应用失败: ${error.message}`)
+      notify('error', t('pages.taxManagement.applyFailed', { message: error.message }))
     } finally {
       setApplying(false)
       setApplyAllTarget(null)
@@ -302,16 +310,16 @@ const TaxManagement: React.FC = () => {
   }
 
   const columns: Column<SimpleTaxRate>[] = [
-    { key: 'name', title: '税种名称', width: 180, render: r => <span className="font-medium text-slate-800">{r.name}</span> },
-    { key: 'rate', title: '税率', width: 110, render: r => <Badge variant="blue">{(r.rate * 100).toFixed(2)}%</Badge> },
+    { key: 'name', title: t('pages.taxManagement.colTaxName'), width: 180, render: r => <span className="font-medium text-slate-800">{r.name}</span> },
+    { key: 'rate', title: t('pages.taxManagement.colRate'), width: 110, render: r => <Badge variant="blue">{(r.rate * 100).toFixed(2)}%</Badge> },
     {
-      key: 'actions', title: '操作',
+      key: 'actions', title: t('pages.taxManagement.colActions'),
       render: r => (
         <div className="flex items-center gap-1 flex-wrap">
-          <Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openEdit(r)}>编辑</Btn>
-          <Btn variant="ghost" size="sm" icon={<LayoutGrid className="w-3.5 h-3.5" />} onClick={() => handleManageItems(r)}>管理商品</Btn>
-          <Btn variant="ghost" size="sm" icon={<StoreIcon className="w-3.5 h-3.5" />} onClick={() => setApplyAllTarget(r)}>应用到全部</Btn>
-          <button title="删除" onClick={() => setDeleteTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+          <Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openEdit(r)}>{t('pages.taxManagement.editBtn')}</Btn>
+          <Btn variant="ghost" size="sm" icon={<LayoutGrid className="w-3.5 h-3.5" />} onClick={() => handleManageItems(r)}>{t('pages.taxManagement.manageItemsBtn')}</Btn>
+          <Btn variant="ghost" size="sm" icon={<StoreIcon className="w-3.5 h-3.5" />} onClick={() => setApplyAllTarget(r)}>{t('pages.taxManagement.applyToAllBtn')}</Btn>
+          <button title={t('pages.taxManagement.deleteTooltip')} onClick={() => setDeleteTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -324,12 +332,12 @@ const TaxManagement: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-6 py-6">
       <PageHeader
-        title="税务管理"
-        description={<>当前税务地区：<Badge variant="green">{getRegionDisplayName(regionCode)}</Badge></>}
+        title={t('pages.taxManagement.pageTitle')}
+        description={<>{t('pages.taxManagement.currentRegionLabel')}<Badge variant="green">{getRegionDisplayName(regionCode)}</Badge></>}
         actions={
           <>
-            <Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loadingTaxRates} onClick={() => loadTaxRates(regionCode)}>刷新</Btn>
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => { setCreateName(''); setCreateRate(NaN); setCreateErr({}); setCreateOpen(true) }}>添加税种</Btn>
+            <Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loadingTaxRates} onClick={() => loadTaxRates(regionCode)}>{t('common.refresh')}</Btn>
+            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => { setCreateName(''); setCreateRate(NaN); setCreateErr({}); setCreateOpen(true) }}>{t('pages.taxManagement.addTaxRateBtn')}</Btn>
           </>
         }
       />
@@ -338,17 +346,17 @@ const TaxManagement: React.FC = () => {
         {flash && <AlertBox type={flash.type} title={flash.msg} />}
 
         {!tenantId ? (
-          <SectionCard><EmptyState title="请先在顶部选择一个组织" /></SectionCard>
+          <SectionCard><EmptyState title={t('pages.taxManagement.selectOrgFirst')} /></SectionCard>
         ) : (
           <>
-            <SectionCard title="已配置的税种" bodyClassName="p-0">
+            <SectionCard title={t('pages.taxManagement.configuredTaxRatesTitle')} bodyClassName="p-0">
               <div className="p-4">
                 {loadingTaxRates ? (
                   <Spinner />
                 ) : taxRates.length === 0 ? (
                   <EmptyState
-                    title="暂无税种配置"
-                    action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setCreateOpen(true)}>创建第一个税种</Btn>}
+                    title={t('pages.taxManagement.noTaxRatesConfigured')}
+                    action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setCreateOpen(true)}>{t('pages.taxManagement.createFirstTaxRateBtn')}</Btn>}
                   />
                 ) : (
                   <Table columns={columns} data={taxRates} rowKey={r => r.id} />
@@ -356,13 +364,13 @@ const TaxManagement: React.FC = () => {
               </div>
             </SectionCard>
 
-            <SectionCard title="税率参考">
-              <p className="text-sm text-slate-500 mb-3">以下是常见地区的税率参考，请根据实际情况配置：</p>
+            <SectionCard title={t('pages.taxManagement.taxRateReferenceTitle')}>
+              <p className="text-sm text-slate-500 mb-3">{t('pages.taxManagement.taxRateReferenceDesc')}</p>
               <div className="flex flex-wrap gap-2">
-                <Badge>BC省: GST 5% + PST 7%</Badge>
-                <Badge>安大略省: HST 13%</Badge>
-                <Badge>魁北克省: GST 5% + QST 9.975%</Badge>
-                <Badge>加州: 7.25% ~ 10.25%</Badge>
+                <Badge>{t('pages.taxManagement.bcRate')}</Badge>
+                <Badge>{t('pages.taxManagement.onRate')}</Badge>
+                <Badge>{t('pages.taxManagement.qcRate')}</Badge>
+                <Badge>{t('pages.taxManagement.caRate')}</Badge>
               </div>
             </SectionCard>
           </>
@@ -373,15 +381,15 @@ const TaxManagement: React.FC = () => {
       <Modal
         open={createOpen}
         onOpenChange={v => !v && setCreateOpen(false)}
-        title="创建新税种"
-        footer={<><Btn variant="secondary" onClick={() => setCreateOpen(false)}>取消</Btn><Btn variant="primary" loading={creating} onClick={handleCreateTaxRate}>创建</Btn></>}
+        title={t('pages.taxManagement.createTaxRateModalTitle')}
+        footer={<><Btn variant="secondary" onClick={() => setCreateOpen(false)}>{t('common.cancel')}</Btn><Btn variant="primary" loading={creating} onClick={handleCreateTaxRate}>{t('common.create')}</Btn></>}
       >
         <div className="space-y-4">
-          <AlertBox type="info" title="输入税种名称和税率即可创建，创建后可应用到全部或特定商品。" />
-          <Field label="税种名称" required error={createErr.name}>
-            <TextInput value={createName} onChange={setCreateName} placeholder="例如: GST, PST, HST" />
+          <AlertBox type="info" title={t('pages.taxManagement.createTaxRateHint')} />
+          <Field label={t('pages.taxManagement.taxNameLabel')} required error={createErr.name}>
+            <TextInput value={createName} onChange={setCreateName} placeholder={t('pages.taxManagement.taxNamePlaceholder')} />
           </Field>
-          <Field label="税率" required error={createErr.rate}>
+          <Field label={t('pages.taxManagement.taxRateLabel')} required error={createErr.rate}>
             <NumberInput value={createRate} onChange={setCreateRate} min={0} max={100} suffix="%" className="w-full" />
           </Field>
         </div>
@@ -391,14 +399,14 @@ const TaxManagement: React.FC = () => {
       <Modal
         open={!!editing}
         onOpenChange={v => !v && setEditing(null)}
-        title="编辑税种"
-        footer={<><Btn variant="secondary" onClick={() => setEditing(null)}>取消</Btn><Btn variant="primary" loading={updating} onClick={handleSaveEdit}>保存</Btn></>}
+        title={t('pages.taxManagement.editTaxRateModalTitle')}
+        footer={<><Btn variant="secondary" onClick={() => setEditing(null)}>{t('common.cancel')}</Btn><Btn variant="primary" loading={updating} onClick={handleSaveEdit}>{t('common.save')}</Btn></>}
       >
         <div className="space-y-4">
-          <Field label="税种名称" required error={editErr.name}>
-            <TextInput value={editName} onChange={setEditName} placeholder="例如: GST, PST, HST" />
+          <Field label={t('pages.taxManagement.taxNameLabel')} required error={editErr.name}>
+            <TextInput value={editName} onChange={setEditName} placeholder={t('pages.taxManagement.taxNamePlaceholder')} />
           </Field>
-          <Field label="税率" required error={editErr.rate}>
+          <Field label={t('pages.taxManagement.taxRateLabel')} required error={editErr.rate}>
             <NumberInput value={editRate} onChange={setEditRate} min={0} max={100} suffix="%" className="w-full" />
           </Field>
         </div>
@@ -408,21 +416,24 @@ const TaxManagement: React.FC = () => {
       <Modal
         open={applyModalVisible}
         onOpenChange={v => !v && handleSkipApply()}
-        title={`应用税种「${newTaxRateName}」`}
+        title={t('pages.taxManagement.applyTaxRateModalTitle', { name: newTaxRateName })}
         size="lg"
         footer={
           <>
-            <Btn variant="secondary" onClick={handleSkipApply}>稍后再说</Btn>
+            <Btn variant="secondary" onClick={handleSkipApply}>{t('pages.taxManagement.laterBtn')}</Btn>
             <Btn variant="primary" loading={applyingScope} onClick={handleApplyScope}>
-              {applyScope === 'all' ? '应用到全店' : `应用到 ${selectedItemIds.length} 个商品`}
+              {applyScope === 'all' ? t('pages.taxManagement.applyToStoreBtn') : t('pages.taxManagement.applyToCountBtn', { count: selectedItemIds.length })}
             </Btn>
           </>
         }
       >
         <div className="space-y-4">
-          <AlertBox type="info" title="选择税种应用范围" description="可应用到全店所有商品，或选择特定商品。" />
+          <AlertBox type="info" title={t('pages.taxManagement.selectScopeHintTitle')} description={t('pages.taxManagement.selectScopeHintDesc')} />
           <div className="grid grid-cols-2 gap-3">
-            {([['all', <StoreIcon className="w-4 h-4" />, '全店所有商品', `${allItems.length} 个商品`], ['selected', <LayoutGrid className="w-4 h-4" />, '选择特定商品', '手动挑选']] as const).map(([val, icon, label, hint]) => (
+            {([
+              ['all', <StoreIcon className="w-4 h-4" />, t('pages.taxManagement.allStoreItemsLabel'), t('pages.taxManagement.itemCountHint', { count: allItems.length })],
+              ['selected', <LayoutGrid className="w-4 h-4" />, t('pages.taxManagement.selectSpecificItemsLabel'), t('pages.taxManagement.manualPickHint')],
+            ] as const).map(([val, icon, label, hint]) => (
               <button
                 key={val}
                 onClick={() => setApplyScope(val)}
@@ -443,7 +454,7 @@ const TaxManagement: React.FC = () => {
                 getKey={i => i.id}
                 getLabel={i => i.name}
                 renderItem={renderStoreItem}
-                titles={['可选商品', '已选商品']}
+                titles={[t('pages.taxManagement.availableItemsTitle'), t('pages.taxManagement.selectedItemsTitle')]}
               />
             )
           )}
@@ -454,18 +465,18 @@ const TaxManagement: React.FC = () => {
       <Modal
         open={manageItemsModalVisible}
         onOpenChange={v => !v && setManageItemsModalVisible(false)}
-        title={`管理「${managingTaxRate?.name || ''}」关联的商品`}
+        title={t('pages.taxManagement.manageLinkedItemsModalTitle', { name: managingTaxRate?.name || '' })}
         size="lg"
-        footer={<><Btn variant="secondary" onClick={() => setManageItemsModalVisible(false)}>取消</Btn><Btn variant="primary" loading={savingItems} onClick={handleSaveItemAssignments}>保存修改</Btn></>}
+        footer={<><Btn variant="secondary" onClick={() => setManageItemsModalVisible(false)}>{t('common.cancel')}</Btn><Btn variant="primary" loading={savingItems} onClick={handleSaveItemAssignments}>{t('common.save')}</Btn></>}
       >
         <div className="space-y-4">
-          <AlertBox type="info" title="管理税种关联的商品" description="左侧未关联、右侧已关联，点击条目即可移动。" />
+          <AlertBox type="info" title={t('pages.taxManagement.manageLinkedItemsHintTitle')} description={t('pages.taxManagement.manageLinkedItemsHintDesc')} />
           {loadingLinkedItems ? (
             <Spinner />
           ) : (
             <>
               <p className="text-sm text-slate-500">
-                当前已关联 <span className="font-semibold text-slate-800">{manageSelectedItemIds.length}</span> 个商品（共 {allItems.length} 个可选）
+                {t('pages.taxManagement.currentlyLinkedCount', { linked: manageSelectedItemIds.length, total: allItems.length })}
               </p>
               <Transfer
                 items={allItems}
@@ -474,7 +485,7 @@ const TaxManagement: React.FC = () => {
                 getKey={i => i.id}
                 getLabel={i => i.name}
                 renderItem={renderStoreItem}
-                titles={['未关联商品', '已关联商品']}
+                titles={[t('pages.taxManagement.unlinkedItemsTitle'), t('pages.taxManagement.linkedItemsTitle')]}
                 height={360}
               />
             </>
@@ -486,9 +497,9 @@ const TaxManagement: React.FC = () => {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={v => !v && setDeleteTarget(null)}
-        title="确认删除"
-        description={`确定要删除税种「${deleteTarget?.name ?? ''}」吗？`}
-        confirmText="删除"
+        title={t('pages.taxManagement.confirmDeleteTitle')}
+        description={t('pages.taxManagement.confirmDeleteTaxDesc', { name: deleteTarget?.name ?? '' })}
+        confirmText={t('pages.taxManagement.deleteTooltip')}
         danger
         loading={deleting}
         onConfirm={() => deleteTarget && handleDeleteTaxRate(deleteTarget)}
@@ -498,9 +509,9 @@ const TaxManagement: React.FC = () => {
       <ConfirmDialog
         open={!!applyAllTarget}
         onOpenChange={v => !v && setApplyAllTarget(null)}
-        title="确认应用"
-        description={`将「${applyAllTarget?.name ?? ''}」应用到所有商品？`}
-        confirmText="确认"
+        title={t('pages.taxManagement.confirmApplyTitle')}
+        description={t('pages.taxManagement.confirmApplyDesc', { name: applyAllTarget?.name ?? '' })}
+        confirmText={t('common.confirm')}
         loading={applying}
         onConfirm={() => applyAllTarget && handleApplyToAllItems(applyAllTarget)}
       />

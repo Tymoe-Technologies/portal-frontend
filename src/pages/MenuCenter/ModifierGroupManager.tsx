@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { LOCALE_LABELS } from '../../services/brand-locale'
 import {
@@ -33,6 +34,7 @@ const normalizeOptions = (options: any[] = []): ModifierOption[] =>
   }))
 
 export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ readOnly = false, isMain = false, additionalLocales = [] }) => {
+  const { t } = useTranslation()
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([])
   const [modifierGroupOptions, setModifierGroupOptions] = useState<Record<string, ModifierOption[]>>({})
   const [loading, setLoading] = useState(false)
@@ -78,7 +80,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
       normalizedGroups.forEach(group => { cache[group.id] = (group.options || []) as ModifierOption[] })
       setModifierGroupOptions(cache)
     } catch {
-      toast.error('加载自定义选项组失败')
+      toast.error(t('pages.menuCenter.modifierGroupManager.loadGroupsFailed'))
       setModifierGroups([])
     } finally {
       setLoading(false)
@@ -98,7 +100,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
       setModifierGroupOptions(prev => ({ ...prev, [groupId]: [] }))
       return []
     } catch {
-      toast.error('加载选项失败')
+      toast.error(t('pages.menuCenter.modifierGroupManager.loadOptionsFailed'))
       setModifierGroupOptions(prev => ({ ...prev, [groupId]: [] }))
       return []
     }
@@ -127,7 +129,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
   }
 
   const handleGroupSubmit = async () => {
-    if (!gDisplayName.trim()) { setGErr('请输入选项组名称'); return }
+    if (!gDisplayName.trim()) { setGErr(t('pages.menuCenter.modifierGroupManager.nameRequired')); return }
     const i18n = Object.fromEntries(Object.entries(gI18n).filter(([, v]) => v))
     try {
       if (editingGroup) {
@@ -138,7 +140,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
           isActive: gIsActive,
         }
         await itemManagementService.updateModifierGroup(editingGroup.id, payload)
-        toast.success('自定义选项组更新成功')
+        toast.success(t('pages.menuCenter.modifierGroupManager.groupUpdateSuccess'))
       } else {
         const payload: CreateModifierGroupPayload = {
           name: gDisplayName,
@@ -149,24 +151,26 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
           isLocal: gIsLocal,
         } as any
         await itemManagementService.createModifierGroup(payload)
-        toast.success('自定义选项组创建成功')
+        toast.success(t('pages.menuCenter.modifierGroupManager.groupCreateSuccess'))
       }
       setModalVisible(false)
       setEditingGroup(null)
       await loadModifierGroups()
     } catch {
-      toast.error(editingGroup ? '更新自定义选项组失败' : '创建自定义选项组失败')
+      toast.error(editingGroup
+        ? t('pages.menuCenter.modifierGroupManager.groupUpdateFailed')
+        : t('pages.menuCenter.modifierGroupManager.groupCreateFailed'))
     }
   }
 
   const handleDeleteGroup = async (group: ModifierGroup) => {
     try {
       await itemManagementService.deleteModifierGroup(group.id)
-      toast.success('删除自定义选项组成功')
+      toast.success(t('pages.menuCenter.modifierGroupManager.groupDeleteSuccess'))
       loadModifierGroups()
       setModifierGroupOptions(prev => { const u = { ...prev }; delete u[group.id]; return u })
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || error?.message || '删除自定义选项组失败')
+      toast.error(error?.response?.data?.error || error?.message || t('pages.menuCenter.modifierGroupManager.groupDeleteFailed'))
     } finally {
       setDeleteGroupTarget(null)
     }
@@ -195,7 +199,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
 
   const handleOptionSubmit = async () => {
     if (!selectedGroupId) return
-    if (!oDisplayName.trim()) { setOErr('请输入显示名称'); return }
+    if (!oDisplayName.trim()) { setOErr(t('pages.menuCenter.modifierGroupManager.optionDisplayNameRequired')); return }
     const i18n = Object.fromEntries(Object.entries(oI18n).filter(([, v]) => v))
     const price = Number.isNaN(oDefaultPrice) ? undefined : oDefaultPrice
     try {
@@ -206,7 +210,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
           code: oCode || undefined,
           defaultPrice: price,
         } as any)
-        toast.success('选项更新成功')
+        toast.success(t('pages.menuCenter.modifierGroupManager.optionUpdateSuccess'))
       } else {
         const currentGroup = modifierGroups.find(g => g.id === selectedGroupId)
         const existingOptions = currentGroup?.options || []
@@ -218,7 +222,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
           displayOrder: nextDisplayOrder,
           ...(Object.keys(i18n).length > 0 && { display_name_i18n: i18n }),
         } as any)
-        toast.success('选项创建成功')
+        toast.success(t('pages.menuCenter.modifierGroupManager.optionCreateSuccess'))
       }
       setOptionModalVisible(false)
       setEditingOption(null)
@@ -232,7 +236,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
         if (managingGroup && managingGroup.id === selectedGroupId) setManagingGroup({ ...updatedGroup, options: opts as any })
       }
     } catch {
-      toast.error('保存选项失败')
+      toast.error(t('pages.menuCenter.modifierGroupManager.optionSaveFailed'))
     }
   }
 
@@ -256,10 +260,10 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
     if (!managingGroup) return
     try {
       await itemManagementService.deleteModifierOption(managingGroup.id, option.id)
-      toast.success('删除选项成功')
+      toast.success(t('pages.menuCenter.modifierGroupManager.optionDeleteSuccess'))
       await handleManageOptions(managingGroup)
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || error?.message || '删除选项失败')
+      toast.error(error?.response?.data?.error || error?.message || t('pages.menuCenter.modifierGroupManager.optionDeleteFailed'))
     } finally {
       setDeleteOptionTarget(null)
     }
@@ -274,7 +278,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
         displayName: record.displayName, code: record.code, defaultPrice: record.defaultPrice, cost: record.cost,
         ...patch,
       } as any)
-      toast.success('选项已更新')
+      toast.success(t('pages.menuCenter.modifierGroupManager.optionUpdatedInline'))
       clearEdit(editKey)
       const updatedOptions = (managingGroup.options || []).map(opt => opt.id === record.id ? { ...opt, ...patch } : opt)
       const updatedGroup = { ...managingGroup, options: updatedOptions as any }
@@ -282,7 +286,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
       setModifierGroupOptions(prev => ({ ...prev, [managingGroup.id]: updatedOptions as any }))
       setModifierGroups(prev => prev.map(g => g.id === managingGroup.id ? updatedGroup : g))
     } catch {
-      toast.error('更新失败')
+      toast.error(t('pages.menuCenter.modifierGroupManager.optionUpdateFailedInline'))
       clearEdit(editKey)
     }
   }
@@ -290,25 +294,25 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
   // ── 主表列 ─────────────────────────────────────────────────
 
   const columns: Column<ModifierGroup>[] = [
-    { key: 'name', title: '名称', width: 110, render: r => <span className="text-slate-600 truncate">{r.name}</span> },
-    { key: 'displayName', title: '显示名称', render: r => <span className="text-slate-800">{r.displayName}</span> },
-    { key: 'scope', title: '范围', width: 80, align: 'center', render: r => r.storeId == null ? <Badge variant="blue">品牌</Badge> : <Badge variant="gold">本店</Badge> },
-    { key: 'isActive', title: '状态', width: 80, align: 'center', render: r => <Badge variant={r.isActive ? 'green' : 'red'}>{r.isActive ? '激活' : '禁用'}</Badge> },
+    { key: 'name', title: t('pages.menuCenter.modifierGroupManager.columnName'), width: 110, render: r => <span className="text-slate-600 truncate">{r.name}</span> },
+    { key: 'displayName', title: t('pages.menuCenter.modifierGroupManager.columnDisplayName'), render: r => <span className="text-slate-800">{r.displayName}</span> },
+    { key: 'scope', title: t('pages.menuCenter.modifierGroupManager.columnScope'), width: 80, align: 'center', render: r => r.storeId == null ? <Badge variant="blue">{t('pages.menuCenter.modifierGroupManager.scopeBrand')}</Badge> : <Badge variant="gold">{t('pages.menuCenter.modifierGroupManager.scopeStore')}</Badge> },
+    { key: 'isActive', title: t('pages.menuCenter.modifierGroupManager.columnStatus'), width: 80, align: 'center', render: r => <Badge variant={r.isActive ? 'green' : 'red'}>{r.isActive ? t('pages.menuCenter.modifierGroupManager.statusActive') : t('pages.menuCenter.modifierGroupManager.statusInactive')}</Badge> },
     {
-      key: 'options', title: '选项', width: 130, align: 'center',
+      key: 'options', title: t('pages.menuCenter.modifierGroupManager.columnOptions'), width: 130, align: 'center',
       render: r => (
         <div className="flex flex-col items-center gap-1">
-          <Badge variant="blue">{(r.options?.length ?? 0)} 个</Badge>
-          <Btn variant={readOnly ? 'secondary' : 'primary'} size="sm" onClick={() => handleManageOptions(r)}>{readOnly ? '查看' : '编辑'}</Btn>
+          <Badge variant="blue">{t('pages.menuCenter.modifierGroupManager.optionsCount', { count: r.options?.length ?? 0 })}</Badge>
+          <Btn variant={readOnly ? 'secondary' : 'primary'} size="sm" onClick={() => handleManageOptions(r)}>{readOnly ? t('pages.menuCenter.modifierGroupManager.viewAction') : t('pages.menuCenter.modifierGroupManager.editAction')}</Btn>
         </div>
       ),
     },
     {
-      key: 'actions', title: '操作', width: 120,
+      key: 'actions', title: t('pages.menuCenter.modifierGroupManager.columnActions'), width: 120,
       render: r => readOnly ? null : (
         <div className="flex items-center gap-1">
-          <Btn variant="ghost" size="sm" onClick={() => handleEditGroup(r)}>编辑</Btn>
-          <button title="删除" onClick={() => setDeleteGroupTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+          <Btn variant="ghost" size="sm" onClick={() => handleEditGroup(r)}>{t('pages.menuCenter.modifierGroupManager.editAction')}</Btn>
+          <button title={t('pages.menuCenter.modifierGroupManager.deleteAction')} onClick={() => setDeleteGroupTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -321,11 +325,11 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
   return (
     <div className="max-w-5xl mx-auto px-6 py-6">
       <SectionCard
-        title="自定义选项组管理"
+        title={t('pages.menuCenter.modifierGroupManager.pageTitle')}
         action={
           <div className="flex items-center gap-2">
-            <Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading} onClick={loadModifierGroups}>刷新</Btn>
-            {!readOnly && <Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateGroup}>创建选项组</Btn>}
+            <Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading} onClick={loadModifierGroups}>{t('pages.menuCenter.modifierGroupManager.refreshAction')}</Btn>
+            {!readOnly && <Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateGroup}>{t('pages.menuCenter.modifierGroupManager.createGroupAction')}</Btn>}
           </div>
         }
         bodyClassName="p-0"
@@ -334,7 +338,7 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
           {loading ? (
             <Spinner />
           ) : modifierGroups.length === 0 ? (
-            <EmptyState title="暂无自定义选项组" action={!readOnly ? <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateGroup}>创建第一个选项组</Btn> : undefined} />
+            <EmptyState title={t('pages.menuCenter.modifierGroupManager.emptyGroupsTitle')} action={!readOnly ? <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateGroup}>{t('pages.menuCenter.modifierGroupManager.createFirstGroupAction')}</Btn> : undefined} />
           ) : (
             <Table columns={columns} data={modifierGroups} rowKey={r => r.id} />
           )}
@@ -345,38 +349,38 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
       <Modal
         open={modalVisible}
         onOpenChange={v => !v && setModalVisible(false)}
-        title={editingGroup ? '编辑自定义选项组' : '创建自定义选项组'}
+        title={editingGroup ? t('pages.menuCenter.modifierGroupManager.editGroupModalTitle') : t('pages.menuCenter.modifierGroupManager.createGroupModalTitle')}
         size="lg"
-        footer={<><Btn variant="secondary" onClick={() => setModalVisible(false)}>取消</Btn><Btn variant="primary" onClick={handleGroupSubmit}>{editingGroup ? '更新' : '创建'}</Btn></>}
+        footer={<><Btn variant="secondary" onClick={() => setModalVisible(false)}>{t('pages.menuCenter.modifierGroupManager.cancelAction')}</Btn><Btn variant="primary" onClick={handleGroupSubmit}>{editingGroup ? t('pages.menuCenter.modifierGroupManager.updateAction') : t('pages.menuCenter.modifierGroupManager.createAction')}</Btn></>}
       >
         <div className="space-y-4">
-          <Field label="选项组名称（English，默认）" required error={gErr} hint="客户在选择时看到的名称">
-            <TextInput value={gDisplayName} onChange={setGDisplayName} placeholder="例如：Size、Color、Add-ons" />
+          <Field label={t('pages.menuCenter.modifierGroupManager.groupNameLabel')} required error={gErr} hint={t('pages.menuCenter.modifierGroupManager.groupNameHint')}>
+            <TextInput value={gDisplayName} onChange={setGDisplayName} placeholder={t('pages.menuCenter.modifierGroupManager.groupNamePlaceholder')} />
           </Field>
           {additionalLocales.map(locale => (
-            <Field key={locale} label={`选项组名称（${LOCALE_LABELS[locale] ?? locale}）`}>
-              <TextInput value={gI18n[locale] ?? ''} onChange={v => setGI18n(prev => ({ ...prev, [locale]: v }))} placeholder="可选" />
+            <Field key={locale} label={t('pages.menuCenter.modifierGroupManager.groupNameLocaleLabel', { locale: LOCALE_LABELS[locale] ?? locale })}>
+              <TextInput value={gI18n[locale] ?? ''} onChange={v => setGI18n(prev => ({ ...prev, [locale]: v }))} placeholder={t('pages.menuCenter.modifierGroupManager.optionalPlaceholder')} />
             </Field>
           ))}
           {editingGroup && (
-            <Field label="系统标识" hint="系统内部使用的标识符，创建后不可修改">
+            <Field label={t('pages.menuCenter.modifierGroupManager.systemIdLabel')} hint={t('pages.menuCenter.modifierGroupManager.systemIdHint')}>
               <TextInput value={gName} onChange={() => {}} disabled />
             </Field>
           )}
-          <Field label="描述（可选）">
-            <Textarea value={gDescription} onChange={setGDescription} rows={3} placeholder="简要描述此选项组的用途" />
+          <Field label={t('pages.menuCenter.modifierGroupManager.descriptionLabel')}>
+            <Textarea value={gDescription} onChange={setGDescription} rows={3} placeholder={t('pages.menuCenter.modifierGroupManager.descriptionPlaceholder')} />
           </Field>
           {isMain && !editingGroup && (
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="text-sm font-medium text-slate-700">范围</div>
-                <div className="text-xs text-slate-400 mt-0.5">{gIsLocal ? '本店私有：仅本店可见' : '品牌级：所有门店可见'}</div>
+                <div className="text-sm font-medium text-slate-700">{t('pages.menuCenter.modifierGroupManager.scopeLabel')}</div>
+                <div className="text-xs text-slate-400 mt-0.5">{gIsLocal ? t('pages.menuCenter.modifierGroupManager.scopeStoreOnlyHint') : t('pages.menuCenter.modifierGroupManager.scopeBrandHint')}</div>
               </div>
               <Switch checked={gIsLocal} onCheckedChange={setGIsLocal} />
             </div>
           )}
           <div className="flex items-center justify-between gap-4">
-            <span className="text-sm font-medium text-slate-700">激活状态</span>
+            <span className="text-sm font-medium text-slate-700">{t('pages.menuCenter.modifierGroupManager.activeStatusLabel')}</span>
             <Switch checked={gIsActive} onCheckedChange={setGIsActive} />
           </div>
         </div>
@@ -386,23 +390,23 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
       <Modal
         open={manageOptionsModalVisible}
         onOpenChange={v => !v && setManageOptionsModalVisible(false)}
-        title={managingGroup ? `管理选项 - ${managingGroup.displayName}` : '管理选项'}
+        title={managingGroup ? t('pages.menuCenter.modifierGroupManager.manageOptionsModalTitle', { name: managingGroup.displayName }) : t('pages.menuCenter.modifierGroupManager.manageOptionsModalTitleDefault')}
         size="lg"
       >
         <div className="space-y-3">
           {!readOnly && (
-            <Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => managingGroup && openCreateOption(managingGroup.id)}>添加选项</Btn>
+            <Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => managingGroup && openCreateOption(managingGroup.id)}>{t('pages.menuCenter.modifierGroupManager.addOptionAction')}</Btn>
           )}
           {manageOptions.length === 0 ? (
-            <EmptyState title="暂无选项" />
+            <EmptyState title={t('pages.menuCenter.modifierGroupManager.emptyOptionsTitle')} />
           ) : (
             <Table
               data={manageOptions}
               rowKey={o => o.id}
               columns={[
-                { key: 'name', title: '选项值', width: 100, render: (o: ModifierOption) => <span className="font-mono text-xs text-slate-600">{o.name || '-'}</span> },
+                { key: 'name', title: t('pages.menuCenter.modifierGroupManager.optionValueColumn'), width: 100, render: (o: ModifierOption) => <span className="font-mono text-xs text-slate-600">{o.name || '-'}</span> },
                 {
-                  key: 'displayName', title: '显示名称', width: 150,
+                  key: 'displayName', title: t('pages.menuCenter.modifierGroupManager.optionDisplayNameColumn'), width: 150,
                   render: (o: ModifierOption) => {
                     const key = `${o.id}_displayName`
                     const val = editingValues[key] !== undefined ? editingValues[key] : o.displayName
@@ -412,17 +416,17 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
                   },
                 },
                 {
-                  key: 'code', title: '打印代码', width: 120,
+                  key: 'code', title: t('pages.menuCenter.modifierGroupManager.printCodeColumn'), width: 120,
                   render: (o: ModifierOption) => {
                     const key = `${o.id}_code`
                     const val = editingValues[key] !== undefined ? editingValues[key] : (o.code || '')
-                    return <input className={inputCls} value={val} placeholder="如: P, C" maxLength={20} disabled={readOnly}
+                    return <input className={inputCls} value={val} placeholder={t('pages.menuCenter.modifierGroupManager.printCodePlaceholder')} maxLength={20} disabled={readOnly}
                       onChange={e => setEditingValues(p => ({ ...p, [key]: e.target.value }))}
                       onBlur={() => { if (!readOnly && val !== (o.code || '')) saveOptionField(o, { code: val || undefined }, key) }} />
                   },
                 },
                 {
-                  key: 'defaultPrice', title: '默认价格', width: 120,
+                  key: 'defaultPrice', title: t('pages.menuCenter.modifierGroupManager.defaultPriceColumn'), width: 120,
                   render: (o: ModifierOption) => {
                     const key = `${o.id}_defaultPrice`
                     const base = typeof o.defaultPrice === 'number' ? o.defaultPrice : 0
@@ -433,11 +437,11 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
                   },
                 },
                 {
-                  key: 'actions', title: '操作', width: 110,
+                  key: 'actions', title: t('pages.menuCenter.modifierGroupManager.columnActions'), width: 110,
                   render: (o: ModifierOption) => readOnly ? null : (
                     <div className="flex items-center gap-1">
-                      <Btn variant="ghost" size="sm" onClick={() => managingGroup && handleEditOption(managingGroup.id, o)}>编辑</Btn>
-                      <button title="删除" onClick={() => setDeleteOptionTarget(o)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+                      <Btn variant="ghost" size="sm" onClick={() => managingGroup && handleEditOption(managingGroup.id, o)}>{t('pages.menuCenter.modifierGroupManager.editAction')}</Btn>
+                      <button title={t('pages.menuCenter.modifierGroupManager.deleteAction')} onClick={() => setDeleteOptionTarget(o)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -453,27 +457,27 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
       <Modal
         open={optionModalVisible}
         onOpenChange={v => { if (!v) { setOptionModalVisible(false); setEditingOption(null) } }}
-        title={editingOption ? '编辑选项' : '添加选项'}
-        footer={<><Btn variant="secondary" onClick={() => { setOptionModalVisible(false); setEditingOption(null) }}>取消</Btn><Btn variant="primary" onClick={handleOptionSubmit}>{editingOption ? '更新' : '创建'}</Btn></>}
+        title={editingOption ? t('pages.menuCenter.modifierGroupManager.editOptionModalTitle') : t('pages.menuCenter.modifierGroupManager.addOptionModalTitle')}
+        footer={<><Btn variant="secondary" onClick={() => { setOptionModalVisible(false); setEditingOption(null) }}>{t('pages.menuCenter.modifierGroupManager.cancelAction')}</Btn><Btn variant="primary" onClick={handleOptionSubmit}>{editingOption ? t('pages.menuCenter.modifierGroupManager.updateAction') : t('pages.menuCenter.modifierGroupManager.createAction')}</Btn></>}
       >
         <div className="space-y-4">
-          <Field label="显示名称（English，默认）" required error={oErr} hint="用户在点单时看到的名称">
-            <TextInput value={oDisplayName} onChange={setODisplayName} placeholder="例如：Small、Medium、Large" />
+          <Field label={t('pages.menuCenter.modifierGroupManager.optionDisplayNameLabel')} required error={oErr} hint={t('pages.menuCenter.modifierGroupManager.optionDisplayNameHint')}>
+            <TextInput value={oDisplayName} onChange={setODisplayName} placeholder={t('pages.menuCenter.modifierGroupManager.optionDisplayNamePlaceholder')} />
           </Field>
           {additionalLocales.map(locale => (
-            <Field key={locale} label={`显示名称（${LOCALE_LABELS[locale] ?? locale}）`}>
-              <TextInput value={oI18n[locale] ?? ''} onChange={v => setOI18n(prev => ({ ...prev, [locale]: v }))} placeholder="可选" />
+            <Field key={locale} label={t('pages.menuCenter.modifierGroupManager.optionDisplayNameLocaleLabel', { locale: LOCALE_LABELS[locale] ?? locale })}>
+              <TextInput value={oI18n[locale] ?? ''} onChange={v => setOI18n(prev => ({ ...prev, [locale]: v }))} placeholder={t('pages.menuCenter.modifierGroupManager.optionalPlaceholder')} />
             </Field>
           ))}
-          <Field label="选项代码" hint="用于制作指引打印，如珍珠用 P、椰果用 C">
-            <TextInput value={oCode} onChange={setOCode} placeholder="例如：P、C、D" maxLength={20} />
+          <Field label={t('pages.menuCenter.modifierGroupManager.optionCodeLabel')} hint={t('pages.menuCenter.modifierGroupManager.optionCodeHint')}>
+            <TextInput value={oCode} onChange={setOCode} placeholder={t('pages.menuCenter.modifierGroupManager.optionCodePlaceholder')} maxLength={20} />
           </Field>
           {editingOption && (
-            <Field label="系统名称" hint="系统内部使用的标识符，创建后不可修改">
+            <Field label={t('pages.menuCenter.modifierGroupManager.systemNameLabel')} hint={t('pages.menuCenter.modifierGroupManager.systemNameHint')}>
               <TextInput value={oName} onChange={() => {}} disabled />
             </Field>
           )}
-          <Field label="默认价格">
+          <Field label={t('pages.menuCenter.modifierGroupManager.defaultPriceLabel')}>
             <input type="number" min={0} step="0.01" className={inputCls} placeholder="0.00"
               value={Number.isNaN(oDefaultPrice) ? '' : oDefaultPrice}
               onChange={e => setODefaultPrice(e.target.value === '' ? NaN : Number(e.target.value))} />
@@ -485,18 +489,18 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
       <ConfirmDialog
         open={!!deleteGroupTarget}
         onOpenChange={v => !v && setDeleteGroupTarget(null)}
-        title="确认删除"
-        description="确定要删除此自定义选项组吗？"
-        confirmText="删除"
+        title={t('pages.menuCenter.modifierGroupManager.confirmDeleteTitle')}
+        description={t('pages.menuCenter.modifierGroupManager.confirmDeleteGroupDescription')}
+        confirmText={t('pages.menuCenter.modifierGroupManager.deleteConfirmText')}
         danger
         onConfirm={() => deleteGroupTarget && handleDeleteGroup(deleteGroupTarget)}
       />
       <ConfirmDialog
         open={!!deleteOptionTarget}
         onOpenChange={v => !v && setDeleteOptionTarget(null)}
-        title="确认删除"
-        description="确定要删除此选项吗？删除后无法恢复。"
-        confirmText="删除"
+        title={t('pages.menuCenter.modifierGroupManager.confirmDeleteTitle')}
+        description={t('pages.menuCenter.modifierGroupManager.confirmDeleteOptionDescription')}
+        confirmText={t('pages.menuCenter.modifierGroupManager.deleteConfirmText')}
         danger
         onConfirm={() => deleteOptionTarget && handleDeleteOption(deleteOptionTarget)}
       />

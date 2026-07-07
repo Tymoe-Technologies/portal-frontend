@@ -39,7 +39,8 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
   sourceCode,
   sourceName
 }) => {
-  const { t: _t } = useTranslation()
+  const { t } = useTranslation()
+  const tk = (key: string, opts?: Record<string, any>): string => t(`pages.orderConfig.modifierPricing.${key}`, opts as any) as string
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [items, setItems] = useState<any[]>([])
@@ -69,7 +70,7 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
       const response = await itemManagementService.getItems({ limit: 1000 })
       setItems(response.data || [])
     } catch (error) {
-      toast.error('加载商品列表失败')
+      toast.error(tk('loadItemsFailed'))
     } finally {
       setLoading(false)
     }
@@ -90,7 +91,7 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
         setModifierPrices([])
       }
     } catch (error) {
-      toast.error('加载自定义选项价格失败')
+      toast.error(tk('loadModifierPricesFailed'))
       setModifierPrices([])
     } finally {
       setLoading(false)
@@ -108,11 +109,11 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
     if (!editingPrice) return
     const newPrice = Number(editValue)
     if (editValue === '' || Number.isNaN(newPrice)) {
-      setEditError('请输入渠道价格')
+      setEditError(tk('pleaseEnterChannelPrice'))
       return
     }
     if (newPrice < 0) {
-      setEditError('价格不能为负数')
+      setEditError(tk('priceCannotBeNegative'))
       return
     }
 
@@ -130,11 +131,11 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
     if (!deletingRow) return
     try {
       await deleteModifierSourcePrice(sourceCode, deletingRow.itemId, deletingRow.modifierOptionId)
-      toast.success('删除成功')
+      toast.success(tk('deleteSuccess'))
       setDeletingRow(null)
       loadModifierPrices()
     } catch (error) {
-      toast.error('删除失败')
+      toast.error(tk('deleteFailed'))
     }
   }
 
@@ -142,7 +143,7 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
     const modifiedPrices = modifierPrices.filter(p => p.modified && p.newSourcePrice !== undefined)
 
     if (modifiedPrices.length === 0) {
-      toast.info('没有修改需要保存')
+      toast.info(tk('noChangesToSave'))
       return
     }
 
@@ -155,10 +156,10 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
       }))
 
       await batchSaveModifierSourcePrices(sourceCode, prices)
-      toast.success(`成功保存 ${prices.length} 个自定义选项价格`)
+      toast.success(tk('savedPricesSuccess', { count: prices.length }))
       await loadModifierPrices()
     } catch (error) {
-      toast.error('保存失败')
+      toast.error(tk('saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -166,9 +167,9 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
 
   const priceSourceBadge = (source: string) => {
     const map: Record<string, { variant: 'green' | 'gold' | 'default'; text: string }> = {
-      source: { variant: 'green', text: '渠道定价' },
-      item: { variant: 'gold', text: '商品定价' },
-      default: { variant: 'default', text: '默认价格' }
+      source: { variant: 'green', text: tk('sourcePricingBadge') },
+      item: { variant: 'gold', text: tk('itemPricingBadge') },
+      default: { variant: 'default', text: tk('defaultPricingBadge') }
     }
     const cfg = map[source] || { variant: 'default' as const, text: source }
     return <Badge variant={cfg.variant}>{cfg.text}</Badge>
@@ -177,13 +178,13 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
   const columns: Column<ModifierPriceRow>[] = [
     {
       key: 'groupName',
-      title: '自定义选项组',
+      title: tk('groupNameColumn'),
       width: 150,
       render: (r) => <span className="font-medium text-slate-700">{r.groupName || '-'}</span>
     },
     {
       key: 'optionName',
-      title: '选项名称',
+      title: tk('optionNameColumn'),
       width: 150,
       render: (r) => <span className="text-slate-700">{r.optionName || '-'}</span>
     },
@@ -191,31 +192,31 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
       key: 'prices',
       title: (
         <span className="inline-flex items-center gap-1">
-          价格优先级
-          <span title="价格计算优先级：渠道价格 > 商品级价格 > 默认价格"><Info size={13} className="text-slate-400" /></span>
+          {tk('pricePriorityLabel')}
+          <span title={tk('pricePriorityTooltip')}><Info size={13} className="text-slate-400" /></span>
         </span>
       ),
       width: 300,
       render: (record) => (
         <div className="flex flex-col gap-0.5 text-xs">
-          <span className="text-slate-400">默认: {record.defaultPrice?.toFixed(2) || '0.00'}</span>
+          <span className="text-slate-400">{tk('defaultPriceLabel')}: {record.defaultPrice?.toFixed(2) || '0.00'}</span>
           {record.itemPrice !== undefined && record.itemPrice !== null && (
-            <span className="text-amber-600">商品级: {record.itemPrice.toFixed(2)}</span>
+            <span className="text-amber-600">{tk('itemLevelLabel')}: {record.itemPrice.toFixed(2)}</span>
           )}
           {(record.sourcePrice !== undefined && record.sourcePrice !== null) || record.modified ? (
             <span className="text-green-600">
-              渠道价: {(record.newSourcePrice ?? record.sourcePrice ?? 0).toFixed(2)}
-              {record.modified && <span className="ml-2"><Badge variant="gold">已修改</Badge></span>}
+              {tk('channelPriceLabel')}: {(record.newSourcePrice ?? record.sourcePrice ?? 0).toFixed(2)}
+              {record.modified && <span className="ml-2"><Badge variant="gold">{tk('modifiedBadge')}</Badge></span>}
             </span>
           ) : (
-            <span className="text-slate-400">渠道价: 未设置</span>
+            <span className="text-slate-400">{tk('channelPriceLabel')}: {tk('notSetLabel')}</span>
           )}
         </div>
       )
     },
     {
       key: 'finalPrice',
-      title: '最终价格',
+      title: tk('finalPriceColumn'),
       width: 120,
       render: (record) => {
         const displayPrice = record.modified && record.newSourcePrice !== undefined
@@ -231,11 +232,11 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
     },
     {
       key: 'actions',
-      title: '操作',
+      title: t('pages.orderConfig.actions'),
       width: 150,
       render: (record) => (
         <div className="flex items-center gap-1">
-          <Btn variant="link" size="sm" icon={<Pencil size={14} />} onClick={() => handleEditPrice(record)}>设置渠道价</Btn>
+          <Btn variant="link" size="sm" icon={<Pencil size={14} />} onClick={() => handleEditPrice(record)}>{tk('setChannelPriceBtn')}</Btn>
           {record.sourcePrice !== undefined && record.sourcePrice !== null && (
             <Btn variant="ghost" size="sm" icon={<Trash2 size={14} className="text-red-500" />} onClick={() => setDeletingRow(record)} />
           )}
@@ -252,23 +253,23 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
         title={
           <span className="inline-flex items-center gap-2">
             <DollarSign size={18} className="text-slate-500" />
-            <span className="text-lg font-semibold text-slate-800">自定义选项渠道定价</span>
+            <span className="text-lg font-semibold text-slate-800">{tk('pageTitle')}</span>
             <Badge variant="blue">{sourceName}</Badge>
           </span>
         }
         action={
           modifiedCount > 0 ? (
             <Btn variant="primary" icon={<Save size={16} />} loading={saving} onClick={handleSaveAll}>
-              保存所有修改 ({modifiedCount})
+              {tk('saveAllChangesBtn')} ({modifiedCount})
             </Btn>
           ) : undefined
         }
       >
         <div className="space-y-6">
           {/* 商品选择 */}
-          <SectionCard title="选择商品">
+          <SectionCard title={tk('selectItemTitle')}>
             <SelectInput
-              placeholder="请选择商品以查看其自定义选项价格"
+              placeholder={tk('selectItemPlaceholder')}
               value={selectedItemId}
               onChange={setSelectedItemId}
               options={items.map(item => ({ value: item.id, label: `${item.name} (${item.basePrice})` }))}
@@ -282,10 +283,10 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
             ) : modifierPrices.length > 0 ? (
               <Table columns={columns} data={modifierPrices} rowKey={(r) => r.key} />
             ) : (
-              <EmptyState title="该商品没有关联的自定义选项" />
+              <EmptyState title={tk('noModifiersForItem')} />
             )
           ) : (
-            <EmptyState title="请先选择一个商品" />
+            <EmptyState title={tk('pleaseSelectItemFirst')} />
           )}
         </div>
       </SectionCard>
@@ -294,38 +295,38 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
       <Modal
         open={editModalVisible}
         onOpenChange={(o) => { if (!o) { setEditModalVisible(false); setEditingPrice(null) } }}
-        title="设置自定义选项渠道价格"
+        title={tk('setModifierChannelPriceTitle')}
         footer={
           <>
-            <Btn variant="secondary" onClick={() => { setEditModalVisible(false); setEditingPrice(null) }}>取消</Btn>
-            <Btn variant="primary" onClick={handleModalOk}>确定</Btn>
+            <Btn variant="secondary" onClick={() => { setEditModalVisible(false); setEditingPrice(null) }}>{t('pages.orderConfig.cancel')}</Btn>
+            <Btn variant="primary" onClick={handleModalOk}>{t('pages.orderConfig.confirm')}</Btn>
           </>
         }
       >
         {editingPrice && (
           <div className="space-y-4">
             <div>
-              <span className="text-slate-400">自定义选项组：</span>
+              <span className="text-slate-400">{tk('groupNameColumn')}：</span>
               <span className="font-medium text-slate-700">{editingPrice.groupName}</span>
             </div>
             <div>
-              <span className="text-slate-400">选项名称：</span>
+              <span className="text-slate-400">{tk('optionNameColumn')}：</span>
               <span className="font-medium text-slate-700">{editingPrice.optionName}</span>
             </div>
 
             <div className="rounded-lg bg-slate-50 p-3">
               <div className="flex flex-col gap-1 text-xs">
-                <span className="text-slate-400">默认价格: {editingPrice.defaultPrice?.toFixed(2) || '0.00'}</span>
+                <span className="text-slate-400">{tk('defaultPriceFullLabel')}: {editingPrice.defaultPrice?.toFixed(2) || '0.00'}</span>
                 {editingPrice.itemPrice !== undefined && editingPrice.itemPrice !== null && (
-                  <span className="text-amber-600">商品级价格: {editingPrice.itemPrice.toFixed(2)}</span>
+                  <span className="text-amber-600">{tk('itemLevelPriceFullLabel')}: {editingPrice.itemPrice.toFixed(2)}</span>
                 )}
                 {editingPrice.sourcePrice !== undefined && editingPrice.sourcePrice !== null && (
-                  <span className="text-green-600">当前渠道价: {editingPrice.sourcePrice.toFixed(2)}</span>
+                  <span className="text-green-600">{tk('currentChannelPriceLabel')}: {editingPrice.sourcePrice.toFixed(2)}</span>
                 )}
               </div>
             </div>
 
-            <Field label="新的渠道价格" required error={editError}>
+            <Field label={tk('newChannelPriceLabel')} required error={editError}>
               <div className="flex items-center rounded-lg border border-slate-200 bg-white px-3 focus-within:outline-2 focus-within:outline-slate-900">
                 <span className="text-sm text-slate-400">{getCurrencySymbol()}</span>
                 <input
@@ -334,7 +335,7 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
                   min={0}
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
-                  placeholder="请输入价格"
+                  placeholder={tk('enterPricePlaceholder')}
                   className="w-full bg-transparent py-2 pl-2 text-sm text-slate-700 focus:outline-none"
                 />
               </div>
@@ -347,8 +348,8 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
       <ConfirmDialog
         open={!!deletingRow}
         onOpenChange={(o) => { if (!o) setDeletingRow(null) }}
-        title="确认删除"
-        description="确定要删除此自定义选项的渠道价格吗？"
+        title={tk('confirmDeleteTitle')}
+        description={tk('confirmDeleteDesc')}
         danger
         onConfirm={handleDeletePrice}
       />

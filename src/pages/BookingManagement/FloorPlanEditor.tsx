@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Pencil, X, Star, Settings } from 'lucide-react'
 import { floorPlanApi, settingsApi } from '@/services/booking'
 import type { FloorPlan, BookableResource, TableConfig, OperatingPeriod, TableSettingsConfig } from '@/types/booking'
@@ -7,9 +8,10 @@ import {
 } from '@/components/ui-kit'
 
 // ─── 星期选择器 ──────────────────────────────────────────────────────
-const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'] // index = dayOfWeek (0=Sun)
-
 function DaySelector({ value, onChange }: { value: number[]; onChange: (v: number[]) => void }) {
+  const { t } = useTranslation()
+  // index = dayOfWeek (0=Sun)
+  const dayLabels = t('pages.booking.floorPlanEditor.dayLabels', { returnObjects: true }) as string[]
   const toggle = (day: number) => {
     if (value.includes(day)) onChange(value.filter(d => d !== day))
     else onChange([...value, day].sort())
@@ -17,7 +19,7 @@ function DaySelector({ value, onChange }: { value: number[]; onChange: (v: numbe
 
   return (
     <div className="flex gap-1">
-      {DAY_LABELS.map((label, day) => {
+      {dayLabels.map((label, day) => {
         const active = value.includes(day)
         const isWeekend = day === 0 || day === 6
         return (
@@ -82,6 +84,7 @@ function TableShape({ table, selected, onPointerDown }: {
   selected: boolean
   onPointerDown: (e: React.PointerEvent) => void
 }) {
+  const { t } = useTranslation()
   const cfg = (table.config ?? {}) as TableConfig
   const geometry = getTableGeometry(table)
   const { rotation, width: w, height: h } = geometry
@@ -114,7 +117,7 @@ function TableShape({ table, selected, onPointerDown }: {
       {/* 文字反向旋转，保持正方向 */}
       <div style={{ transform: rotation ? `rotate(-${rotation}deg)` : undefined, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: '#262626', lineHeight: 1.2, textAlign: 'center', padding: '0 4px' }}>{table.name}</span>
-        <span style={{ fontSize: 11, color: '#8c8c8c' }}>{cfg.minCapacity ?? 1}–{cfg.maxCapacity ?? 4}人</span>
+        <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('pages.booking.floorPlanEditor.capacityRange', { min: cfg.minCapacity ?? 1, max: cfg.maxCapacity ?? 4 })}</span>
       </div>
     </div>
   )
@@ -122,19 +125,20 @@ function TableShape({ table, selected, onPointerDown }: {
 
 // ─── 左侧工具栏：桌位形状 ────────────────────────────────────────────
 function ShapeToolbar({ onAdd }: { onAdd: (shape: 'round' | 'square' | 'long') => void }) {
+  const { t } = useTranslation()
   const sz4round = calcTableSize('round', 4)
   const sz4square = calcTableSize('square', 4)
   const sz4long = calcTableSize('long', 4)
 
   const shapes: Array<{ key: 'round' | 'square' | 'long'; label: string; preview: React.ReactNode }> = [
-    { key: 'round', label: '圆桌', preview: <div style={{ width: sz4round.w * 0.5, height: sz4round.h * 0.5, borderRadius: '50%', border: '2px solid #595959', background: '#fafafa' }} /> },
-    { key: 'square', label: '方桌', preview: <div style={{ width: sz4square.w * 0.5, height: sz4square.h * 0.5, borderRadius: 4, border: '2px solid #595959', background: '#fafafa' }} /> },
-    { key: 'long', label: '长桌', preview: <div style={{ width: sz4long.w * 0.5, height: sz4long.h * 0.5, borderRadius: 4, border: '2px solid #595959', background: '#fafafa' }} /> },
+    { key: 'round', label: t('pages.booking.floorPlanEditor.shapeRound'), preview: <div style={{ width: sz4round.w * 0.5, height: sz4round.h * 0.5, borderRadius: '50%', border: '2px solid #595959', background: '#fafafa' }} /> },
+    { key: 'square', label: t('pages.booking.floorPlanEditor.shapeSquare'), preview: <div style={{ width: sz4square.w * 0.5, height: sz4square.h * 0.5, borderRadius: 4, border: '2px solid #595959', background: '#fafafa' }} /> },
+    { key: 'long', label: t('pages.booking.floorPlanEditor.shapeLong'), preview: <div style={{ width: sz4long.w * 0.5, height: sz4long.h * 0.5, borderRadius: 4, border: '2px solid #595959', background: '#fafafa' }} /> },
   ]
 
   return (
     <div className="w-[72px] bg-slate-50 border-r border-slate-100 flex flex-col items-center py-3 gap-2 shrink-0">
-      <span className="text-[11px] text-slate-400 mb-1">添加</span>
+      <span className="text-[11px] text-slate-400 mb-1">{t('pages.booking.floorPlanEditor.addLabel')}</span>
       {shapes.map(s => (
         <div
           key={s.key}
@@ -158,6 +162,7 @@ function TablePropertiesPanel({ table, floorPlanId, onChange, onDelete, onClose 
   onDelete: () => void
   onClose?: () => void
 }) {
+  const { t } = useTranslation()
   const cfg = (table.config ?? {}) as TableConfig
   const [localCfg, setLocalCfg] = useState<TableConfig>({
     minCapacity: cfg.minCapacity ?? 1, maxCapacity: cfg.maxCapacity ?? 4,
@@ -184,90 +189,100 @@ function TablePropertiesPanel({ table, floorPlanId, onChange, onDelete, onClose 
       const updated = await floorPlanApi.updateTable(floorPlanId, table.id, { name, config: cfg })
       onChange(updated)
     } catch {
-      toast.error('保存失败')
+      toast.error(t('pages.booking.floorPlanEditor.saveFailed'))
     }
   }
 
   return (
     <div className="w-[260px] bg-white p-4 flex flex-col gap-3 overflow-y-auto rounded-lg shadow-xl border border-slate-100">
       <div className="flex items-center justify-between mb-1">
-        <span className="font-semibold text-sm text-slate-800">桌位属性</span>
+        <span className="font-semibold text-sm text-slate-800">{t('pages.booking.floorPlanEditor.tableProperties')}</span>
         {onClose && <X className="w-3.5 h-3.5 text-slate-400 cursor-pointer" onClick={onClose} />}
       </div>
 
       {/* 名称 */}
       <div>
-        <div className="text-xs text-slate-400 mb-1">名称</div>
+        <div className="text-xs text-slate-400 mb-1">{t('pages.booking.floorPlanEditor.nameLabel')}</div>
         <TextInput className="w-full" value={localName} onChange={setLocalName} />
         <input type="hidden" onBlur={() => autoSave(localName, localCfg)} />
       </div>
 
       {/* 形状 */}
       <div>
-        <div className="text-xs text-slate-400 mb-1">形状</div>
+        <div className="text-xs text-slate-400 mb-1">{t('pages.booking.floorPlanEditor.shapeLabel')}</div>
         <SelectInput
           className="w-full"
           value={localCfg.shape ?? 'square'}
           onChange={v => { const newCfg = { ...localCfg, shape: v as TableConfig['shape'] }; setLocalCfg(newCfg); autoSave(localName, newCfg) }}
-          options={[{ value: 'round', label: '圆桌' }, { value: 'square', label: '方桌' }, { value: 'long', label: '长桌' }]}
+          options={[
+            { value: 'round', label: t('pages.booking.floorPlanEditor.shapeRound') },
+            { value: 'square', label: t('pages.booking.floorPlanEditor.shapeSquare') },
+            { value: 'long', label: t('pages.booking.floorPlanEditor.shapeLong') },
+          ]}
         />
       </div>
 
       {/* 旋转（仅长桌） */}
       {localCfg.shape === 'long' && (
         <div>
-          <div className="text-xs text-slate-400 mb-1">旋转</div>
+          <div className="text-xs text-slate-400 mb-1">{t('pages.booking.floorPlanEditor.rotationLabel')}</div>
           <Btn variant="secondary" size="sm" className="w-full"
             onClick={() => { const newCfg = { ...localCfg, rotation: ((localCfg.rotation ?? 0) + 90) % 360 }; setLocalCfg(newCfg); autoSave(localName, newCfg) }}>
-            旋转 90°（当前 {localCfg.rotation ?? 0}°）
+            {t('pages.booking.floorPlanEditor.rotateBtn', { deg: localCfg.rotation ?? 0 })}
           </Btn>
         </div>
       )}
 
       {/* 最小人数 */}
       <div onBlur={() => autoSave(localName, localCfg)}>
-        <div className="text-xs text-slate-400 mb-1">最少人数</div>
+        <div className="text-xs text-slate-400 mb-1">{t('pages.booking.floorPlanEditor.minCapacityLabel')}</div>
         <NumberInput className="w-full" min={1} max={localCfg.maxCapacity} value={localCfg.minCapacity ?? 1}
           onChange={v => setLocalCfg(c => ({ ...c, minCapacity: v ?? 1 }))} />
       </div>
 
       {/* 最大人数 */}
       <div onBlur={() => autoSave(localName, localCfg)}>
-        <div className="text-xs text-slate-400 mb-1">最大人数</div>
+        <div className="text-xs text-slate-400 mb-1">{t('pages.booking.floorPlanEditor.maxCapacityLabel')}</div>
         <NumberInput className="w-full" min={localCfg.minCapacity} max={50} value={localCfg.maxCapacity ?? 4}
           onChange={v => setLocalCfg(c => ({ ...c, maxCapacity: v ?? 4 }))} />
       </div>
 
       {/* 区域 */}
       <div>
-        <div className="text-xs text-slate-400 mb-1">区域</div>
+        <div className="text-xs text-slate-400 mb-1">{t('pages.booking.floorPlanEditor.areaLabel')}</div>
         <SelectInput
           className="w-full"
           value={localCfg.location ?? 'indoor'}
           onChange={v => { const newCfg = { ...localCfg, location: v as TableConfig['location'] }; setLocalCfg(newCfg); autoSave(localName, newCfg) }}
-          options={[{ value: 'indoor', label: '室内' }, { value: 'outdoor', label: '户外/露台' }, { value: 'window', label: '靠窗' }, { value: 'bar', label: '吧台' }]}
+          options={[
+            { value: 'indoor', label: t('pages.booking.floorPlanEditor.locationIndoor') },
+            { value: 'outdoor', label: t('pages.booking.floorPlanEditor.locationOutdoor') },
+            { value: 'window', label: t('pages.booking.floorPlanEditor.locationWindow') },
+            { value: 'bar', label: t('pages.booking.floorPlanEditor.locationBar') },
+          ]}
         />
       </div>
 
       {/* 可拼桌 */}
       <div className="flex justify-between items-center">
-        <span className="text-xs text-slate-400">可拼桌</span>
+        <span className="text-xs text-slate-400">{t('pages.booking.floorPlanEditor.combinableLabel')}</span>
         <Switch checked={!!localCfg.combinable}
           onCheckedChange={v => { const newCfg = { ...localCfg, combinable: v }; setLocalCfg(newCfg); autoSave(localName, newCfg) }} />
       </div>
 
       <Btn variant="danger" size="sm" icon={<Trash2 className="w-3.5 h-3.5" />} className="w-full" onClick={() => setConfirmDel(true)}>
-        删除桌位
+        {t('pages.booking.floorPlanEditor.deleteTableBtn')}
       </Btn>
 
-      <ConfirmDialog open={confirmDel} onOpenChange={setConfirmDel} title="确认删除此桌位？"
-        danger confirmText="删除" onConfirm={() => { setConfirmDel(false); onDelete() }} />
+      <ConfirmDialog open={confirmDel} onOpenChange={setConfirmDel} title={t('pages.booking.floorPlanEditor.confirmDeleteTableTitle')}
+        danger confirmText={t('pages.booking.floorPlanEditor.confirmDeleteBtn')} onConfirm={() => { setConfirmDel(false); onDelete() }} />
     </div>
   )
 }
 
 // ─── 主组件 ──────────────────────────────────────────────────────────
 export default function FloorPlanEditor() {
+  const { t } = useTranslation()
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([])
   const [activePlanId, setActivePlanId] = useState<string | null>(null)
   const [tables, setTables] = useState<BookableResource[]>([])
@@ -358,7 +373,7 @@ export default function FloorPlanEditor() {
         }
       }
     } catch (error) {
-      toast.error('加载平面图失败')
+      toast.error(t('pages.booking.floorPlanEditor.loadFloorPlanFailed'))
       setFloorPlans([])
       setTables([])
     } finally {
@@ -401,10 +416,10 @@ export default function FloorPlanEditor() {
         slotDurationMinutes: slotDuration,
         tableConfig,
       })
-      toast.success('设置已保存')
+      toast.success(t('pages.booking.floorPlanEditor.settingsSaved'))
       setSettingsOpen(false)
     } catch {
-      toast.error('保存失败')
+      toast.error(t('pages.booking.floorPlanEditor.saveFailed'))
     } finally {
       setSavingSettings(false)
     }
@@ -493,7 +508,7 @@ export default function FloorPlanEditor() {
         if (!pos) return prev
         const planId = editPlanId ?? activePlanId
         if (!planId) return prev
-        floorPlanApi.savePositions(planId, [{ id: draggedId, posX: Math.round(pos.x), posY: Math.round(pos.y) }]).catch(() => toast.error('位置保存失败'))
+        floorPlanApi.savePositions(planId, [{ id: draggedId, posX: Math.round(pos.x), posY: Math.round(pos.y) }]).catch(() => toast.error(t('pages.booking.floorPlanEditor.positionSaveFailed')))
         const next = new Map(prev)
         next.delete(draggedId)
         return next
@@ -557,7 +572,7 @@ export default function FloorPlanEditor() {
     try {
       await floorPlanApi.savePositions(planId, newPositions)
     } catch {
-      toast.error('对齐保存失败')
+      toast.error(t('pages.booking.floorPlanEditor.alignSaveFailed'))
     }
   }
 
@@ -575,7 +590,7 @@ export default function FloorPlanEditor() {
       setTables(prev => [...prev, newTable])
       setSelectedIds(new Set([newTable.id]))
     } catch {
-      toast.error('添加桌位失败')
+      toast.error(t('pages.booking.floorPlanEditor.addTableFailed'))
     }
   }
 
@@ -586,15 +601,15 @@ export default function FloorPlanEditor() {
       await floorPlanApi.removeTable(activePlanId, tableId)
       setTables(prev => prev.filter(t => t.id !== tableId))
       setSelectedIds(new Set())
-      toast.success('桌位已删除')
+      toast.success(t('pages.booking.floorPlanEditor.tableDeleted'))
     } catch {
-      toast.error('删除失败')
+      toast.error(t('pages.booking.floorPlanEditor.deleteFailed'))
     }
   }
 
   // ─── 创建新平面图 ──────────────────────────────────────────────────
   const createFloorPlan = async () => {
-    if (!newPlanName.trim()) { setNewPlanError('请输入区域名称'); return }
+    if (!newPlanName.trim()) { setNewPlanError(t('pages.booking.floorPlanEditor.planNameRequired')); return }
     setNewPlanError('')
     try {
       const plan = await floorPlanApi.create({ name: newPlanName, width: newPlanWidth, height: newPlanHeight })
@@ -605,9 +620,9 @@ export default function FloorPlanEditor() {
       setSelectedIds(new Set())
       setNewPlanModal(false)
       setNewPlanName(''); setNewPlanWidth(1200); setNewPlanHeight(800)
-      toast.success(`"${plan.name}" 已创建`)
+      toast.success(t('pages.booking.floorPlanEditor.planCreatedToast', { name: plan.name }))
     } catch {
-      toast.error('创建失败')
+      toast.error(t('pages.booking.floorPlanEditor.createFailed'))
     }
   }
 
@@ -615,7 +630,7 @@ export default function FloorPlanEditor() {
   const setDefault = async (planId: string) => {
     await floorPlanApi.setDefault(planId)
     setFloorPlans(prev => prev.map(p => ({ ...p, isDefault: p.id === planId })))
-    toast.success('已设为默认')
+    toast.success(t('pages.booking.floorPlanEditor.setAsDefaultToast'))
   }
 
   // ─── 删除平面图 ────────────────────────────────────────────────────
@@ -633,7 +648,7 @@ export default function FloorPlanEditor() {
         setTables([])
       }
     }
-    toast.success('平面图已删除')
+    toast.success(t('pages.booking.floorPlanEditor.planDeletedToast'))
   }
 
   // 打开编辑区域弹窗
@@ -649,7 +664,7 @@ export default function FloorPlanEditor() {
       setEditHeight(latestPlan.height)
       setEditPlanModal(true)
     } catch (error) {
-      toast.error('加载平面图失败')
+      toast.error(t('pages.booking.floorPlanEditor.loadFloorPlanFailed'))
     }
   }
 
@@ -708,24 +723,24 @@ export default function FloorPlanEditor() {
               {isActive && (
                 <div className="flex gap-1 ml-1" onClick={e => e.stopPropagation()}>
                   {!plan.isDefault && (
-                    <Star className="w-3 h-3 cursor-pointer" title="设为默认" onClick={() => setDefault(plan.id)} />
+                    <Star className="w-3 h-3 cursor-pointer" title={t('pages.booking.floorPlanEditor.setAsDefaultTitle')} onClick={() => setDefault(plan.id)} />
                   )}
-                  <Pencil className="w-3 h-3 cursor-pointer" title="编辑区域" onClick={() => openEditPlan(plan.id)} />
-                  <Trash2 className="w-3 h-3 cursor-pointer text-red-300" title="删除区域" onClick={() => setDeletePlanId(plan.id)} />
+                  <Pencil className="w-3 h-3 cursor-pointer" title={t('pages.booking.floorPlanEditor.editAreaTitle')} onClick={() => openEditPlan(plan.id)} />
+                  <Trash2 className="w-3 h-3 cursor-pointer text-red-300" title={t('pages.booking.floorPlanEditor.deleteAreaTitle')} onClick={() => setDeletePlanId(plan.id)} />
                 </div>
               )}
             </div>
           )
         })}
 
-        <Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setNewPlanModal(true)}>添加区域</Btn>
+        <Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setNewPlanModal(true)}>{t('pages.booking.floorPlanEditor.addAreaBtn')}</Btn>
 
         <div className="ml-auto flex gap-2 items-center">
-          <Btn variant="secondary" size="sm" icon={<Settings className="w-3.5 h-3.5" />} onClick={() => setSettingsOpen(true)}>营业设置</Btn>
+          <Btn variant="secondary" size="sm" icon={<Settings className="w-3.5 h-3.5" />} onClick={() => setSettingsOpen(true)}>{t('pages.booking.floorPlanEditor.businessSettingsBtn')}</Btn>
           {/* 图例 */}
           <div className="flex gap-3 text-xs text-slate-400">
-            <span><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style={{ background: '#52c41a' }} />空闲</span>
-            <span><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style={{ background: '#fa8c16' }} />已占</span>
+            <span><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style={{ background: '#52c41a' }} />{t('pages.booking.floorPlanEditor.legendAvailable')}</span>
+            <span><span className="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style={{ background: '#fa8c16' }} />{t('pages.booking.floorPlanEditor.legendOccupied')}</span>
           </div>
         </div>
       </div>
@@ -753,16 +768,16 @@ export default function FloorPlanEditor() {
                 {tables.filter(t => t.isActive).length === 0 && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 gap-2 pointer-events-none">
                     <Settings className="w-10 h-10" />
-                    <div className="text-sm">从左侧工具栏拖入桌位</div>
-                    <div className="text-xs">点击桌位形状即可添加到画布</div>
+                    <div className="text-sm">{t('pages.booking.floorPlanEditor.dragTablesHint')}</div>
+                    <div className="text-xs">{t('pages.booking.floorPlanEditor.clickToAddHint')}</div>
                   </div>
                 )}
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-300">
-              <div className="text-sm">还没有平面图</div>
-              <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setNewPlanModal(true)}>创建第一个区域</Btn>
+              <div className="text-sm">{t('pages.booking.floorPlanEditor.noFloorPlanYet')}</div>
+              <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setNewPlanModal(true)}>{t('pages.booking.floorPlanEditor.createFirstAreaBtn')}</Btn>
             </div>
           )}
         </div>
@@ -776,7 +791,7 @@ export default function FloorPlanEditor() {
             {/* 顶部：编辑区域名称和尺寸 */}
             <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex gap-4 items-center flex-wrap">
               <div className="flex gap-2 items-center flex-1 min-w-[300px]">
-                <span className="text-xs text-slate-400 min-w-[60px]">区域名称:</span>
+                <span className="text-xs text-slate-400 min-w-[60px]">{t('pages.booking.floorPlanEditor.areaNameColonLabel')}</span>
                 <input
                   className="flex-1 text-sm bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
                   defaultValue={floorPlans.find(p => p.id === editPlanId)?.name}
@@ -793,7 +808,7 @@ export default function FloorPlanEditor() {
                 />
               </div>
               <div className="flex gap-2 items-center min-w-[250px]">
-                <span className="text-xs text-slate-400">画布尺寸:</span>
+                <span className="text-xs text-slate-400">{t('pages.booking.floorPlanEditor.canvasSizeColonLabel')}</span>
                 <div onBlur={() => {
                   if (!editPlanId || !editWidth) return
                   const oldWidth = floorPlans.find(p => p.id === editPlanId)?.width
@@ -815,18 +830,18 @@ export default function FloorPlanEditor() {
                 {/* 多选时显示对齐工具栏 */}
                 {selectedIds.size >= 2 && (
                   <div className="flex gap-1 items-center px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200">
-                    <span className="text-xs text-slate-500 mr-1">已选 {selectedIds.size} 个</span>
-                    <Btn variant="secondary" size="sm" onClick={() => alignTables('left')}>左</Btn>
-                    <Btn variant="secondary" size="sm" onClick={() => alignTables('right')}>右</Btn>
-                    <Btn variant="secondary" size="sm" onClick={() => alignTables('top')}>顶</Btn>
-                    <Btn variant="secondary" size="sm" onClick={() => alignTables('bottom')}>底</Btn>
-                    <Btn variant="secondary" size="sm" onClick={() => alignTables('centerH')}>水平居中</Btn>
-                    <Btn variant="secondary" size="sm" onClick={() => alignTables('centerV')}>垂直居中</Btn>
+                    <span className="text-xs text-slate-500 mr-1">{t('pages.booking.floorPlanEditor.selectedCountLabel', { count: selectedIds.size })}</span>
+                    <Btn variant="secondary" size="sm" onClick={() => alignTables('left')}>{t('pages.booking.floorPlanEditor.alignLeft')}</Btn>
+                    <Btn variant="secondary" size="sm" onClick={() => alignTables('right')}>{t('pages.booking.floorPlanEditor.alignRight')}</Btn>
+                    <Btn variant="secondary" size="sm" onClick={() => alignTables('top')}>{t('pages.booking.floorPlanEditor.alignTop')}</Btn>
+                    <Btn variant="secondary" size="sm" onClick={() => alignTables('bottom')}>{t('pages.booking.floorPlanEditor.alignBottom')}</Btn>
+                    <Btn variant="secondary" size="sm" onClick={() => alignTables('centerH')}>{t('pages.booking.floorPlanEditor.alignCenterH')}</Btn>
+                    <Btn variant="secondary" size="sm" onClick={() => alignTables('centerV')}>{t('pages.booking.floorPlanEditor.alignCenterV')}</Btn>
                   </div>
                 )}
-                <Btn variant="secondary" size="sm" onClick={() => setZoom(z => Math.min(z + 0.2, 2))} disabled={zoom >= 2}>放大 {Math.round(zoom * 100)}%</Btn>
-                <Btn variant="secondary" size="sm" onClick={() => setZoom(z => Math.max(z - 0.2, 0.5))} disabled={zoom <= 0.5}>缩小</Btn>
-                <Btn variant="primary" size="sm" onClick={closeEditPlan}>完成编辑</Btn>
+                <Btn variant="secondary" size="sm" onClick={() => setZoom(z => Math.min(z + 0.2, 2))} disabled={zoom >= 2}>{t('pages.booking.floorPlanEditor.zoomInBtn', { percent: Math.round(zoom * 100) })}</Btn>
+                <Btn variant="secondary" size="sm" onClick={() => setZoom(z => Math.max(z - 0.2, 0.5))} disabled={zoom <= 0.5}>{t('pages.booking.floorPlanEditor.zoomOutBtn')}</Btn>
+                <Btn variant="primary" size="sm" onClick={closeEditPlan}>{t('pages.booking.floorPlanEditor.finishEditBtn')}</Btn>
               </div>
             </div>
 
@@ -869,7 +884,7 @@ export default function FloorPlanEditor() {
                     {tables.filter(t => t.isActive).length === 0 && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 gap-2 pointer-events-none">
                         <Settings className="w-10 h-10" />
-                        <div className="text-sm">从左侧工具栏添加桌位</div>
+                        <div className="text-sm">{t('pages.booking.floorPlanEditor.dragTablesHintEdit')}</div>
                       </div>
                     )}
                   </div>
@@ -885,29 +900,29 @@ export default function FloorPlanEditor() {
 
       {/* 新建平面图 Modal */}
       <Modal
-        title="添加区域"
+        title={t('pages.booking.floorPlanEditor.addAreaBtn')}
         open={newPlanModal}
         onOpenChange={(o) => { if (!o) { setNewPlanModal(false); setNewPlanError('') } }}
         size="md"
         footer={
           <div className="flex justify-end gap-2">
-            <Btn variant="secondary" onClick={() => { setNewPlanModal(false); setNewPlanError('') }}>取消</Btn>
-            <Btn variant="primary" onClick={createFloorPlan}>创建</Btn>
+            <Btn variant="secondary" onClick={() => { setNewPlanModal(false); setNewPlanError('') }}>{t('pages.booking.floorPlanEditor.cancelBtn')}</Btn>
+            <Btn variant="primary" onClick={createFloorPlan}>{t('pages.booking.floorPlanEditor.createBtn')}</Btn>
           </div>
         }
       >
         <div className="space-y-4">
           <div>
-            <div className="text-sm text-slate-600 mb-1.5">区域名称</div>
-            <TextInput className="w-full" value={newPlanName} onChange={(v) => { setNewPlanName(v); if (newPlanError) setNewPlanError('') }} placeholder="如：大厅、露台、VIP包厢" />
+            <div className="text-sm text-slate-600 mb-1.5">{t('pages.booking.floorPlanEditor.areaNameLabel')}</div>
+            <TextInput className="w-full" value={newPlanName} onChange={(v) => { setNewPlanName(v); if (newPlanError) setNewPlanError('') }} placeholder={t('pages.booking.floorPlanEditor.areaNamePlaceholder')} />
             {newPlanError && <p className="text-sm text-red-500 mt-1">{newPlanError}</p>}
           </div>
           <div>
-            <div className="text-sm text-slate-600 mb-1.5">画布尺寸</div>
+            <div className="text-sm text-slate-600 mb-1.5">{t('pages.booking.floorPlanEditor.canvasSizeLabel')}</div>
             <div className="flex gap-2 items-center">
-              <NumberInput value={newPlanWidth} onChange={setNewPlanWidth} min={400} max={3000} suffix="px 宽" />
+              <NumberInput value={newPlanWidth} onChange={setNewPlanWidth} min={400} max={3000} suffix={t('pages.booking.floorPlanEditor.widthSuffix')} />
               <span className="text-slate-400">×</span>
-              <NumberInput value={newPlanHeight} onChange={setNewPlanHeight} min={300} max={2000} suffix="px 高" />
+              <NumberInput value={newPlanHeight} onChange={setNewPlanHeight} min={300} max={2000} suffix={t('pages.booking.floorPlanEditor.heightSuffix')} />
             </div>
           </div>
         </div>
@@ -917,50 +932,50 @@ export default function FloorPlanEditor() {
       <ConfirmDialog
         open={!!deletePlanId}
         onOpenChange={(o) => !o && setDeletePlanId(null)}
-        title="删除此平面图？"
-        description="桌位将被清除。"
+        title={t('pages.booking.floorPlanEditor.deletePlanConfirmTitle')}
+        description={t('pages.booking.floorPlanEditor.deletePlanConfirmDesc')}
         danger
-        confirmText="删除"
+        confirmText={t('pages.booking.floorPlanEditor.confirmDeleteBtn')}
         onConfirm={() => { const id = deletePlanId!; setDeletePlanId(null); deleteFloorPlan(id) }}
       />
 
       {/* 营业设置 Drawer */}
       <Drawer
-        title="餐桌营业设置"
+        title={t('pages.booking.floorPlanEditor.businessSettingsDrawerTitle')}
         width={380}
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         footer={
           <div className="flex justify-end gap-2">
-            <Btn variant="secondary" onClick={() => setSettingsOpen(false)}>取消</Btn>
-            <Btn variant="primary" loading={settingsSaving} onClick={saveSettings}>保存</Btn>
+            <Btn variant="secondary" onClick={() => setSettingsOpen(false)}>{t('pages.booking.floorPlanEditor.cancelBtn')}</Btn>
+            <Btn variant="primary" loading={settingsSaving} onClick={saveSettings}>{t('pages.booking.floorPlanEditor.saveBtn')}</Btn>
           </div>
         }
       >
         {/* 营业时段 */}
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
-            <span className="font-semibold text-slate-700">营业时段</span>
+            <span className="font-semibold text-slate-700">{t('pages.booking.floorPlanEditor.businessHoursLabel')}</span>
             <Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />}
-              onClick={() => setPeriods(prev => [...prev, { name: '', start: '17:00', end: '21:00' }])}>添加时段</Btn>
+              onClick={() => setPeriods(prev => [...prev, { name: '', start: '17:00', end: '21:00' }])}>{t('pages.booking.floorPlanEditor.addPeriodBtn')}</Btn>
           </div>
           {periods.map((period, index) => (
             <div key={index} className="mb-3 px-2.5 pt-2.5 pb-2 bg-slate-50 rounded-md border border-slate-100">
               {/* 第一行：名称 + 时间 + 删除 */}
               <div className="flex gap-1.5 items-end mb-2">
                 <div className="flex-1">
-                  <div className="text-[11px] text-slate-400 mb-0.5">时段名称（可选）</div>
-                  <TextInput className="w-full" value={period.name ?? ''} placeholder="如：午餐、晚餐"
+                  <div className="text-[11px] text-slate-400 mb-0.5">{t('pages.booking.floorPlanEditor.periodNameLabel')}</div>
+                  <TextInput className="w-full" value={period.name ?? ''} placeholder={t('pages.booking.floorPlanEditor.periodNamePlaceholder')}
                     onChange={v => setPeriods(prev => prev.map((p, i) => i === index ? { ...p, name: v } : p))} />
                 </div>
                 <div>
-                  <div className="text-[11px] text-slate-400 mb-0.5">开始</div>
+                  <div className="text-[11px] text-slate-400 mb-0.5">{t('pages.booking.floorPlanEditor.startLabel')}</div>
                   <input type="time" step={900} value={period.start ?? ''}
                     onChange={e => setPeriods(prev => prev.map((p, i) => i === index ? { ...p, start: e.target.value } : p))}
                     className="text-sm bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0" />
                 </div>
                 <div>
-                  <div className="text-[11px] text-slate-400 mb-0.5">结束</div>
+                  <div className="text-[11px] text-slate-400 mb-0.5">{t('pages.booking.floorPlanEditor.endLabel')}</div>
                   <input type="time" step={900} value={period.end ?? ''}
                     onChange={e => setPeriods(prev => prev.map((p, i) => i === index ? { ...p, end: e.target.value } : p))}
                     className="text-sm bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0" />
@@ -976,8 +991,8 @@ export default function FloorPlanEditor() {
               {/* 第二行：星期选择 */}
               <div>
                 <div className="text-[11px] text-slate-400 mb-1">
-                  适用星期
-                  {(!period.days || period.days.length === 0) && <span className="ml-1.5 text-slate-600">每天</span>}
+                  {t('pages.booking.floorPlanEditor.applicableDaysLabel')}
+                  {(!period.days || period.days.length === 0) && <span className="ml-1.5 text-slate-600">{t('pages.booking.floorPlanEditor.everydayLabel')}</span>}
                 </div>
                 <DaySelector value={period.days ?? []} onChange={days => setPeriods(prev => prev.map((p, i) => i === index ? { ...p, days } : p))} />
               </div>
@@ -989,9 +1004,9 @@ export default function FloorPlanEditor() {
 
         {/* 预约间隔 */}
         <div className="mb-4">
-          <span className="font-semibold text-slate-700 block mb-1">预约间隔</span>
-          <p className="text-xs text-slate-400 block mb-2">客人可选的时间粒度，如设 60 分钟则可选 11:00、12:00、13:00…</p>
-          <NumberInput value={slotDuration} onChange={v => setSlotDuration(v ?? 60)} min={5} max={240} suffix="分钟" />
+          <span className="font-semibold text-slate-700 block mb-1">{t('pages.booking.floorPlanEditor.bookingIntervalLabel')}</span>
+          <p className="text-xs text-slate-400 block mb-2">{t('pages.booking.floorPlanEditor.bookingIntervalDesc')}</p>
+          <NumberInput value={slotDuration} onChange={v => setSlotDuration(v ?? 60)} min={5} max={240} suffix={t('pages.booking.floorPlanEditor.minutesSuffix')} />
         </div>
 
         <div className="border-t border-slate-100 my-3" />
@@ -1000,19 +1015,19 @@ export default function FloorPlanEditor() {
         <div className="mb-3">
           <div className="flex justify-between items-center">
             <div>
-              <div className="font-medium text-sm text-slate-700">自动接受预约</div>
-              <div className="text-xs text-slate-400">收到预约后自动确认，无需人工审核</div>
+              <div className="font-medium text-sm text-slate-700">{t('pages.booking.floorPlanEditor.autoAcceptLabel')}</div>
+              <div className="text-xs text-slate-400">{t('pages.booking.floorPlanEditor.autoAcceptDesc')}</div>
             </div>
             <Switch checked={autoAccept} onCheckedChange={setAutoAccept} />
           </div>
           {autoAccept && (
             <div className="mt-2.5 px-3 py-2.5 bg-slate-50 rounded-md">
               <div className="flex items-center gap-2">
-                <span className="text-[13px] text-slate-700">营业结束前</span>
+                <span className="text-[13px] text-slate-700">{t('pages.booking.floorPlanEditor.beforeCloseLabel')}</span>
                 <NumberInput value={autoAcceptCutoff} onChange={v => setAutoAcceptCutoff(v ?? 30)} min={0} max={480} />
-                <span className="text-[13px] text-slate-700">分钟截止</span>
+                <span className="text-[13px] text-slate-700">{t('pages.booking.floorPlanEditor.cutoffMinutesLabel')}</span>
               </div>
-              <div className="text-xs text-slate-400 mt-1">例如 21:00 关门，设 60 分钟则 20:00 后不再自动接受当日预约</div>
+              <div className="text-xs text-slate-400 mt-1">{t('pages.booking.floorPlanEditor.autoAcceptExampleHint')}</div>
             </div>
           )}
         </div>
@@ -1022,8 +1037,8 @@ export default function FloorPlanEditor() {
         {/* 自动安排座位 */}
         <div className="flex justify-between items-center">
           <div>
-            <div className="font-medium text-sm text-slate-700">自动安排座位</div>
-            <div className="text-xs text-slate-400">根据人数自动分配餐桌，关闭后需人工指定</div>
+            <div className="font-medium text-sm text-slate-700">{t('pages.booking.floorPlanEditor.autoAssignSeatLabel')}</div>
+            <div className="text-xs text-slate-400">{t('pages.booking.floorPlanEditor.autoAssignSeatDesc')}</div>
           </div>
           <Switch checked={autoAssignSeat} onCheckedChange={setAutoAssignSeat} />
         </div>

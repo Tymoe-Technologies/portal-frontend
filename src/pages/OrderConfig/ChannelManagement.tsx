@@ -41,8 +41,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   SKIP_THE_DISHES: 'Skip The Dishes',
   GRUBHUB: 'Grubhub',
   RITUAL: 'Ritual',
-  FANTUAN: '饭团',
-  OTHER_PLATFORM: '其他平台',
+  FANTUAN: 'Fantuan',
 }
 
 const PLATFORM_LOGOS: Record<string, string> = {
@@ -65,16 +64,19 @@ const PLATFORM_COLORS: Record<string, string> = {
   OTHER_PLATFORM: '#64748b',
 }
 
-const BILLING_CYCLE_LABELS: Record<string, string> = {
-  WEEKLY: '每周', BIWEEKLY: '每两周', MONTHLY: '每月',
-}
+const getBillingCycleLabels = (t: (key: string) => string): Record<string, string> => ({
+  WEEKLY: t('pages.orderConfig.billingCycleWeekly'),
+  BIWEEKLY: t('pages.orderConfig.billingCycleBiweekly'),
+  MONTHLY: t('pages.orderConfig.billingCycleMonthly'),
+})
 
 // 平台 Logo：有 URL 显示图片，失败或无 URL 显示品牌色缩写块
 const PlatformLogo: React.FC<{ platform: string; size?: number }> = ({ platform, size = 40 }) => {
+  const { t } = useTranslation()
   const [imgError, setImgError] = useState(false)
   const logoUrl = PLATFORM_LOGOS[platform]
   const color = PLATFORM_COLORS[platform] ?? '#64748b'
-  const label = PLATFORM_LABELS[platform] ?? platform
+  const label = platform === 'OTHER_PLATFORM' ? t('pages.orderConfig.otherPlatformLabel') : (PLATFORM_LABELS[platform] ?? platform)
 
   if (logoUrl && !imgError) {
     return (
@@ -198,7 +200,7 @@ const ChannelManagement: React.FC = () => {
     try {
       setMembers(await getChannelMembers(channel.id))
     } catch {
-      notify('error', '加载成员失败')
+      notify('error', tk('loadMembersFailed'))
     } finally {
       setMembersLoading(false)
     }
@@ -206,15 +208,15 @@ const ChannelManagement: React.FC = () => {
 
   const handleAddMember = async () => {
     if (!memberModalChannel) return
-    if (!memberPhone.trim()) { notify('error', '请输入手机号'); return }
+    if (!memberPhone.trim()) { notify('error', tk('pleaseEnterPhone')); return }
     setAddingMember(true)
     try {
       await addChannelMember(memberModalChannel.id, { phone: memberPhone.trim(), name: memberName || undefined, note: memberNote || undefined } as any)
-      notify('success', '成员已添加')
+      notify('success', tk('memberAdded'))
       setMemberPhone(''); setMemberName(''); setMemberNote('')
       setMembers(await getChannelMembers(memberModalChannel.id))
     } catch (e: any) {
-      notify('error', '添加失败：' + (e?.message || '请重试'))
+      notify('error', tk('addFailedPrefix') + (e?.message || tk('pleaseRetry')))
     } finally {
       setAddingMember(false)
     }
@@ -226,7 +228,7 @@ const ChannelManagement: React.FC = () => {
       await removeChannelMember(memberModalChannel.id, member.id)
       setMembers(prev => prev.filter(m => m.id !== member.id))
     } catch {
-      notify('error', '删除失败')
+      notify('error', tk('deleteFailedGeneric'))
     } finally {
       setRemoveMemberTarget(null)
     }
@@ -238,7 +240,7 @@ const ChannelManagement: React.FC = () => {
       const updated = await updateChannelMember(memberModalChannel.id, member.id, { isActive })
       setMembers(prev => prev.map(m => m.id === updated.id ? updated : m))
     } catch {
-      notify('error', '更新失败')
+      notify('error', tk('updateFailedGeneric'))
     }
   }
 
@@ -282,13 +284,13 @@ const ChannelManagement: React.FC = () => {
     if (!name) e.channelName = tk('sourceNameRequired')
     else if (name.length < 2) e.channelName = tk('sourceNameMinLength')
     else if (name.length > 100) e.channelName = tk('sourceNameMaxLength')
-    if (!channelForm.displayOrder) e.displayOrder = '必填'
+    if (!channelForm.displayOrder) e.displayOrder = tk('requiredField')
     if (channelForm.checkoutMode === 'CREDIT_ACCOUNT') {
-      if (!channelForm.billingCycle) e.billingCycle = '请选择结账周期'
-      if (channelForm.cycleLimit == null) e.cycleLimit = '请输入周期限额'
+      if (!channelForm.billingCycle) e.billingCycle = tk('pleaseSelectBillingCycle')
+      if (channelForm.cycleLimit == null) e.cycleLimit = tk('pleaseEnterCycleLimit')
     }
     if (channelForm.discountEnabled && channelForm.discountValue == null) {
-      e.discountValue = '请输入折扣值'
+      e.discountValue = tk('pleaseEnterDiscountValue')
     }
     setErrors(e)
     return Object.keys(e).length === 0
@@ -404,27 +406,27 @@ const ChannelManagement: React.FC = () => {
     { key: 'description', title: tk('descriptionColumn'), render: r => <span className="text-slate-500">{r.description || '-'}</span> },
     {
       key: 'accessMode',
-      title: '准入',
+      title: tk('accessModeColumn'),
       width: 100,
       render: r => r.accessMode === 'MEMBER_ONLY'
-        ? <Badge variant="gold" icon={<Lock className="w-3 h-3" />}>仅会员</Badge>
-        : <Badge>公开</Badge>,
+        ? <Badge variant="gold" icon={<Lock className="w-3 h-3" />}>{tk('memberOnlyBadge')}</Badge>
+        : <Badge>{tk('publicBadge')}</Badge>,
     },
     {
       key: 'checkoutMode',
-      title: '结账方式',
+      title: tk('checkoutModeColumn'),
       width: 120,
       render: r => r.checkoutMode === 'CREDIT_ACCOUNT'
         ? (
-          <span title={r.creditConfig ? `周期：${BILLING_CYCLE_LABELS[r.creditConfig.billingCycle]}  限额：$${(r.creditConfig.cycleLimit / 100).toFixed(2)}` : '未配置记账周期'}>
-            <Badge variant="blue">记账</Badge>
+          <span title={r.creditConfig ? t('pages.orderConfig.cycleAndLimitTooltip', { cycle: getBillingCycleLabels(t)[r.creditConfig.billingCycle], limit: (r.creditConfig.cycleLimit / 100).toFixed(2) }) : tk('creditCycleNotConfigured')}>
+            <Badge variant="blue">{tk('creditAccountBadge')}</Badge>
           </span>
         )
-        : <Badge variant="green">正常结账</Badge>,
+        : <Badge variant="green">{tk('normalCheckoutBadge')}</Badge>,
     },
     {
       key: 'discount',
-      title: '整单折扣',
+      title: tk('orderDiscountColumn'),
       width: 110,
       render: r => {
         const d = r.checkoutRules?.orderDiscount
@@ -454,7 +456,7 @@ const ChannelManagement: React.FC = () => {
           {!r.isSystemChannel && (
             <>
               <span className="w-px h-4 bg-slate-200 mx-0.5" />
-              <button title="成员管理" onClick={() => openMemberModal(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
+              <button title={tk('memberManagementBtn')} onClick={() => openMemberModal(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
                 <Users className="w-4 h-4" />
               </button>
               <button title={tk('edit')} onClick={() => openModal(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
@@ -490,11 +492,11 @@ const ChannelManagement: React.FC = () => {
 
         {/* 外卖平台销售渠道 */}
         <SectionCard
-          title={<span className="inline-flex items-center gap-2"><Car className="w-4 h-4 text-slate-400" />外卖平台销售渠道</span>}
-          description="系统预设，启用后配置佣金率即可手动录单，日后平台接入后将自动对接"
+          title={<span className="inline-flex items-center gap-2"><Car className="w-4 h-4 text-slate-400" />{tk('deliveryChannelsTitle')}</span>}
+          description={tk('deliveryChannelsDesc')}
         >
           {deliveryChannels.length === 0 ? (
-            <div className="py-8 text-center text-sm text-slate-400">暂无外卖平台渠道</div>
+            <div className="py-8 text-center text-sm text-slate-400">{tk('noDeliveryChannels')}</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {deliveryChannels.map(ch => {
@@ -510,17 +512,17 @@ const ChannelManagement: React.FC = () => {
                         </div>
                         <div className="mt-1">
                           {rate != null
-                            ? <Badge variant="gold" icon={<Percent className="w-3 h-3" />}>佣金 {rate.toFixed(1)}%</Badge>
-                            : <span className="text-xs text-slate-400">未配置佣金率</span>}
+                            ? <Badge variant="gold" icon={<Percent className="w-3 h-3" />}>{t('pages.orderConfig.commissionRateBadge', { rate: rate.toFixed(1) })}</Badge>
+                            : <span className="text-xs text-slate-400">{tk('commissionRateNotConfigured')}</span>}
                         </div>
                       </div>
                     </div>
                     <div className="flex border-t border-slate-100 divide-x divide-slate-100">
                       <button onClick={() => openDeliveryModal(ch)} className="flex-1 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
-                        <Pencil className="w-3 h-3" />配置
+                        <Pencil className="w-3 h-3" />{tk('configureBtn')}
                       </button>
                       <button onClick={() => navigate(`/order-config/pricing?channelId=${ch.id}`)} className="flex-1 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
-                        <DollarSign className="w-3 h-3" />定价
+                        <DollarSign className="w-3 h-3" />{tk('pricingBtn')}
                       </button>
                     </div>
                   </div>
@@ -532,7 +534,7 @@ const ChannelManagement: React.FC = () => {
 
         {/* 自定义销售渠道 */}
         <SectionCard
-          title={<span className="inline-flex items-center gap-2"><Store className="w-4 h-4 text-slate-400" />自定义渠道</span>}
+          title={<span className="inline-flex items-center gap-2"><Store className="w-4 h-4 text-slate-400" />{tk('customChannelsTitle')}</span>}
           action={
             <div className="relative w-64">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -575,7 +577,7 @@ const ChannelManagement: React.FC = () => {
         }
       >
         <div className="space-y-4">
-          <SectionLabel>基本信息</SectionLabel>
+          <SectionLabel>{tk('basicInfoSection')}</SectionLabel>
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-7">
               <Field label={tk('sourceName')} required error={errors.channelName}>
@@ -598,82 +600,82 @@ const ChannelManagement: React.FC = () => {
             <Textarea value={channelForm.description} onChange={v => setField('description', v.slice(0, 500))} rows={2} placeholder={tk('descriptionPlaceholder')} />
           </Field>
 
-          <SectionLabel>准入设置</SectionLabel>
-          <Field label="渠道准入" hint="仅会员模式需要商家开启会员功能，通过 member 系统管理可用人员名单">
+          <SectionLabel>{tk('accessSettingsSection')}</SectionLabel>
+          <Field label={tk('channelAccessLabel')} hint={tk('channelAccessHint')}>
             <SelectInput
               value={channelForm.accessMode}
               onChange={v => setField('accessMode', v)}
               className="w-full"
               options={[
-                { label: '公开 — 任何人可使用', value: 'PUBLIC' },
-                { label: '仅会员 — 需验证会员身份', value: 'MEMBER_ONLY' },
+                { label: tk('publicAccessOption'), value: 'PUBLIC' },
+                { label: tk('memberOnlyAccessOption'), value: 'MEMBER_ONLY' },
               ]}
             />
           </Field>
 
-          <SectionLabel>结账设置</SectionLabel>
-          <Field label="结账方式">
+          <SectionLabel>{tk('checkoutSettingsSection')}</SectionLabel>
+          <Field label={tk('checkoutModeLabel')}>
             <SelectInput
               value={channelForm.checkoutMode}
               onChange={v => setField('checkoutMode', v)}
               className="w-full"
               options={[
-                { label: '正常结账（信用卡、现金等）', value: 'NORMAL' },
-                { label: '记账（周期结算）', value: 'CREDIT_ACCOUNT' },
+                { label: tk('normalCheckoutOption'), value: 'NORMAL' },
+                { label: tk('creditAccountOption'), value: 'CREDIT_ACCOUNT' },
               ]}
             />
           </Field>
 
           {channelForm.checkoutMode === 'CREDIT_ACCOUNT' && (
             <>
-              <AlertBox type="info" title="记账模式" description="下单时无需即时支付，系统按设定周期汇总账单，到期后统一结算。" />
+              <AlertBox type="info" title={tk('creditModeTitle')} description={tk('creditModeDesc')} />
               <div className="grid grid-cols-2 gap-3">
-                <Field label="结账周期" required error={errors.billingCycle}>
+                <Field label={tk('billingCycleLabel')} required error={errors.billingCycle}>
                   <SelectInput
                     value={channelForm.billingCycle ?? ''}
                     onChange={v => setField('billingCycle', v)}
                     className="w-full"
                     options={[
-                      { label: '请选择', value: '' },
-                      { label: '每周结', value: 'WEEKLY' },
-                      { label: '每两周结', value: 'BIWEEKLY' },
-                      { label: '每月结', value: 'MONTHLY' },
+                      { label: tk('pleaseSelectOption'), value: '' },
+                      { label: tk('billingCycleWeekly'), value: 'WEEKLY' },
+                      { label: tk('billingCycleBiweekly'), value: 'BIWEEKLY' },
+                      { label: tk('billingCycleMonthly'), value: 'MONTHLY' },
                     ]}
                   />
                 </Field>
-                <Field label="周期限额 ($)" required error={errors.cycleLimit} hint="超出限额后该渠道将暂停下单">
+                <Field label={tk('cycleLimitLabel')} required error={errors.cycleLimit} hint={tk('cycleLimitHint')}>
                   <NumberInput value={channelForm.cycleLimit ?? NaN} onChange={v => setField('cycleLimit', v)} min={0} className="w-full" />
                 </Field>
               </div>
             </>
           )}
 
-          <SectionLabel>结账规则</SectionLabel>
-          <FieldRow label="整单折扣">
+          <SectionLabel>{tk('checkoutRulesSection')}</SectionLabel>
+          <FieldRow label={tk('orderDiscountLabel')}>
             <Switch checked={channelForm.discountEnabled} onCheckedChange={v => setField('discountEnabled', v)} />
           </FieldRow>
 
           {channelForm.discountEnabled && (
             <div className="grid grid-cols-12 gap-3">
               <div className="col-span-5">
-                <Field label="折扣类型">
+                <Field label={tk('discountTypeLabel')}>
                   <SelectInput
                     value={channelForm.discountType}
                     onChange={v => setField('discountType', v)}
                     className="w-full"
                     options={[
-                      { label: '百分比折扣', value: 'PERCENTAGE' },
-                      { label: '固定金额减免', value: 'FIXED' },
+                      { label: tk('percentageDiscountOption'), value: 'PERCENTAGE' },
+                      { label: tk('fixedAmountDiscountOption'), value: 'FIXED' },
                     ]}
                   />
                 </Field>
               </div>
               <div className="col-span-7">
                 <Field
-                  label="折扣值"
+                  label={tk('discountValueLabel')}
                   required
                   error={errors.discountValue}
-                  hint={channelForm.discountType === 'PERCENTAGE' ? '0–100，如 15 表示打 85 折' : '固定减免金额（元），如 5 表示减 $5'}
+                  hint={channelForm.discountType === 'PERCENTAGE' ? tk('discountValuePercentHint') : tk('discountValueFixedHint')}
                 >
                   <NumberInput value={channelForm.discountValue ?? NaN} onChange={v => setField('discountValue', v)} min={0} className="w-full" />
                 </Field>
@@ -687,7 +689,7 @@ const ChannelManagement: React.FC = () => {
       <Modal
         open={deliveryModalVisible}
         onOpenChange={v => !v && setDeliveryModalVisible(false)}
-        title={`配置 ${editingDelivery?.sourceName ?? ''}`}
+        title={t('pages.orderConfig.configurePlatformTitle', { name: editingDelivery?.sourceName ?? '' })}
         footer={
           <>
             <Btn variant="secondary" onClick={() => setDeliveryModalVisible(false)}>{tk('cancel')}</Btn>
@@ -696,10 +698,10 @@ const ChannelManagement: React.FC = () => {
         }
       >
         <div className="space-y-4">
-          <FieldRow label="启用状态">
+          <FieldRow label={tk('enabledStatusLabel')}>
             <Switch checked={deliveryActive} onCheckedChange={setDeliveryActive} />
           </FieldRow>
-          <Field label="平台佣金率 (%)" hint="用于在报表中计算扣佣后的实际净收入，不影响前台价格显示">
+          <Field label={tk('platformCommissionRateLabel')} hint={tk('platformCommissionRateHint')}>
             <NumberInput value={deliveryCommission ?? NaN} onChange={setDeliveryCommission} min={0} max={100} suffix="%" className="w-full" />
           </Field>
         </div>
@@ -709,22 +711,22 @@ const ChannelManagement: React.FC = () => {
       <Modal
         open={!!memberModalChannel}
         onOpenChange={v => !v && (setMemberModalChannel(null), setMembers([]))}
-        title={`成员管理 — ${memberModalChannel?.sourceName ?? ''}`}
+        title={t('pages.orderConfig.memberManagementModalTitle', { name: memberModalChannel?.sourceName ?? '' })}
         size="lg"
       >
         <div className="space-y-4">
           {/* 添加成员 */}
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <TextInput value={memberPhone} onChange={setMemberPhone} placeholder="手机号（如 +14161234567）" />
+              <TextInput value={memberPhone} onChange={setMemberPhone} placeholder={tk('memberPhonePlaceholder')} />
             </div>
             <div className="w-28">
-              <TextInput value={memberName} onChange={setMemberName} placeholder="姓名（选填）" />
+              <TextInput value={memberName} onChange={setMemberName} placeholder={tk('memberNamePlaceholder')} />
             </div>
             <div className="w-28">
-              <TextInput value={memberNote} onChange={setMemberNote} placeholder="备注（选填）" />
+              <TextInput value={memberNote} onChange={setMemberNote} placeholder={tk('memberNotePlaceholder')} />
             </div>
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} loading={addingMember} onClick={handleAddMember}>添加</Btn>
+            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} loading={addingMember} onClick={handleAddMember}>{tk('addBtn')}</Btn>
           </div>
 
           {/* 成员列表 */}
@@ -733,20 +735,20 @@ const ChannelManagement: React.FC = () => {
           ) : (
             <Table
               columns={[
-                { key: 'phone', title: '手机号', render: (m: ChannelMember) => m.phone },
-                { key: 'name', title: '姓名', render: (m: ChannelMember) => m.name || '-' },
-                { key: 'note', title: '备注', render: (m: ChannelMember) => m.note || '-' },
-                { key: 'isActive', title: '状态', render: (m: ChannelMember) => <Switch checked={m.isActive} onCheckedChange={c => handleToggleMember(m, c)} /> },
+                { key: 'phone', title: tk('phoneColumn'), render: (m: ChannelMember) => m.phone },
+                { key: 'name', title: tk('nameColumn'), render: (m: ChannelMember) => m.name || '-' },
+                { key: 'note', title: tk('noteColumn'), render: (m: ChannelMember) => m.note || '-' },
+                { key: 'isActive', title: tk('status'), render: (m: ChannelMember) => <Switch checked={m.isActive} onCheckedChange={c => handleToggleMember(m, c)} /> },
                 {
-                  key: 'actions', title: '操作',
+                  key: 'actions', title: tk('actions'),
                   render: (m: ChannelMember) => (
-                    <Btn variant="ghost" size="sm" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setRemoveMemberTarget(m)}>移除</Btn>
+                    <Btn variant="ghost" size="sm" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setRemoveMemberTarget(m)}>{tk('removeBtn')}</Btn>
                   ),
                 },
               ]}
               data={members}
               rowKey={(m: ChannelMember) => m.id}
-              empty="暂无成员，在上方添加手机号"
+              empty={tk('noMembersHint')}
             />
           )}
         </div>
@@ -769,8 +771,8 @@ const ChannelManagement: React.FC = () => {
       <ConfirmDialog
         open={!!removeMemberTarget}
         onOpenChange={v => !v && setRemoveMemberTarget(null)}
-        title="确认移除该成员？"
-        confirmText="移除"
+        title={tk('confirmRemoveMemberTitle')}
+        confirmText={tk('removeBtn')}
         danger
         onConfirm={() => removeMemberTarget && handleRemoveMember(removeMemberTarget)}
       />

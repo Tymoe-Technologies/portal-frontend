@@ -173,7 +173,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
     const tenantId = getTenantId()
     if (!tenantId) {
-      toast.error('无法获取租户信息')
+      toast.error(t('pages.menuSync.noTenantInfo'))
       return
     }
 
@@ -213,7 +213,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       console.log('加载的modifier总数:', totalModifiers)
       console.log('modifierConfigs详情:', Array.from(allModifierConfigs.entries()).map(([id, mods]) => ({ itemId: id, count: mods.length })))
     } catch (error: any) {
-      toast.error(error.message || '加载配置失败')
+      toast.error(error.message || t('pages.menuSync.loadConfigFailed'))
     } finally {
       setConfigLoading(false)
     }
@@ -266,7 +266,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       const data = await uberService.getMenuCategories(integrationId)
       setUberCategories(data)
     } catch (error: any) {
-      toast.error(error.message || '加载 Uber 分类失败')
+      toast.error(error.message || t('pages.menuSync.loadUberCategoriesFailed'))
     } finally {
       setcategoryLoading(false)
     }
@@ -284,7 +284,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       setPosItems(items || [])
     } catch (error: any) {
       console.error('加载商品失败:', error)
-      toast.error(error.message || '加载商品失败')
+      toast.error(error.message || t('pages.menuSync.loadItemsFailed'))
     } finally {
       setItemsLoading(false)
     }
@@ -299,7 +299,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       // 重置选择，防止上一个分类的选择干扰新分类
       setSelectedItems([])
     } catch (error: any) {
-      toast.error(error.message || '加载分类商品失败')
+      toast.error(error.message || t('pages.menuSync.loadCategoryItemsFailed'))
     } finally {
       setItemsLoading(false)
     }
@@ -371,7 +371,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       return groups
     } catch (error: any) {
       console.error('加载菜单组失败:', error)
-      toast.error(error.message || '加载菜单组失败')
+      toast.error(error.message || t('pages.menuSync.loadMenuGroupsFailed'))
       return []
     } finally {
       setMenuGroupLoading(false)
@@ -392,7 +392,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       setAvailableCategoriesForMenu(available)
     } catch (error: any) {
       console.error('加载菜单分类失败:', error)
-      toast.error(error.message || '加载菜单分类失败')
+      toast.error(error.message || t('pages.menuSync.loadMenuCategoriesFailed'))
     } finally {
       setMenuCategoriesLoading(false)
     }
@@ -402,7 +402,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
   const handleAddCategoryToMenu = async (categoryId: string) => {
     const menuGroupId = activeTab
     if (!menuGroupId || !integrationId) {
-      toast.error('请先选择菜单')
+      toast.error(t('pages.menuSync.pleaseSelectMenuFirst'))
       return
     }
 
@@ -414,10 +414,10 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         categoryId,
         integrationId
       )
-      toast.success('分类已添加到菜单')
+      toast.success(t('pages.menuSync.categoryAddedToMenu'))
       await loadMenuCategoriesForCurrentMenu(menuGroupId)
     } catch (error: any) {
-      toast.error(error.message || '添加分类失败')
+      toast.error(error.message || t('pages.menuSync.addCategoryFailed'))
     } finally {
       setMenuCategoriesLoading(false)
     }
@@ -427,7 +427,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
   const handleRemoveCategoryFromMenu = async (categoryId: string, categoryName: string, isSystemCategory: boolean) => {
     const menuGroupId = activeTab
     if (!menuGroupId) {
-      toast.error('请先选择菜单')
+      toast.error(t('pages.menuSync.pleaseSelectMenuFirst'))
       return
     }
 
@@ -437,19 +437,19 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       if (isSystemCategory) {
         // 系统分类：只移除关联,保留分类本身
         await uberMenuSyncService.removeCategoryFromMenuGroup(storeId, menuGroupId, categoryId)
-        toast.success(`系统分类「${categoryName}」已从菜单中移除(分类本身保留)`)
+        toast.success(t('pages.menuSync.systemCategoryRemovedFromMenu', { name: categoryName }))
       } else {
         // 自定义分类：先移除关联,再彻底删除分类
         await uberMenuSyncService.removeCategoryFromMenuGroup(storeId, menuGroupId, categoryId)
         await uberService.deleteMenuCategory(categoryId)
-        toast.success(`自定义分类「${categoryName}」已彻底删除`)
+        toast.success(t('pages.menuSync.customCategoryFullyDeleted', { name: categoryName }))
       }
 
       // 重新加载数据：先加载全局分类列表,确保删除操作已生效,然后再加载菜单分类
       await loadUberCategories()
       await loadMenuCategoriesForCurrentMenu(menuGroupId)
     } catch (error: any) {
-      toast.error(error.message || '删除分类失败')
+      toast.error(error.message || t('pages.menuSync.deleteCategoryFailed'))
     } finally {
       setMenuCategoriesLoading(false)
     }
@@ -459,16 +459,16 @@ const MenuSync: React.FC<MenuSyncProps> = ({
   const handleReorderMenuCategories = async (categoryIds: string[]) => {
     const menuGroupId = activeTab
     if (!menuGroupId) {
-      toast.error('请先选择菜单')
+      toast.error(t('pages.menuSync.pleaseSelectMenuFirst'))
       return
     }
 
     try {
       await uberMenuSyncService.reorderMenuGroupCategories(storeId, menuGroupId, categoryIds)
-      toast.success('分类顺序已更新')
+      toast.success(t('pages.menuSync.categoryOrderUpdated'))
       await loadMenuCategoriesForCurrentMenu(menuGroupId)
     } catch (error: any) {
-      toast.error(error.message || '重新排序失败')
+      toast.error(error.message || t('pages.menuSync.reorderFailed'))
     }
   }
 
@@ -482,7 +482,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         displayOrder: menuGroups.length,
         serviceAvailability: availability
       })
-      toast.success('菜单创建成功')
+      toast.success(t('pages.menuSync.menuCreateSuccess'))
       setMenuGroupModalVisible(false)
       const groups = await loadMenuGroups()
       // 自动切换到新创建的菜单
@@ -490,7 +490,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         setActiveTab(groups[groups.length - 1].id)
       }
     } catch (error: any) {
-      toast.error(error.message || '创建菜单失败')
+      toast.error(error.message || t('pages.menuSync.menuCreateFailed'))
     } finally {
       setMenuGroupLoading(false)
     }
@@ -504,11 +504,11 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         name,
         serviceAvailability: availability
       })
-      toast.success('菜单更新成功')
+      toast.success(t('pages.menuSync.menuUpdateSuccess'))
       setMenuGroupModalVisible(false)
       await loadMenuGroups()
     } catch (error: any) {
-      toast.error(error.message || '更新菜单失败')
+      toast.error(error.message || t('pages.menuSync.menuUpdateFailed'))
     } finally {
       setMenuGroupLoading(false)
     }
@@ -521,7 +521,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
       // 删除数据库中的菜单配置
       await uberMenuSyncService.deleteMenuGroup(storeId, groupId)
-      toast.success('菜单配置已删除')
+      toast.success(t('pages.menuSync.menuConfigDeleted'))
 
       // 更新选中状态
       if (selectedMenuGroupId === groupId) {
@@ -539,7 +539,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       }
 
     } catch (error: any) {
-      toast.error(error.message || '删除菜单失败')
+      toast.error(error.message || t('pages.menuSync.menuDeleteFailed'))
     } finally {
       setMenuGroupLoading(false)
     }
@@ -551,7 +551,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
     const tenantId = getTenantId()
     if (!tenantId) {
-      toast.error('无法获取租户信息')
+      toast.error(t('pages.menuSync.noTenantInfo'))
       return
     }
 
@@ -650,7 +650,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       await Promise.all(savePromises)
 
       const savedCount = modifiedItems.size + modifiedModifiers.size
-      toast.success(`配置保存成功（共 ${savedCount} 项更改），请点击"菜单同步"按钮来应用更改`)
+      toast.success(t('pages.menuSync.configSavedApplyHint', { count: savedCount }))
 
       // 清空修改状态
       setModifiedItems(new Map())
@@ -659,7 +659,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       // 重新加载配置
       loadMenuConfig(menuGroupId)
     } catch (error: any) {
-      toast.error(error.message || '保存失败')
+      toast.error(error.message || t('pages.menuSync.saveFailed'))
     } finally {
       setConfigSaving(false)
       setModifierSaving(false)
@@ -669,19 +669,19 @@ const MenuSync: React.FC<MenuSyncProps> = ({
   // 基于配置同步
   const handleSyncWithConfig = async () => {
     if (!integrationId) {
-      toast.error('缺少集成信息')
+      toast.error(t('pages.menuSync.missingIntegrationInfo'))
       return
     }
 
     // 检查是否已有菜单
     if (menuGroups.length === 0) {
-      toast.error('请先创建至少一个菜单')
+      toast.error(t('pages.menuSync.pleaseCreateMenuFirst'))
       return
     }
 
     // 检查是否选择了菜单
     if (!activeTab) {
-      toast.warning('请先选择要同步的菜单')
+      toast.warning(t('pages.menuSync.pleaseSelectMenuToSync'))
       return
     }
 
@@ -692,13 +692,13 @@ const MenuSync: React.FC<MenuSyncProps> = ({
   // 处理菜单配置确认 - 同步所有菜单到 Uber
   const handleConfirmMenuConfig = async () => {
     if (!integrationId) {
-      toast.error('缺少集成信息')
+      toast.error(t('pages.menuSync.missingIntegrationInfo'))
       return
     }
 
     const tenantId = getTenantId()
     if (!tenantId) {
-      toast.error('无法获取租户信息')
+      toast.error(t('pages.menuSync.noTenantInfo'))
       return
     }
 
@@ -718,13 +718,13 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         integrationId
       )
 
-      toast.success('✓ 菜单已成功同步到 Uber')
+      toast.success(t('pages.menuSync.menuSyncedToUberSuccess'))
       setMenuConfigModalVisible(false)
 
       // 重新加载菜单组
       await loadMenuGroups()
     } catch (error: any) {
-      toast.error(error.message || '同步失败')
+      toast.error(error.message || t('pages.menuSync.syncFailed'))
     } finally {
       setPOSSyncing(false)
     }
@@ -733,7 +733,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
   // 统一调价功能
   const handleApplyPriceAdjustment = () => {
     if (priceAdjustmentPercent === undefined) {
-      toast.warning('请输入调价百分比')
+      toast.warning(t('pages.menuSync.pleaseEnterAdjustPercent'))
       return
     }
     const percent = priceAdjustmentPercent
@@ -778,7 +778,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
     setPriceAdjustmentModalVisible(false)
     setPriceAdjustmentPercent(undefined)
-    toast.success(`已应用 ${percent > 0 ? '+' : ''}${percent}% 的调价`)
+    toast.success(t('pages.menuSync.priceAdjustmentApplied', { sign: percent > 0 ? '+' : '', percent }))
   }
 
   const handleOpenItemsDrawer = async (category: any) => {
@@ -794,7 +794,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
   const handleAddItems = async () => {
     if (!selectedCategory || selectedItems.length === 0) {
-      toast.warning('请选择商品')
+      toast.warning(t('pages.menuSync.pleaseSelectItems'))
       return
     }
 
@@ -813,7 +813,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         )
       }
 
-      toast.success(`添加了 ${newItemIds.length} 个商品`)
+      toast.success(t('pages.menuSync.addedItemsCount', { count: newItemIds.length }))
       // 更新分类商品列表、全局分类和当前菜单分类
       await Promise.all([
         loadCategoryItems(selectedCategory.id),
@@ -822,14 +822,14 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       ])
       setSelectedItems([])
     } catch (error: any) {
-      toast.error(error.message || '添加失败')
+      toast.error(error.message || t('pages.menuSync.addFailed'))
     }
   }
 
   const handleRemoveItem = async (itemId: string) => {
     try {
       await uberService.removeItemFromMenuCategory(itemId)
-      toast.success('移除成功')
+      toast.success(t('pages.menuSync.removeSuccess'))
       // 更新分类商品列表、全局分类和当前菜单分类
       await Promise.all([
         loadCategoryItems(selectedCategory!.id),
@@ -837,7 +837,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         activeTab ? loadMenuCategoriesForCurrentMenu(activeTab) : Promise.resolve()
       ])
     } catch (error: any) {
-      toast.error(error.message || '移除失败')
+      toast.error(error.message || t('pages.menuSync.removeItemFailed'))
     }
   }
 
@@ -937,7 +937,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
       console.log('准备保存的自定义选项配置:', modifiersToSave)
       await uberMenuSyncService.saveModifierConfig(integrationId, modifiersToSave)
-      toast.success('自定义选项配置保存成功，请点击"菜单同步"按钮来应用更改')
+      toast.success(t('pages.menuSync.modifierConfigSavedApplyHint'))
       setModifiedModifiers(new Map())
 
       // 重新加载
@@ -949,7 +949,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         setModifierConfigs(newModifierConfigs)
       }
     } catch (error: any) {
-      toast.error(error.message || '保存失败')
+      toast.error(error.message || t('pages.menuSync.saveFailed'))
     } finally {
       setModifierSaving(false)
     }
@@ -987,10 +987,10 @@ const MenuSync: React.FC<MenuSyncProps> = ({
     <div>
       {/* 统计信息 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <StatBox value={stats.total} label="总商品数" color="text-blue-600" />
-        <StatBox value={stats.enabled} label="已启用" color="text-green-600" />
-        <StatBox value={stats.customPrice} label="自定义价格" color="text-amber-500" />
-        <StatBox value={modifiedItems.size} label="待保存更改" color="text-slate-700" />
+        <StatBox value={stats.total} label={t('pages.menuSync.totalItemsLabel')} color="text-blue-600" />
+        <StatBox value={stats.enabled} label={t('pages.menuSync.enabledLabel')} color="text-green-600" />
+        <StatBox value={stats.customPrice} label={t('pages.menuSync.customPriceLabel')} color="text-amber-500" />
+        <StatBox value={modifiedItems.size} label={t('pages.menuSync.pendingChangesLabel')} color="text-slate-700" />
       </div>
 
       {/* 操作按钮 */}
@@ -1001,10 +1001,10 @@ const MenuSync: React.FC<MenuSyncProps> = ({
           onClick={() => loadMenuConfig(activeTab)}
           loading={configLoading}
         >
-          刷新配置
+          {t('pages.menuSync.refreshConfig')}
         </Btn>
         <Btn variant="secondary" onClick={() => setPriceAdjustmentModalVisible(true)}>
-          统一调价
+          {t('pages.menuSync.uniformPriceAdjust')}
         </Btn>
         <Btn
           variant="primary"
@@ -1013,7 +1013,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
           loading={configSaving || modifierSaving}
           disabled={modifiedItems.size === 0 && modifiedModifiers.size === 0}
         >
-          保存配置 {(modifiedItems.size + modifiedModifiers.size) > 0 && `(${modifiedItems.size + modifiedModifiers.size})`}
+          {t('pages.menuSync.saveConfigBtn')} {(modifiedItems.size + modifiedModifiers.size) > 0 && `(${modifiedItems.size + modifiedModifiers.size})`}
         </Btn>
       </div>
 
@@ -1056,7 +1056,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                     )}
                     {hasModifiers && (
                       <Badge variant="green">
-                        {modifiers.length} 个自定义选项
+                        {t('pages.menuSync.modifiersCount', { count: modifiers.length })}
                       </Badge>
                     )}
                   </div>
@@ -1064,7 +1064,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
                 {/* POS 价格 */}
                 <div className="text-center">
-                  <div className="text-[11px] text-slate-400 mb-1">POS 价格</div>
+                  <div className="text-[11px] text-slate-400 mb-1">{t('pages.menuSync.posPriceLabel')}</div>
                   <div className="font-medium text-sm text-slate-700">
                     ${(item.posPrice / 100).toFixed(2)}
                   </div>
@@ -1072,9 +1072,9 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
                 {/* Uber 价格输入 */}
                 <div>
-                  <div className="text-[11px] text-slate-400 mb-1">Uber 价格</div>
+                  <div className="text-[11px] text-slate-400 mb-1">{t('pages.menuSync.uberPriceLabel')}</div>
                   <MoneyInput
-                    placeholder="使用 POS 价格"
+                    placeholder={t('pages.menuSync.usePosPricePlaceholder')}
                     value={uberPriceCents ? uberPriceCents / 100 : undefined}
                     onChange={(val) => handleConfigChange(
                       item.posItemId,
@@ -1089,15 +1089,15 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
                 {/* 同步状态 */}
                 <div className="text-center">
-                  {!item.syncStatus && <Badge variant="default">未同步</Badge>}
+                  {!item.syncStatus && <Badge variant="default">{t('pages.menuSync.notSynced')}</Badge>}
                   {item.syncStatus === 'success' && (
-                    <span title={item.lastSyncedAt ? `最后同步: ${new Date(item.lastSyncedAt).toLocaleString()}` : ''}>
-                      <Badge variant="green" icon={<CheckCircle2 className="w-3 h-3" />}>已同步</Badge>
+                    <span title={item.lastSyncedAt ? t('pages.menuSync.lastSyncedAt', { time: new Date(item.lastSyncedAt).toLocaleString() }) : ''}>
+                      <Badge variant="green" icon={<CheckCircle2 className="w-3 h-3" />}>{t('pages.menuSync.syncedLabel')}</Badge>
                     </span>
                   )}
                   {item.syncStatus === 'error' && (
                     <span title={item.syncError}>
-                      <Badge variant="red" icon={<XCircle className="w-3 h-3" />}>失败</Badge>
+                      <Badge variant="red" icon={<XCircle className="w-3 h-3" />}>{t('pages.menuSync.failedLabel')}</Badge>
                     </span>
                   )}
                 </div>
@@ -1108,7 +1108,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                 <div className="p-3.5 border border-slate-200 border-t-0 bg-slate-100 flex flex-wrap gap-2.5 items-start rounded-b-lg">
                   <div className="w-full mb-2">
                     <span className="font-semibold text-[13px] text-slate-700">
-                      自定义选项 ({modifiers.length})
+                      {t('pages.menuSync.customOptionsCount', { count: modifiers.length })}
                     </span>
                   </div>
                   {modifiers.map((mod) => {
@@ -1132,7 +1132,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                         {/* 启用状态 */}
                         {!mod.enabled && (
                           <div className="mb-1">
-                            <Badge variant="red">禁用</Badge>
+                            <Badge variant="red">{t('pages.menuSync.disabledLabel')}</Badge>
                           </div>
                         )}
 
@@ -1196,20 +1196,20 @@ const MenuSync: React.FC<MenuSyncProps> = ({
               i // displayOrder
             )
           }
-          toast.success(`已添加「${categoryName}」及其 ${itemsToAdd.length} 个商品到配置列表`)
+          toast.success(t('pages.menuSync.addedCategoryWithItemsToConfig', { name: categoryName, count: itemsToAdd.length }))
         } catch (error: any) {
           console.error('自动添加商品失败:', error)
-          toast.warning(`已添加分类，但自动添加商品失败: ${error.message}`)
+          toast.warning(t('pages.menuSync.categoryAddedItemsAutoAddFailed', { message: error.message }))
         }
       } else {
-        toast.success(`已添加「${categoryName}」到配置列表`)
+        toast.success(t('pages.menuSync.addedCategoryToConfig', { name: categoryName }))
       }
 
       // 添加到选中列表
       setSelectedSystemCategories([...selectedSystemCategories, sysCategory])
       await loadUberCategories()
     } catch (error: any) {
-      toast.error(error.message || '添加分类失败')
+      toast.error(error.message || t('pages.menuSync.addCategoryFailed'))
     } finally {
       setcategoryLoading(false)
     }
@@ -1239,10 +1239,10 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       }
       setSystemToUberCategoryMap(newMap)
 
-      toast.success(`已删除「${categoryName}」`)
+      toast.success(t('pages.menuSync.deletedCategoryNamed', { name: categoryName }))
       await loadUberCategories()
     } catch (error: any) {
-      toast.error(error.message || '删除失败')
+      toast.error(error.message || t('pages.menuSync.deleteFailed'))
     } finally {
       setcategoryLoading(false)
     }
@@ -1264,7 +1264,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       }
       await loadUberCategories()
     } catch (error: any) {
-      toast.error('更新顺序失败')
+      toast.error(t('pages.menuSync.updateOrderFailed'))
     }
   }
 
@@ -1284,14 +1284,14 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       }
       await loadUberCategories()
     } catch (error: any) {
-      toast.error('更新顺序失败')
+      toast.error(t('pages.menuSync.updateOrderFailed'))
     }
   }
 
   // 添加自定义分类
   const handleAddCustomCategory = async () => {
     if (!customCategoryName.trim()) {
-      toast.warning('请输入分类名称')
+      toast.warning(t('pages.menuSync.pleaseEnterCategoryName'))
       return
     }
 
@@ -1303,7 +1303,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         selectedSystemCategories.length
       )
 
-      toast.success(`已创建自定义分类「${customCategoryName}」`)
+      toast.success(t('pages.menuSync.customCategoryCreated', { name: customCategoryName }))
       setCustomCategoryName('')
 
       // 先重新加载全局分类列表,确保新分类已经存在
@@ -1321,7 +1321,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
           )
           // 添加成功后重新加载菜单分类列表
           await loadMenuCategoriesForCurrentMenu(activeTab)
-          toast.success('新分类已自动添加到当前菜单')
+          toast.success(t('pages.menuSync.newCategoryAutoAddedToMenu'))
         } catch (error: any) {
           console.warn('自动添加分类到菜单失败:', error)
           // 即使添加失败也要加载菜单分类,确保UI状态正确
@@ -1336,7 +1336,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         await loadMenuCategoriesForCurrentMenu(activeTab)
       }
     } catch (error: any) {
-      toast.error(error.message || '创建分类失败')
+      toast.error(error.message || t('pages.menuSync.createCategoryFailed'))
     } finally {
       setcategoryLoading(false)
     }
@@ -1345,13 +1345,13 @@ const MenuSync: React.FC<MenuSyncProps> = ({
   // 清理菜单处理函数（由 ConfirmDialog 触发）
   const handleClearMenu = async () => {
     if (!integrationId) {
-      toast.error('缺少集成ID')
+      toast.error(t('pages.menuSync.missingIntegrationId'))
       return
     }
 
     try {
       setClearingMenu(true)
-      toast.info('正在清理菜单...')
+      toast.info(t('pages.menuSync.clearingMenu'))
 
       const result = await uberMenuSyncService.clearMenuItems(
         merchantId,
@@ -1363,12 +1363,12 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       await loadMenuConfig()
 
       if (result.success) {
-        toast.success('✓ 菜单已清理')
+        toast.success(t('pages.menuSync.menuClearedSuccess'))
       } else {
-        toast.warning(result.message || '菜单清理完成但可能有错误')
+        toast.warning(result.message || t('pages.menuSync.menuClearedWithErrors'))
       }
     } catch (error: any) {
-      toast.error(error.message || '清理菜单失败，请重试')
+      toast.error(error.message || t('pages.menuSync.clearMenuFailed'))
       console.error('清理菜单错误:', error)
     } finally {
       setClearingMenu(false)
@@ -1420,11 +1420,11 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                         <div className="text-[15px] font-medium mb-1 flex items-center gap-2 text-slate-900">
                           {cat.name}
                           {isSystemMenuCategory(cat) && (
-                            <Badge variant="blue">系统分类</Badge>
+                            <Badge variant="blue">{t('pages.menuSync.systemCategoryBadge')}</Badge>
                           )}
                         </div>
                         <div className="text-xs text-slate-400">
-                          已配置 <strong>{cat.itemCount || 0}</strong> 个商品
+                          {t('pages.menuSync.configuredItemsCountPrefix')} <strong>{cat.itemCount || 0}</strong> {t('pages.menuSync.itemsUnit')}
                         </div>
                       </div>
                     </div>
@@ -1465,7 +1465,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                         icon={<LayoutGrid className="w-4 h-4" />}
                         onClick={() => handleOpenItemsDrawer(cat)}
                       >
-                        配置商品
+                        {t('pages.menuSync.configItemsBtn')}
                       </Btn>
 
                       <Btn
@@ -1486,9 +1486,9 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         {/* 从系统分类添加 */}
         {systemCategories.length > 0 && (
           <div className="mb-6">
-            <SectionCard title="从 POS 系统分类添加">
+            <SectionCard title={t('pages.menuSync.addFromPosCategoriesTitle')}>
               <p className="text-slate-500 mb-4 text-xs">
-                点击下方分类可将其添加到当前菜单
+                {t('pages.menuSync.clickCategoryToAddHint')}
               </p>
               <div className="flex gap-3 flex-wrap">
                 {systemCategories
@@ -1545,21 +1545,21 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                                   index
                                 ).catch((err: any) => {
                                   // 忽略"商品已存在"的错误
-                                  if (!err.message?.includes('已在此分类中')) {
+                                  if (!err.message?.includes(t('pages.menuSync.alreadyInCategoryErrText'))) {
                                     throw err
                                   }
                                 })
                               )
                               await Promise.all(addPromises)
-                              toast.success(`已添加分类 "${categoryName}" 及其 ${catItems.length} 个商品到当前菜单`)
+                              toast.success(t('pages.menuSync.addedCategoryWithItemsToCurrentMenu', { name: categoryName, count: catItems.length }))
                             } else {
-                              toast.success(`已添加分类 "${categoryName}" 到当前菜单`)
+                              toast.success(t('pages.menuSync.addedCategoryToCurrentMenu', { name: categoryName }))
                             }
 
                             // 重新加载 Uber 分类列表
                             await loadUberCategories()
                           } catch (error: any) {
-                            toast.error(error.message || '添加分类失败')
+                            toast.error(error.message || t('pages.menuSync.addCategoryFailed'))
                           } finally {
                             setMenuCategoriesLoading(false)
                           }
@@ -1568,7 +1568,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                         <div className="text-center">
                           <div className="font-medium">+ {categoryName}</div>
                           <div className="text-xs mt-1 text-slate-400">
-                            {totalItemCount} 个商品
+                            {t('pages.menuSync.itemsCountSuffix', { count: totalItemCount })}
                           </div>
                         </div>
                       </Btn>
@@ -1582,7 +1582,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         {/* 添加分类 */}
         {availableCategoriesForMenu.length > 0 && (
           <div className="mb-6">
-            <SectionCard title="从全局分类添加">
+            <SectionCard title={t('pages.menuSync.addFromGlobalCategoriesTitle')}>
               <div className="flex gap-3 flex-wrap">
                 {availableCategoriesForMenu.map((cat: any) => (
                   <Btn
@@ -1596,7 +1596,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                       <div className="font-medium">+ {cat.name}</div>
                       {cat.itemCount > 0 && (
                         <div className="text-xs mt-1 text-slate-400">
-                          {cat.itemCount} 个商品
+                          {t('pages.menuSync.itemsCountSuffix', { count: cat.itemCount })}
                         </div>
                       )}
                     </div>
@@ -1609,10 +1609,10 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
         {/* 创建新分类 */}
         <div className="mb-6">
-          <SectionCard title="创建新分类">
+          <SectionCard title={t('pages.menuSync.createNewCategoryTitle')}>
             <div className="flex gap-2">
               <TextInput
-                placeholder="输入分类名称，如「早餐」、「限时优惠」"
+                placeholder={t('pages.menuSync.categoryNameExamplePlaceholder')}
                 value={customCategoryName}
                 onChange={setCustomCategoryName}
                 className="flex-1"
@@ -1624,13 +1624,13 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                 loading={categoryLoading}
                 className="w-[140px]"
               >
-                创建分类
+                {t('pages.menuSync.createCategoryBtn')}
               </Btn>
             </div>
           </SectionCard>
         </div>
 
-        {renderItemsDrawer(selectedCategory ? `为「${selectedCategory.name}」配置商品` : '配置分类商品')}
+        {renderItemsDrawer(selectedCategory ? t('pages.menuSync.configItemsForCategory', { name: selectedCategory.name }) : t('pages.menuSync.configCategoryItems'))}
       </div>
     )
   }
@@ -1652,19 +1652,19 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         <div>
           {/* 已添加的商品列表 */}
           <div className="mb-6">
-            <h4 className="text-sm font-semibold text-slate-900 mb-3">已配置的商品 ({categoryItems.length})</h4>
+            <h4 className="text-sm font-semibold text-slate-900 mb-3">{t('pages.menuSync.configuredItemsCount', { count: categoryItems.length })}</h4>
             {categoryItems.length === 0 ? (
-              <EmptyState title="该分类还没有配置任何商品。从下方添加。" />
+              <EmptyState title={t('pages.menuSync.noItemsInCategoryHint')} />
             ) : (
               <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
                 {categoryItems.map(item => (
                   <div key={item.id} className="flex items-center justify-between px-3 py-2">
                     <div className="min-w-0">
                       <div className="text-sm text-slate-700 truncate">{getItemName(item)}</div>
-                      <div className="text-xs text-slate-400">顺序: {item.displayOrder}</div>
+                      <div className="text-xs text-slate-400">{t('pages.menuSync.orderLabel')}: {item.displayOrder}</div>
                     </div>
                     <Btn variant="link" size="sm" className="text-red-500!" onClick={() => handleRemoveItem(item.id)}>
-                      移除
+                      {t('pages.menuSync.removeBtn')}
                     </Btn>
                   </div>
                 ))}
@@ -1674,16 +1674,16 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
           {/* 添加商品 */}
           <div className="pt-4 border-t border-slate-100">
-            <h4 className="text-sm font-semibold text-slate-900 mb-1">添加商品</h4>
+            <h4 className="text-sm font-semibold text-slate-900 mb-1">{t('pages.menuSync.addItemsTitle')}</h4>
             <p className="text-xs text-slate-400 mb-3">
-              从下方选择要添加到该分类的商品。选中后点击「确认添加」。
+              {t('pages.menuSync.addItemsHint')}
             </p>
             {itemsLoading ? (
               <Spinner className="!py-8" />
             ) : (
               <>
                 <TextInput
-                  placeholder="搜索商品..."
+                  placeholder={t('pages.menuSync.searchItemsPlaceholder')}
                   value={itemSearch}
                   onChange={setItemSearch}
                   className="mb-3"
@@ -1709,7 +1709,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                   {(Array.isArray(posItems)
                     ? posItems.filter(item => !categoryItems.find(ci => ci.posItemId === item.id)).length === 0
                     : true) && (
-                    <div className="px-3 py-4 text-center text-sm text-slate-400">暂无可添加的商品</div>
+                    <div className="px-3 py-4 text-center text-sm text-slate-400">{t('pages.menuSync.noItemsToAdd')}</div>
                   )}
                 </div>
               </>
@@ -1720,7 +1720,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
               disabled={selectedItems.length === 0}
               className="w-full"
             >
-              确认添加 ({selectedItems.length} 个)
+              {t('pages.menuSync.confirmAddCount', { count: selectedItems.length })}
             </Btn>
           </div>
         </div>
@@ -1768,13 +1768,13 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       <div>
         {/* 系统分类选择区 */}
         <div className="mb-6">
-          <SectionCard title="1. 选择系统分类">
+          <SectionCard title={t('pages.menuSync.step1SelectSystemCategoryTitle')}>
             {systemCategories.length === 0 ? (
-              <EmptyState title="系统中没有分类。请先在 POS 系统中创建分类。" />
+              <EmptyState title={t('pages.menuSync.noSystemCategoriesHint')} />
             ) : (
               <div>
                 <p className="text-slate-500 mb-4 text-xs">
-                  点击下方的分类卡片可将其添加到下方的配置列表中进行排序和商品配置。
+                  {t('pages.menuSync.clickCategoryCardHint')}
                 </p>
                 <div className="flex gap-3 flex-wrap">
                   {systemCategories.map((sysCategory: any) => {
@@ -1812,16 +1812,16 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                           <div className="text-xs mt-1">
                             {isSelected ? (
                               <>
-                                已配置 <strong>{configuredItemCount}</strong> 个商品
+                                {t('pages.menuSync.configuredItemsCountPrefix')} <strong>{configuredItemCount}</strong> {t('pages.menuSync.itemsUnit')}
                                 {configuredItemCount < totalItemCount && (
                                   <div className="text-[11px] mt-0.5 opacity-70">
-                                    (共 {totalItemCount} 个)
+                                    {t('pages.menuSync.totalItemsSuffix', { count: totalItemCount })}
                                   </div>
                                 )}
                               </>
                             ) : (
                               <>
-                                {totalItemCount} 个商品
+                                {t('pages.menuSync.itemsCountSuffix', { count: totalItemCount })}
                               </>
                             )}
                           </div>
@@ -1840,13 +1840,13 @@ const MenuSync: React.FC<MenuSyncProps> = ({
           <SectionCard
             title={
               <span className="flex items-center gap-2">
-                <span>2. 配置菜单分类</span>
+                <span>{t('pages.menuSync.step2ConfigMenuCategoriesTitle')}</span>
                 <Badge variant="blue">{allConfiguredCategories.length}</Badge>
               </span>
             }
           >
             {allConfiguredCategories.length === 0 ? (
-              <EmptyState title="还没有配置任何菜单分类。请从上方选择系统分类或创建自定义分类。" />
+              <EmptyState title={t('pages.menuSync.noMenuCategoriesConfiguredHint')} />
             ) : (
               <div className="flex flex-col gap-3">
                 {allConfiguredCategories.map((uberCategory: any, index: number) => {
@@ -1877,12 +1877,12 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                           </div>
                           <div className="text-xs text-slate-400 flex items-center gap-2">
                             {isSystemCategory ? (
-                              <Badge variant="blue">系统分类</Badge>
+                              <Badge variant="blue">{t('pages.menuSync.systemCategoryBadge')}</Badge>
                             ) : (
-                              <Badge variant="gold">自定义分类</Badge>
+                              <Badge variant="gold">{t('pages.menuSync.customCategoryBadge')}</Badge>
                             )}
                             <span>
-                              已配置 <strong>{itemCount}</strong> 个商品
+                              {t('pages.menuSync.configuredItemsCountPrefix')} <strong>{itemCount}</strong> {t('pages.menuSync.itemsUnit')}
                             </span>
                           </div>
                         </div>
@@ -1914,7 +1914,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                           icon={<LayoutGrid className="w-4 h-4" />}
                           onClick={() => handleOpenItemsDrawer(uberCategory)}
                         >
-                          配置商品
+                          {t('pages.menuSync.configItemsBtn')}
                         </Btn>
 
                         {/* 删除按钮 */}
@@ -1935,10 +1935,10 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
         {/* 创建自定义分类区 */}
         <div className="mb-4">
-          <SectionCard title="3. 创建自定义分类（可选）">
+          <SectionCard title={t('pages.menuSync.step3CreateCustomCategoryTitle')}>
             <div className="flex gap-2">
               <TextInput
-                placeholder="输入自定义分类名称，如「限时优惠」、「新品推荐」"
+                placeholder={t('pages.menuSync.customCategoryNameExamplePlaceholder')}
                 value={customCategoryName}
                 onChange={setCustomCategoryName}
                 className="flex-1"
@@ -1950,13 +1950,13 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                 loading={categoryLoading}
                 className="w-[140px]"
               >
-                创建分类
+                {t('pages.menuSync.createCategoryBtn')}
               </Btn>
             </div>
           </SectionCard>
         </div>
 
-        {renderItemsDrawer(selectedCategory ? `为「${selectedCategory.name || selectedCategory.displayName}」配置商品` : '配置分类商品')}
+        {renderItemsDrawer(selectedCategory ? t('pages.menuSync.configItemsForCategory', { name: selectedCategory.name || selectedCategory.displayName }) : t('pages.menuSync.configCategoryItems'))}
       </div>
     )
   }
@@ -1969,7 +1969,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
     return (
       <div className="mb-6">
         <SectionCard
-          title="营业时间设置"
+          title={t('pages.menuSync.businessHoursSetting')}
           action={
             <div className="flex items-center gap-2">
               <Btn
@@ -1982,7 +1982,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                   setMenuGroupModalVisible(true)
                 }}
               >
-                编辑菜单信息
+                {t('pages.menuSync.editMenuInfo')}
               </Btn>
               <Btn
                 variant="danger"
@@ -1990,7 +1990,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                 icon={<Trash2 className="w-4 h-4" />}
                 onClick={() => setDeleteMenuGroupTarget(menuGroup)}
               >
-                删除菜单
+                {t('pages.menuSync.deleteMenu')}
               </Btn>
             </div>
           }
@@ -1999,13 +1999,13 @@ const MenuSync: React.FC<MenuSyncProps> = ({
             {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
               const times = currentAvailability[day] || []
               const dayNames: Record<string, string> = {
-                monday: '周一',
-                tuesday: '周二',
-                wednesday: '周三',
-                thursday: '周四',
-                friday: '周五',
-                saturday: '周六',
-                sunday: '周日'
+                monday: t('organization.weekdayMonday'),
+                tuesday: t('organization.weekdayTuesday'),
+                wednesday: t('organization.weekdayWednesday'),
+                thursday: t('organization.weekdayThursday'),
+                friday: t('organization.weekdayFriday'),
+                saturday: t('organization.weekdaySaturday'),
+                sunday: t('organization.weekdaySunday')
               }
               return (
                 <div key={day} className="flex items-center gap-1.5 text-xs">
@@ -2016,7 +2016,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                     {Array.isArray(times) && times.length > 0 ? (
                       times.map((time: any) => `${time.startTime}-${time.endTime}`).join(',')
                     ) : (
-                      <span className="text-slate-400">休</span>
+                      <span className="text-slate-400">{t('organization.closedLabel')}</span>
                     )}
                   </span>
                 </div>
@@ -2030,15 +2030,15 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
   // 菜单内容子 Tab 项
   const subTabItems = [
-    { key: 'categories', label: '分类管理', icon: <LayoutGrid className="w-4 h-4" /> },
-    { key: 'items', label: '商品配置', icon: <Settings className="w-4 h-4" /> },
+    { key: 'categories', label: t('pages.menuSync.categoryManagementTab'), icon: <LayoutGrid className="w-4 h-4" /> },
+    { key: 'items', label: t('pages.menuSync.itemConfigTab'), icon: <Settings className="w-4 h-4" /> },
   ]
 
   // 自定义选项模态框表格列
   const modifierColumns: Column<ModifierConfigItem>[] = [
     {
       key: 'enabled',
-      title: '启用',
+      title: t('pages.menuSync.enabledColumnTitle'),
       width: 60,
       render: (record) => (
         <Checkbox
@@ -2049,31 +2049,31 @@ const MenuSync: React.FC<MenuSyncProps> = ({
     },
     {
       key: 'modifierGroupName',
-      title: '自定义选项',
+      title: t('pages.menuSync.modifierColumnTitle'),
       width: 120,
       render: (record) => <Badge variant="blue">{record.modifierGroupName}</Badge>
     },
     {
       key: 'modifierOptionName',
-      title: '选项名称',
+      title: t('pages.menuSync.optionNameColumnTitle'),
       width: 150,
       render: (record) => record.modifierOptionName
     },
     {
       key: 'posPrice',
-      title: 'POS 价格',
+      title: t('pages.menuSync.posPriceColumnTitle'),
       width: 100,
       render: (record) => `$${(record.posPrice / 100).toFixed(2)}`
     },
     {
       key: 'uberPrice',
-      title: 'Uber 价格',
+      title: t('pages.menuSync.uberPriceColumnTitle'),
       width: 150,
       render: (record) => {
         const currentValue = getModifierEffectiveValue(record, 'uberPrice') as number | undefined
         return (
           <MoneyInput
-            placeholder="使用 POS"
+            placeholder={t('pages.menuSync.usePosPricePlaceholder')}
             value={currentValue !== undefined && currentValue !== null ? currentValue / 100 : undefined}
             onChange={(val) => handleModifierChange(
               record.posItemId,
@@ -2091,7 +2091,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
     },
     {
       key: 'effectivePrice',
-      title: '实际价格',
+      title: t('pages.menuSync.effectivePriceColumnTitle'),
       width: 100,
       render: (record) => {
         const uberPrice = getModifierEffectiveValue(record, 'uberPrice') as number | undefined
@@ -2107,11 +2107,11 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         title={
           <span className="flex items-center gap-2.5">
             <Upload className="w-5 h-5 text-blue-600" />
-            <span>菜单同步</span>
+            <span>{t('pages.menuSync.title')}</span>
             {modifiedItems.size > 0 && (
               <span
                 className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[11px] font-medium"
-                title="待保存的更改"
+                title={t('pages.menuSync.pendingChangesLabel')}
               >
                 {modifiedItems.size}
               </span>
@@ -2127,7 +2127,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
               loading={posSyncing}
               disabled={stats.enabled === 0}
             >
-              同步到 Uber
+              {t('pages.menuSync.syncToUberBtn')}
             </Btn>
             <Btn
               variant="danger"
@@ -2135,7 +2135,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
               loading={clearingMenu}
               onClick={() => setClearMenuConfirmOpen(true)}
             >
-              清理菜单
+              {t('pages.menuSync.clearMenuBtn')}
             </Btn>
           </div>
         ) : undefined}
@@ -2157,7 +2157,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                   />
                 ) : (
                   <Tabs
-                    items={[{ key: 'empty', label: '暂无菜单' }]}
+                    items={[{ key: 'empty', label: t('pages.menuSync.noMenuYet') }]}
                     value="empty"
                     onChange={() => {}}
                   />
@@ -2183,7 +2183,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                   setMenuGroupModalVisible(true)
                 }}
               >
-                新建菜单
+                {t('pages.menuSync.newMenu')}
               </Btn>
             </div>
 
@@ -2208,21 +2208,21 @@ const MenuSync: React.FC<MenuSyncProps> = ({
               })()
             ) : (
               <EmptyState
-                title="还没有创建菜单"
-                description="点击右上角的「新建菜单」按钮创建一个"
+                title={t('pages.menuSync.noMenuCreatedTitle')}
+                description={t('pages.menuSync.noMenuCreatedDesc')}
               />
             )}
           </>
         ) : (
           <div className="text-center py-10 text-slate-400">
-            <p>请先完成 Uber 店铺绑定后再配置菜单同步</p>
+            <p>{t('pages.menuSync.pleaseCompleteUberBindingHint')}</p>
           </div>
         )}
       </SectionCard>
 
       {/* 统一调价模态框 */}
       <Modal
-        title="统一调价工具"
+        title={t('pages.menuSync.priceAdjustmentToolTitle')}
         open={priceAdjustmentModalVisible}
         onOpenChange={(v) => {
           if (!v) {
@@ -2237,25 +2237,25 @@ const MenuSync: React.FC<MenuSyncProps> = ({
               setPriceAdjustmentModalVisible(false)
               setPriceAdjustmentPercent(undefined)
             }}>
-              取消
+              {t('common.cancel')}
             </Btn>
             <Btn variant="primary" onClick={handleApplyPriceAdjustment}>
-              应用调价
+              {t('pages.menuSync.applyPriceAdjustmentBtn')}
             </Btn>
           </>
         }
       >
         <div>
           <p className="mb-4 text-slate-500 text-sm">
-            输入调价百分比，系统将对所有商品进行统一调价。正数为涨价，负数为降价。
+            {t('pages.menuSync.priceAdjustmentDesc')}
           </p>
           <div className="mb-2">
-            <label className="block mb-2 font-medium text-sm text-slate-700">调价百分比 (%)</label>
+            <label className="block mb-2 font-medium text-sm text-slate-700">{t('pages.menuSync.adjustmentPercentLabel')}</label>
             <div className="flex items-center rounded-lg border border-slate-200 bg-white px-3 focus-within:outline-2 focus-within:outline-slate-900">
               <input
                 type="number"
                 className="w-full bg-transparent py-2 text-sm text-slate-700 focus:outline-none"
-                placeholder="例如：10 表示涨价 10%，-5 表示降价 5%"
+                placeholder={t('pages.menuSync.adjustmentPercentPlaceholder')}
                 value={priceAdjustmentPercent ?? ''}
                 onChange={(e) => setPriceAdjustmentPercent(e.target.value === '' ? undefined : Number(e.target.value))}
                 step={0.1}
@@ -2267,7 +2267,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
           </div>
           {priceAdjustmentPercent !== undefined && (
             <div className="p-3 bg-blue-50 rounded mt-4 border-l-[3px] border-blue-600">
-              <div className="text-[13px] text-slate-700 mb-2">调价示例：</div>
+              <div className="text-[13px] text-slate-700 mb-2">{t('pages.menuSync.adjustmentExampleLabel')}</div>
               {configItems.slice(0, 2).map(item => {
                 const posPrice = item.posPrice / 100
                 const adjustedPrice = posPrice * (1 + priceAdjustmentPercent / 100)
@@ -2290,7 +2290,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                         })}
                         {modifiers.length > 2 && (
                           <div className="text-[11px] mb-0.5">
-                            └ ... 还有 {modifiers.length - 2} 个选项
+                            {t('pages.menuSync.andMoreOptions', { count: modifiers.length - 2 })}
                           </div>
                         )}
                       </div>
@@ -2300,7 +2300,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
               })}
               {configItems.length > 2 && (
                 <div className="text-xs text-slate-400 mt-1">
-                  ... 共 {configItems.length} 个商品
+                  {t('pages.menuSync.totalItemsCount', { count: configItems.length })}
                 </div>
               )}
             </div>
@@ -2313,7 +2313,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         title={
           <span className="flex items-center gap-2">
             <LayoutGrid className="w-4 h-4" />
-            {editingMenuGroup ? '编辑菜单' : '新建菜单'}
+            {editingMenuGroup ? t('pages.menuSync.editMenu') : t('pages.menuSync.newMenu')}
           </span>
         }
         open={menuGroupModalVisible}
@@ -2328,14 +2328,14 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         footer={
           <>
             <Btn variant="secondary" onClick={() => setMenuGroupModalVisible(false)}>
-              取消
+              {t('common.cancel')}
             </Btn>
             <Btn
               variant="primary"
               loading={menuGroupLoading}
               onClick={() => {
                 if (!menuName.trim()) {
-                  toast.error('菜单名称不能为空')
+                  toast.error(t('pages.menuSync.menuNameRequired'))
                   return
                 }
 
@@ -2348,7 +2348,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                 }
               }}
             >
-              {editingMenuGroup ? '保存更新' : '创建菜单'}
+              {editingMenuGroup ? t('pages.menuSync.saveUpdateBtn') : t('pages.menuSync.createMenu')}
             </Btn>
           </>
         }
@@ -2356,9 +2356,9 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         <div className="flex flex-col gap-4">
           {/* 菜单名称 */}
           <div>
-            <label className="block mb-1.5 font-medium text-sm text-slate-700">菜单名称</label>
+            <label className="block mb-1.5 font-medium text-sm text-slate-700">{t('pages.menuSync.menuName')}</label>
             <TextInput
-              placeholder="例如: 早餐菜单、午餐菜单、晚餐菜单"
+              placeholder={t('pages.menuSync.menuNamePlaceholder')}
               value={menuName}
               onChange={setMenuName}
             />
@@ -2366,18 +2366,18 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
           {/* 营业时间 - 紧凑横向展示 */}
           <div>
-            <label className="block mb-2 font-medium text-sm text-slate-700">营业时间（周一至周日）</label>
+            <label className="block mb-2 font-medium text-sm text-slate-700">{t('pages.menuSync.businessHours')}</label>
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
               {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
                 const times = serviceAvailability.get(day) || []
                 const dayNames: Record<string, string> = {
-                  monday: '周一',
-                  tuesday: '周二',
-                  wednesday: '周三',
-                  thursday: '周四',
-                  friday: '周五',
-                  saturday: '周六',
-                  sunday: '周日'
+                  monday: t('organization.weekdayMonday'),
+                  tuesday: t('organization.weekdayTuesday'),
+                  wednesday: t('organization.weekdayWednesday'),
+                  thursday: t('organization.weekdayThursday'),
+                  friday: t('organization.weekdayFriday'),
+                  saturday: t('organization.weekdaySaturday'),
+                  sunday: t('organization.weekdaySunday')
                 }
                 return (
                   <div key={day} className="flex gap-1.5 items-start flex-wrap">
@@ -2386,7 +2386,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                     </span>
                     <div className="flex gap-1.5 flex-wrap items-center flex-1">
                       {times.length === 0 ? (
-                        <span className="text-xs text-slate-400 mt-1.5">休息</span>
+                        <span className="text-xs text-slate-400 mt-1.5">{t('pages.menuSync.rest')}</span>
                       ) : (
                         times.map((time, idx) => (
                           <div key={idx} className="flex gap-1 items-center text-xs">
@@ -2457,9 +2457,9 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         title={
           <span className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
-            自定义选项配置 - {currentModifierItem?.posItemName}
+            {t('pages.menuSync.modifierConfigTitle', { name: currentModifierItem?.posItemName })}
             <span className="ml-2 text-xs text-slate-500">
-              (已修改: {modifiedModifiers.size})
+              {t('pages.menuSync.modifiedCountSuffix', { count: modifiedModifiers.size })}
             </span>
           </span>
         }
@@ -2474,7 +2474,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
         footer={
           <>
             <Btn variant="secondary" onClick={() => setModifierModalVisible(false)}>
-              取消
+              {t('common.cancel')}
             </Btn>
             <Btn
               variant="secondary"
@@ -2506,10 +2506,10 @@ const MenuSync: React.FC<MenuSyncProps> = ({
                   })
                 })
                 setModifiedModifiers(newModified)
-                toast.success('已将所有 POS 价格应用到 Uber 价格')
+                toast.success(t('pages.menuSync.appliedAllPosPrices'))
               }}
             >
-              应用 POS 价格
+              {t('pages.menuSync.applyPosPricesBtn')}
             </Btn>
             <Btn
               variant="primary"
@@ -2518,18 +2518,18 @@ const MenuSync: React.FC<MenuSyncProps> = ({
               loading={modifierSaving}
               disabled={modifiedModifiers.size === 0}
             >
-              保存配置 {modifiedModifiers.size > 0 && `(${modifiedModifiers.size})`}
+              {t('pages.menuSync.saveConfigBtn')} {modifiedModifiers.size > 0 && `(${modifiedModifiers.size})`}
             </Btn>
           </>
         }
       >
         {!currentModifierItem ? (
           <div className="text-center py-10 text-slate-400">
-            未选择商品
+            {t('pages.menuSync.noItemSelected')}
           </div>
         ) : (modifierConfigs.get(currentModifierItem.posItemId) || []).length === 0 ? (
           <div className="text-center py-10 text-slate-400">
-            该商品没有自定义选项选项
+            {t('pages.menuSync.itemHasNoModifiers')}
           </div>
         ) : (
           <KitTable
@@ -2542,25 +2542,25 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
       {/* 菜单同步确认模态框 */}
       <Modal
-        title="确认同步所有菜单到 Uber"
+        title={t('pages.menuSync.confirmSyncAllMenusTitle')}
         open={menuConfigModalVisible}
         onOpenChange={(v) => { if (!v) setMenuConfigModalVisible(false) }}
         size="md"
         footer={
           <>
-            <Btn variant="secondary" onClick={() => setMenuConfigModalVisible(false)}>取消</Btn>
-            <Btn variant="primary" loading={posSyncing} onClick={handleConfirmMenuConfig}>确认同步</Btn>
+            <Btn variant="secondary" onClick={() => setMenuConfigModalVisible(false)}>{t('common.cancel')}</Btn>
+            <Btn variant="primary" loading={posSyncing} onClick={handleConfirmMenuConfig}>{t('pages.menuSync.confirmSyncBtn')}</Btn>
           </>
         }
       >
         <div className="text-center">
           <p className="text-sm mb-4 text-slate-700">
-            将同步所有已配置的菜单到 Uber
+            {t('pages.menuSync.willSyncAllMenusDesc')}
           </p>
 
           <div className="bg-slate-50 p-4 rounded mb-4">
             <div className="mb-3">
-              <strong className="text-slate-700">待同步菜单数：</strong>
+              <strong className="text-slate-700">{t('pages.menuSync.menusToSyncCount')}</strong>
               <span className="text-lg text-blue-600 ml-2">
                 {menuGroups.length}
               </span>
@@ -2568,7 +2568,7 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
             {menuGroups.length > 0 && (
               <div className="text-left border-t border-slate-200 pt-3">
-                <strong className="block mb-2 text-slate-700">菜单列表：</strong>
+                <strong className="block mb-2 text-slate-700">{t('pages.menuSync.menuListLabel')}</strong>
                 <div className="max-h-52 overflow-y-auto">
                   {menuGroups.map((menu) => (
                     <div
@@ -2585,15 +2585,15 @@ const MenuSync: React.FC<MenuSyncProps> = ({
 
           <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
             <div className="text-xs text-slate-500">
-              📌 将同时同步配送菜单和自取菜单到 Uber Eats
+              {t('pages.menuSync.deliveryAndPickupSyncNote')}
             </div>
             <div className="text-xs text-slate-400 mt-1">
-              如需禁用自取功能，请在 Uber Eats 后台进行设置
+              {t('pages.menuSync.disablePickupHint')}
             </div>
           </div>
 
           <p className="text-xs text-slate-400 m-0">
-            同步过程中请勿关闭页面，这可能需要几秒钟
+            {t('pages.menuSync.doNotClosePageHint')}
           </p>
         </div>
       </Modal>
@@ -2602,19 +2602,19 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       <ConfirmDialog
         open={clearMenuConfirmOpen}
         onOpenChange={setClearMenuConfirmOpen}
-        title="清理菜单"
+        title={t('pages.menuSync.clearMenu')}
         danger
         loading={clearingMenu}
-        confirmText="确认清理"
-        cancelText="取消"
+        confirmText={t('pages.menuSync.confirmClearBtn')}
+        cancelText={t('common.cancel')}
         description={
           <div>
-            <div>确定要清理菜单中的所有商品、分类和自定义选项吗？</div>
+            <div>{t('pages.menuSync.clearMenuConfirmDesc')}</div>
             <div className="text-xs mt-3 text-slate-500 leading-relaxed">
-              <div className="mb-2">注意：</div>
-              <div>• 菜单内容将被完全删除</div>
-              <div>• 由于 Uber API 限制，菜单本身无法通过 API 删除</div>
-              <div>• 如需完全移除菜单，请联系 Uber</div>
+              <div className="mb-2">{t('pages.menuSync.noteLabel')}</div>
+              <div>{t('pages.menuSync.clearMenuNote1')}</div>
+              <div>{t('pages.menuSync.clearMenuNote2')}</div>
+              <div>{t('pages.menuSync.clearMenuNote3')}</div>
             </div>
           </div>
         }
@@ -2625,17 +2625,17 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       <ConfirmDialog
         open={!!deleteMenuGroupTarget}
         onOpenChange={(v) => { if (!v) setDeleteMenuGroupTarget(null) }}
-        title="删除菜单配置"
+        title={t('pages.menuSync.deleteMenuConfirm')}
         danger
-        confirmText="确定删除"
-        cancelText="取消"
+        confirmText={t('pages.menuSync.confirmDeleteBtn')}
+        cancelText={t('common.cancel')}
         description={
           <div>
-            <div>确定要删除「{deleteMenuGroupTarget?.name}」菜单配置吗？</div>
+            <div>{t('pages.menuSync.deleteMenuConfirmDesc', { name: deleteMenuGroupTarget?.name })}</div>
             <div className="mt-2 text-xs text-slate-500">
-              注意：此操作只删除数据库中的菜单配置，不会自动同步到Uber。
+              {t('pages.menuSync.deleteMenuNote')}
               <br />
-              如需同步删除，请在删除后手动点击"同步到Uber"按钮。
+              {t('pages.menuSync.deleteMenuSyncHint')}
             </div>
           </div>
         }
@@ -2649,14 +2649,14 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       <ConfirmDialog
         open={!!removeCategoryTarget}
         onOpenChange={(v) => { if (!v) setRemoveCategoryTarget(null) }}
-        title="删除分类"
+        title={t('pages.menuSync.deleteCategoryTitle')}
         danger
-        confirmText="删除"
-        cancelText="取消"
+        confirmText={t('pages.menuSync.deleteBtn')}
+        cancelText={t('common.cancel')}
         description={
           removeCategoryTarget?.isSystem
-            ? `确定要从菜单中移除「${removeCategoryTarget?.name}」吗？系统分类将保留，可以再次添加。`
-            : `确定要彻底删除「${removeCategoryTarget?.name}」吗？删除后无法恢复。`
+            ? t('pages.menuSync.removeSystemCategoryFromMenuConfirm', { name: removeCategoryTarget?.name })
+            : t('pages.menuSync.deleteCustomCategoryConfirm', { name: removeCategoryTarget?.name })
         }
         onConfirm={() => {
           if (removeCategoryTarget) {
@@ -2670,14 +2670,14 @@ const MenuSync: React.FC<MenuSyncProps> = ({
       <ConfirmDialog
         open={!!removeConfiguredCategoryTarget}
         onOpenChange={(v) => { if (!v) setRemoveConfiguredCategoryTarget(null) }}
-        title="确定删除？"
+        title={t('pages.menuSync.confirmDeleteTitle')}
         danger
-        confirmText="删除"
-        cancelText="取消"
+        confirmText={t('pages.menuSync.deleteBtn')}
+        cancelText={t('common.cancel')}
         description={
           removeConfiguredCategoryTarget?.isSystem
-            ? '删除此分类配置后，已配置的商品映射将被清除。系统分类本身不会被删除。'
-            : '删除后无法恢复。'
+            ? t('pages.menuSync.deleteCategoryConfigNote')
+            : t('pages.menuSync.deleteCannotUndoNote')
         }
         onConfirm={() => {
           if (removeConfiguredCategoryTarget) {

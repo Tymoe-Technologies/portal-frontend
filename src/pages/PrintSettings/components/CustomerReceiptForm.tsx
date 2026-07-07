@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Save, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react'
 import LogoCropModal from '../../../components/LogoCropModal'
 import { uploadPrintLogo, deletePrintLogo } from '../../../services/print-settings'
@@ -15,17 +16,21 @@ interface Props {
   brandLogoUrl?: string | null
 }
 
-const PAPER_OPTIONS = [
-  { label: '58mm（小票）', value: '58' },
-  { label: '80mm（标准）', value: '80' },
+// 模块级选项需要 t 参数，在组件内部调用时传入
+const getPaperOptions = (t: (key: string) => string) => [
+  { label: t('pages.printSettings.customerReceiptForm.paperOption58'), value: '58' },
+  { label: t('pages.printSettings.customerReceiptForm.paperOption80'), value: '80' },
 ]
-const LANG_OPTIONS = [
-  { label: '简体中文', value: 'zh-CN' },
-  { label: 'English', value: 'en' },
-  { label: '繁體中文', value: 'zh-TW' },
+const getLangOptions = (t: (key: string) => string) => [
+  { label: t('pages.printSettings.customerReceiptForm.langOptionZhCN'), value: 'zh-CN' },
+  { label: t('pages.printSettings.customerReceiptForm.langOptionEn'), value: 'en' },
+  { label: t('pages.printSettings.customerReceiptForm.langOptionZhTW'), value: 'zh-TW' },
 ]
 
 const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLogoUrl }) => {
+  const { t } = useTranslation()
+  const PAPER_OPTIONS = getPaperOptions(t)
+  const LANG_OPTIONS = getLangOptions(t)
   // 表单字段以「展平」形式保存在 state 中（key 形如 storeInfo.showName）
   const [values, setValues] = useState<Record<string, any>>({})
   const [logoUrl, setLogoUrl] = useState<string | undefined>(config?.sections?.storeInfo?.logoUrl)
@@ -93,7 +98,7 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
     }
     // customMessage 直接使用字符串
     if (cfg.sections.footer.customMessage === undefined) {
-      cfg.sections.footer.customMessage = config.sections?.footer?.customMessage || '感谢惠顾'
+      cfg.sections.footer.customMessage = config.sections?.footer?.customMessage || t('pages.printSettings.customerReceiptForm.defaultThankYouMessage')
     }
     return cfg
   }
@@ -151,9 +156,9 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
   // 选择文件 → 校验 → 读取 dataURL → 打开裁剪弹窗
   const handleLogoFilePicked = (file: File) => {
     const isValidType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
-    if (!isValidType) { toast.error('只支持 JPG、PNG、WebP 格式的图片'); return }
+    if (!isValidType) { toast.error(t('pages.printSettings.customerReceiptForm.invalidLogoFormatToast')); return }
     const isLt2M = file.size / 1024 / 1024 < 2
-    if (!isLt2M) { toast.error('Logo 图片大小不能超过 2MB'); return }
+    if (!isLt2M) { toast.error(t('pages.printSettings.customerReceiptForm.logoTooLargeToast')); return }
     const reader = new FileReader()
     reader.onload = (e) => {
       setCropImageSrc(e.target?.result as string)
@@ -180,7 +185,7 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
       setProcessedResult(result)
       setPreprocessModalVisible(true)
     } catch (error: any) {
-      toast.error('图片处理失败: ' + error.message)
+      toast.error(t('pages.printSettings.customerReceiptForm.imageProcessFailedToast', { message: error.message }))
     }
   }
 
@@ -192,10 +197,10 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
       const processedFile = new File([processedResult.blob], 'logo.png', { type: 'image/png' })
       const result = await uploadPrintLogo(processedFile as any)
       setLogoUrl(result.url)
-      toast.success('Logo 上传成功')
+      toast.success(t('pages.printSettings.customerReceiptForm.logoUploadSuccessToast'))
       setPreprocessModalVisible(false)
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Logo 上传失败')
+      toast.error(error?.response?.data?.error || t('pages.printSettings.customerReceiptForm.logoUploadFailedToast'))
     } finally {
       setLogoUploading(false)
     }
@@ -210,7 +215,7 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
       const result = await LogoPreprocessor.preprocessImage(originalFile as any, options)
       setProcessedResult(result)
     } catch (error: any) {
-      toast.error('图片处理失败: ' + error.message)
+      toast.error(t('pages.printSettings.customerReceiptForm.imageProcessFailedToast', { message: error.message }))
     }
   }
 
@@ -223,9 +228,9 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
       if (cfg.sections.storeInfo) cfg.sections.storeInfo.logoUrl = ''
       buildLayoutAndStyles(cfg)
       onSave(cfg)
-      toast.success('Logo 已删除并保存')
+      toast.success(t('pages.printSettings.customerReceiptForm.logoDeleteSuccessToast'))
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Logo 删除失败')
+      toast.error(error?.response?.data?.error || t('pages.printSettings.customerReceiptForm.logoDeleteFailedToast'))
     } finally {
       setLogoUploading(false)
     }
@@ -245,25 +250,25 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
     <>
       <div className="space-y-4 max-w-3xl">
         {/* 基础设置 */}
-        <SectionCard title="基础设置">
-          <FormRow label="纸张宽度">
+        <SectionCard title={t('pages.printSettings.customerReceiptForm.basicSettingsTitle')}>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.paperWidthLabel')}>
             <div className="w-48"><SelectInput className="w-full" value={String(values.paperWidth ?? 80)}
               onChange={(v) => setField('paperWidth', Number(v))} options={PAPER_OPTIONS} /></div>
           </FormRow>
-          <FormRow label="语言">
+          <FormRow label={t('pages.printSettings.customerReceiptForm.languageLabel')}>
             <div className="w-48"><SelectInput className="w-full" value={values.language || 'zh-CN'}
               onChange={(v) => setField('language', String(v))} options={LANG_OPTIONS} /></div>
           </FormRow>
         </SectionCard>
 
         {/* 店铺信息 */}
-        <SectionCard title="店铺信息">
-          <FormRow label="显示店铺名称"><Switch checked={!!values['storeInfo.showName']} onCheckedChange={sw('storeInfo.showName')} /></FormRow>
-          <FormRow label="显示地址"><Switch checked={!!values['storeInfo.showAddress']} onCheckedChange={sw('storeInfo.showAddress')} /></FormRow>
-          <FormRow label="显示电话"><Switch checked={!!values['storeInfo.showPhone']} onCheckedChange={sw('storeInfo.showPhone')} /></FormRow>
-          <FormRow label="显示 Logo"><Switch checked={!!values['storeInfo.showLogo']} onCheckedChange={sw('storeInfo.showLogo')} /></FormRow>
+        <SectionCard title={t('pages.printSettings.customerReceiptForm.storeInfoTitle')}>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.showStoreNameLabel')}><Switch checked={!!values['storeInfo.showName']} onCheckedChange={sw('storeInfo.showName')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.showAddressLabel')}><Switch checked={!!values['storeInfo.showAddress']} onCheckedChange={sw('storeInfo.showAddress')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.showPhoneLabel')}><Switch checked={!!values['storeInfo.showPhone']} onCheckedChange={sw('storeInfo.showPhone')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.showLogoLabel')}><Switch checked={!!values['storeInfo.showLogo']} onCheckedChange={sw('storeInfo.showLogo')} /></FormRow>
           {showLogo && (
-            <FormRow label="收据 Logo">
+            <FormRow label={t('pages.printSettings.customerReceiptForm.receiptLogoLabel')}>
               <div>
                 {logoUrl ? (
                   // 模板专属 Logo
@@ -279,8 +284,8 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
                       </button>
                     </div>
                     <div className="text-xs text-slate-500 mt-1">
-                      模板专属 Logo<br />
-                      <span className="text-slate-400">删除后将自动使用品牌 Logo</span>
+                      {t('pages.printSettings.customerReceiptForm.templateLogoText')}<br />
+                      <span className="text-slate-400">{t('pages.printSettings.customerReceiptForm.deleteAutoUseBrandHint')}</span>
                     </div>
                   </div>
                 ) : brandLogoUrl ? (
@@ -290,10 +295,10 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
                       <img src={brandLogoUrl} className="w-[100px] h-[100px] object-contain rounded border border-dashed border-blue-400 bg-blue-50/50" />
                     </div>
                     <div className="text-xs">
-                      <div className="text-blue-600 mb-1">当前使用品牌 Logo</div>
-                      <div className="text-slate-400 mb-2">上传专属 Logo 可覆盖品牌设置</div>
+                      <div className="text-blue-600 mb-1">{t('pages.printSettings.customerReceiptForm.currentlyUsingBrandLogo')}</div>
+                      <div className="text-slate-400 mb-2">{t('pages.printSettings.customerReceiptForm.uploadOwnLogoOverrideHint')}</div>
                       <Btn variant="secondary" size="sm" icon={<ImageIcon className="w-3.5 h-3.5" />} loading={logoUploading}
-                        onClick={() => logoInputRef.current?.click()}>上传专属 Logo</Btn>
+                        onClick={() => logoInputRef.current?.click()}>{t('pages.printSettings.customerReceiptForm.uploadOwnLogoBtn')}</Btn>
                     </div>
                   </div>
                 ) : (
@@ -305,10 +310,10 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
                   >
                     {logoUploading
                       ? <Loader2 className="w-6 h-6 animate-spin" />
-                      : <><ImageIcon className="w-6 h-6 mb-1" /><span className="text-xs text-slate-500">上传 Logo</span></>}
+                      : <><ImageIcon className="w-6 h-6 mb-1" /><span className="text-xs text-slate-500">{t('pages.printSettings.customerReceiptForm.uploadLogoBtn')}</span></>}
                   </button>
                 )}
-                <p className="text-xs text-slate-400 mt-1">支持 JPG、PNG、WebP，最大 2MB</p>
+                <p className="text-xs text-slate-400 mt-1">{t('pages.printSettings.customerReceiptForm.logoFormatHint')}</p>
                 <input
                   ref={logoInputRef}
                   type="file"
@@ -322,66 +327,66 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
         </SectionCard>
 
         {/* 订单信息 */}
-        <SectionCard title="订单信息">
-          <FormRow label="订单号"><Switch checked={!!values['orderInfo.showOrderNumber']} onCheckedChange={sw('orderInfo.showOrderNumber')} /></FormRow>
-          <FormRow label="订单类型"><Switch checked={!!values['orderInfo.showOrderType']} onCheckedChange={sw('orderInfo.showOrderType')} /></FormRow>
-          <FormRow label="桌号"><Switch checked={!!values['orderInfo.showTableNumber']} onCheckedChange={sw('orderInfo.showTableNumber')} /></FormRow>
-          <FormRow label="时间"><Switch checked={!!values['orderInfo.showTime']} onCheckedChange={sw('orderInfo.showTime')} /></FormRow>
-          <FormRow label="顾客姓名"><Switch checked={!!values['orderInfo.showCustomerName']} onCheckedChange={sw('orderInfo.showCustomerName')} /></FormRow>
-          <FormRow label="顾客电话"><Switch checked={!!values['orderInfo.showCustomerPhone']} onCheckedChange={sw('orderInfo.showCustomerPhone')} /></FormRow>
-          <FormRow label="收银员"><Switch checked={!!values['orderInfo.showCashier']} onCheckedChange={sw('orderInfo.showCashier')} /></FormRow>
+        <SectionCard title={t('pages.printSettings.customerReceiptForm.orderInfoTitle')}>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.orderNumberLabel')}><Switch checked={!!values['orderInfo.showOrderNumber']} onCheckedChange={sw('orderInfo.showOrderNumber')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.orderTypeLabel')}><Switch checked={!!values['orderInfo.showOrderType']} onCheckedChange={sw('orderInfo.showOrderType')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.tableNumberLabel')}><Switch checked={!!values['orderInfo.showTableNumber']} onCheckedChange={sw('orderInfo.showTableNumber')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.timeLabel')}><Switch checked={!!values['orderInfo.showTime']} onCheckedChange={sw('orderInfo.showTime')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.customerNameLabel')}><Switch checked={!!values['orderInfo.showCustomerName']} onCheckedChange={sw('orderInfo.showCustomerName')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.customerPhoneLabel')}><Switch checked={!!values['orderInfo.showCustomerPhone']} onCheckedChange={sw('orderInfo.showCustomerPhone')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.cashierLabel')}><Switch checked={!!values['orderInfo.showCashier']} onCheckedChange={sw('orderInfo.showCashier')} /></FormRow>
         </SectionCard>
 
         {/* 商品明细 */}
-        <SectionCard title="商品明细">
-          <FormRow label="商品属性（规格）"><Switch checked={!!values['items.showAttributes']} onCheckedChange={sw('items.showAttributes')} /></FormRow>
-          <FormRow label="加料/自定义选项"><Switch checked={!!values['items.showModifiers']} onCheckedChange={sw('items.showModifiers')} /></FormRow>
-          <FormRow label="单品备注"><Switch checked={!!values['items.showItemNotes']} onCheckedChange={sw('items.showItemNotes')} /></FormRow>
-          <FormRow label="单价"><Switch checked={!!values['items.showUnitPrice']} onCheckedChange={sw('items.showUnitPrice')} /></FormRow>
+        <SectionCard title={t('pages.printSettings.customerReceiptForm.itemsTitle')}>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.showAttributesLabel')}><Switch checked={!!values['items.showAttributes']} onCheckedChange={sw('items.showAttributes')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.showModifiersLabel')}><Switch checked={!!values['items.showModifiers']} onCheckedChange={sw('items.showModifiers')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.showItemNotesLabel')}><Switch checked={!!values['items.showItemNotes']} onCheckedChange={sw('items.showItemNotes')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.showUnitPriceLabel')}><Switch checked={!!values['items.showUnitPrice']} onCheckedChange={sw('items.showUnitPrice')} /></FormRow>
         </SectionCard>
 
         {/* 金额汇总 */}
-        <SectionCard title="金额汇总">
-          <FormRow label="小计"><Switch checked={!!values['amounts.showSubtotal']} onCheckedChange={sw('amounts.showSubtotal')} /></FormRow>
-          <FormRow label="折扣"><Switch checked={!!values['amounts.showDiscount']} onCheckedChange={sw('amounts.showDiscount')} /></FormRow>
-          <FormRow label="税费"><Switch checked={!!values['amounts.showTax']} onCheckedChange={sw('amounts.showTax')} /></FormRow>
-          <FormRow label="服务费"><Switch checked={!!values['amounts.showServiceFee']} onCheckedChange={sw('amounts.showServiceFee')} /></FormRow>
-          <FormRow label="配送费"><Switch checked={!!values['amounts.showDeliveryFee']} onCheckedChange={sw('amounts.showDeliveryFee')} /></FormRow>
-          <FormRow label="小费"><Switch checked={!!values['amounts.showTip']} onCheckedChange={sw('amounts.showTip')} /></FormRow>
+        <SectionCard title={t('pages.printSettings.customerReceiptForm.amountsTitle')}>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.subtotalLabel')}><Switch checked={!!values['amounts.showSubtotal']} onCheckedChange={sw('amounts.showSubtotal')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.discountLabel')}><Switch checked={!!values['amounts.showDiscount']} onCheckedChange={sw('amounts.showDiscount')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.taxLabel')}><Switch checked={!!values['amounts.showTax']} onCheckedChange={sw('amounts.showTax')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.serviceFeeLabel')}><Switch checked={!!values['amounts.showServiceFee']} onCheckedChange={sw('amounts.showServiceFee')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.deliveryFeeLabel')}><Switch checked={!!values['amounts.showDeliveryFee']} onCheckedChange={sw('amounts.showDeliveryFee')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.tipLabel')}><Switch checked={!!values['amounts.showTip']} onCheckedChange={sw('amounts.showTip')} /></FormRow>
         </SectionCard>
 
         {/* 支付信息 */}
-        <SectionCard title="支付信息">
-          <FormRow label="支付方式"><Switch checked={!!values['payment.showPaymentMethod']} onCheckedChange={sw('payment.showPaymentMethod')} /></FormRow>
-          <FormRow label="支付时间"><Switch checked={!!values['payment.showPaymentTime']} onCheckedChange={sw('payment.showPaymentTime')} /></FormRow>
-          <FormRow label="交易号"><Switch checked={!!values['payment.showTransactionId']} onCheckedChange={sw('payment.showTransactionId')} /></FormRow>
-          <FormRow label="现金收付详情"><Switch checked={!!values['payment.showCashDetail']} onCheckedChange={sw('payment.showCashDetail')} /></FormRow>
+        <SectionCard title={t('pages.printSettings.customerReceiptForm.paymentTitle')}>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.paymentMethodLabel')}><Switch checked={!!values['payment.showPaymentMethod']} onCheckedChange={sw('payment.showPaymentMethod')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.paymentTimeLabel')}><Switch checked={!!values['payment.showPaymentTime']} onCheckedChange={sw('payment.showPaymentTime')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.transactionIdLabel')}><Switch checked={!!values['payment.showTransactionId']} onCheckedChange={sw('payment.showTransactionId')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.cashDetailLabel')}><Switch checked={!!values['payment.showCashDetail']} onCheckedChange={sw('payment.showCashDetail')} /></FormRow>
         </SectionCard>
 
         {/* 底部信息 */}
-        <SectionCard title="底部信息">
-          <FormRow label="二维码"><Switch checked={!!values['footer.showQrCode']} onCheckedChange={sw('footer.showQrCode')} /></FormRow>
+        <SectionCard title={t('pages.printSettings.customerReceiptForm.footerTitle')}>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.qrCodeLabel')}><Switch checked={!!values['footer.showQrCode']} onCheckedChange={sw('footer.showQrCode')} /></FormRow>
           {showQrCode && (
             <>
-              <FormRow label="二维码链接">
+              <FormRow label={t('pages.printSettings.customerReceiptForm.qrCodeUrlLabel')}>
                 <TextInput className="w-full" value={values['footer.qrCodeUrl'] || ''} onChange={(v) => setField('footer.qrCodeUrl', v)}
                   placeholder="https://example.com/order/{orderId}" />
               </FormRow>
-              <FormRow label="二维码文字">
+              <FormRow label={t('pages.printSettings.customerReceiptForm.qrCodeTextLabel')}>
                 <TextInput className="w-full" value={values['footer.qrCodeText'] || ''} onChange={(v) => setField('footer.qrCodeText', v)}
-                  placeholder="扫码关注（可选）" />
+                  placeholder={t('pages.printSettings.customerReceiptForm.qrCodeTextPlaceholder')} />
               </FormRow>
             </>
           )}
-          <FormRow label="订单备注"><Switch checked={!!values['footer.showOrderNotes']} onCheckedChange={sw('footer.showOrderNotes')} /></FormRow>
-          <FormRow label="自定义底部文字">
+          <FormRow label={t('pages.printSettings.customerReceiptForm.orderNotesLabel')}><Switch checked={!!values['footer.showOrderNotes']} onCheckedChange={sw('footer.showOrderNotes')} /></FormRow>
+          <FormRow label={t('pages.printSettings.customerReceiptForm.customMessageLabel')}>
             <TextInput className="w-full" value={values['footer.customMessage'] ?? ''} onChange={(v) => setField('footer.customMessage', v)}
-              placeholder="感谢惠顾" />
+              placeholder={t('pages.printSettings.customerReceiptForm.customMessagePlaceholder')} />
           </FormRow>
         </SectionCard>
 
         <div className="text-center pt-2">
-          <Btn variant="primary" icon={<Save className="w-3.5 h-3.5" />} onClick={handleSave} loading={saving}>保存配置</Btn>
+          <Btn variant="primary" icon={<Save className="w-3.5 h-3.5" />} onClick={handleSave} loading={saving}>{t('pages.printSettings.customerReceiptForm.saveConfigBtn')}</Btn>
         </div>
       </div>
 
@@ -395,26 +400,26 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
 
       {/* Logo 预处理弹窗 */}
       <Modal
-        title="Logo 图片处理"
+        title={t('pages.printSettings.customerReceiptForm.logoProcessModalTitle')}
         open={preprocessModalVisible}
         onOpenChange={(o) => !o && setPreprocessModalVisible(false)}
         size="xl"
         footer={
           <div className="flex justify-end gap-2">
-            <Btn variant="secondary" onClick={() => setPreprocessModalVisible(false)}>取消</Btn>
-            <Btn variant="primary" loading={logoUploading} onClick={handleConfirmUpload}>上传处理后的图片</Btn>
+            <Btn variant="secondary" onClick={() => setPreprocessModalVisible(false)}>{t('pages.printSettings.customerReceiptForm.cancelBtn')}</Btn>
+            <Btn variant="primary" loading={logoUploading} onClick={handleConfirmUpload}>{t('pages.printSettings.customerReceiptForm.uploadProcessedBtn')}</Btn>
           </div>
         }
       >
         <div className="flex gap-10 mb-8">
           {/* 原图预览 */}
           <div className="flex-1 text-center">
-            <h4 className="font-semibold text-slate-700 mb-2">原图</h4>
+            <h4 className="font-semibold text-slate-700 mb-2">{t('pages.printSettings.customerReceiptForm.originalImageTitle')}</h4>
             {originalPreview && (
               <>
-                <img src={originalPreview} alt="原图" className="max-w-full border border-slate-200 rounded mx-auto" />
+                <img src={originalPreview} alt={t('pages.printSettings.customerReceiptForm.originalImageAlt')} className="max-w-full border border-slate-200 rounded mx-auto" />
                 <p className="mt-2.5 text-slate-500 text-sm">
-                  大小: {originalFile ? (originalFile.size / 1024).toFixed(2) : 0} KB
+                  {t('pages.printSettings.customerReceiptForm.sizeLabel')}: {originalFile ? (originalFile.size / 1024).toFixed(2) : 0} KB
                 </p>
               </>
             )}
@@ -422,12 +427,12 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
 
           {/* 处理后预览 */}
           <div className="flex-1 text-center">
-            <h4 className="font-semibold text-slate-700 mb-2">处理后（纯黑白）</h4>
+            <h4 className="font-semibold text-slate-700 mb-2">{t('pages.printSettings.customerReceiptForm.processedImageTitle')}</h4>
             {processedResult && (
               <>
                 <img
                   src={processedResult.dataUrl}
-                  alt="处理后"
+                  alt={t('pages.printSettings.customerReceiptForm.processedImageAlt')}
                   className="max-w-full border border-slate-200 rounded mx-auto"
                   style={{
                     background: `
@@ -441,10 +446,10 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
                   }}
                 />
                 <p className="mt-2.5 text-slate-500 text-sm">
-                  大小: {(processedResult.stats.processedSize / 1024).toFixed(2)} KB<br />
-                  尺寸: {processedResult.width} × {processedResult.height}<br />
-                  去除背景: {processedResult.stats.removedPixels} 像素<br />
-                  黑色: {processedResult.stats.blackPixels} / 白色: {processedResult.stats.whitePixels}
+                  {t('pages.printSettings.customerReceiptForm.sizeLabel')}: {(processedResult.stats.processedSize / 1024).toFixed(2)} KB<br />
+                  {t('pages.printSettings.customerReceiptForm.dimensionsLabel')}: {processedResult.width} × {processedResult.height}<br />
+                  {t('pages.printSettings.customerReceiptForm.removedBackgroundLabel')}: {processedResult.stats.removedPixels} {t('pages.printSettings.customerReceiptForm.pixelsUnit')}<br />
+                  {t('pages.printSettings.customerReceiptForm.blackLabel')}: {processedResult.stats.blackPixels} / {t('pages.printSettings.customerReceiptForm.whiteLabel')}: {processedResult.stats.whitePixels}
                 </p>
               </>
             )}
@@ -453,12 +458,12 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
 
         {/* 参数调整 */}
         <div className="bg-slate-50 p-5 rounded">
-          <h4 className="font-semibold text-slate-700 mb-4">调整参数</h4>
+          <h4 className="font-semibold text-slate-700 mb-4">{t('pages.printSettings.customerReceiptForm.adjustParamsTitle')}</h4>
 
           <div className="mb-5">
             <label className="block mb-2 text-sm text-slate-700">
-              背景去除阈值 ({preprocessOptions.backgroundThreshold})
-              <span className="text-xs text-slate-500 ml-2.5">越高越激进地移除浅色背景</span>
+              {t('pages.printSettings.customerReceiptForm.bgThresholdLabel')} ({preprocessOptions.backgroundThreshold})
+              <span className="text-xs text-slate-500 ml-2.5">{t('pages.printSettings.customerReceiptForm.bgThresholdHint')}</span>
             </label>
             <Slider min={200} max={255} value={preprocessOptions.backgroundThreshold ?? 240}
               onChange={(value) => handlePreprocessOptionsChange({ backgroundThreshold: value })} />
@@ -466,8 +471,8 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
 
           <div className="mb-5">
             <label className="block mb-2 text-sm text-slate-700">
-              黑白阈值 ({preprocessOptions.binarizeThreshold})
-              <span className="text-xs text-slate-500 ml-2.5">低于此值的像素视为黑色</span>
+              {t('pages.printSettings.customerReceiptForm.bwThresholdLabel')} ({preprocessOptions.binarizeThreshold})
+              <span className="text-xs text-slate-500 ml-2.5">{t('pages.printSettings.customerReceiptForm.bwThresholdHint')}</span>
             </label>
             <Slider min={0} max={255} value={preprocessOptions.binarizeThreshold ?? 128}
               onChange={(value) => handlePreprocessOptionsChange({ binarizeThreshold: value })} />
@@ -475,8 +480,8 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
 
           <div className="mb-5">
             <label className="block mb-2 text-sm text-slate-700">
-              对比度 ({preprocessOptions.contrastFactor?.toFixed(1)})
-              <span className="text-xs text-slate-500 ml-2.5">增强图片对比度</span>
+              {t('pages.printSettings.customerReceiptForm.contrastLabel')} ({preprocessOptions.contrastFactor?.toFixed(1)})
+              <span className="text-xs text-slate-500 ml-2.5">{t('pages.printSettings.customerReceiptForm.contrastHint')}</span>
             </label>
             <Slider min={1.0} max={3.0} step={0.1} value={preprocessOptions.contrastFactor ?? 1.5}
               onChange={(value) => handlePreprocessOptionsChange({ contrastFactor: value })} />
@@ -485,7 +490,7 @@ const CustomerReceiptForm: React.FC<Props> = ({ config, onSave, saving, brandLog
           <Checkbox
             checked={!!preprocessOptions.invert}
             onCheckedChange={(checked) => handlePreprocessOptionsChange({ invert: checked })}
-            label="反色（黑底白字 → 白底黑字）"
+            label={t('pages.printSettings.customerReceiptForm.invertLabel')}
           />
         </div>
       </Modal>

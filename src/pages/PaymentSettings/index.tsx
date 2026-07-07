@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '@/auth/AuthProvider'
 import {
   CheckCircle2, XCircle, CreditCard, Trash2, DollarSign, AlertCircle,
@@ -53,12 +54,7 @@ const isSystemMethod = (paymentMethod: string) => paymentMethod === 'cash' || is
 // 判断是否为自定义方式
 const isCustomMethod = (paymentMethod: string) => !isCardMethod(paymentMethod) && !isSystemMethod(paymentMethod)
 
-// 找零方式映射
-const ROUNDING_METHOD_MAP: Record<string, string> = {
-  ROUND: '四舍五入',
-  ROUND_UP: '往上舍（对商家有利）',
-  ROUND_DOWN: '往下舍（对顾客有利）',
-}
+// 找零方式可选值（文案走 i18n，见组件内 useRoundingMethodOptions）
 const ROUNDING_METHOD_VALUES = ['ROUND', 'ROUND_UP', 'ROUND_DOWN'] as const
 
 // 设备类型标签配色（严禁紫色，MOBILE 归入 slate）
@@ -84,6 +80,7 @@ function MethodRow({ children, dashed, faded }: { children: React.ReactNode; das
  * 管理每个设备的支付方式配置
  */
 const PaymentSettings: React.FC = () => {
+  const { t } = useTranslation()
   const { user, organizations } = useAuthContext()
 
   const tenantId = localStorage.getItem('organization_id') || ''
@@ -146,11 +143,11 @@ const PaymentSettings: React.FC = () => {
     try {
       setCurrenciesLoading(true)
       const data = await getSupportedCurrencies()
-      if (data.length === 0) toast.warning('未能从后端获取货币配置，请检查 Finance Service 连接')
+      if (data.length === 0) toast.warning(t('pages.paymentSettings.toastNoCurrencyConfig'))
       setCurrencies(data)
     } catch (error: any) {
       console.error('加载货币配置失败:', error.message)
-      toast.error('加载货币配置失败，请确保 Finance Service 正常运行')
+      toast.error(t('pages.paymentSettings.toastLoadCurrencyFailed'))
       setCurrencies([])
     } finally {
       setCurrenciesLoading(false)
@@ -190,7 +187,7 @@ const PaymentSettings: React.FC = () => {
 
   // 保存租户级全局货币配置
   const handleSaveTenantConfig = async () => {
-    if (!tenantCfg.currency) { setTenantCfgError('请选择币种'); return }
+    if (!tenantCfg.currency) { setTenantCfgError(t('pages.paymentSettings.toastPleaseSelectCurrency')); return }
     setTenantCfgError('')
     try {
       setTenantConfigLoading(true)
@@ -199,9 +196,9 @@ const PaymentSettings: React.FC = () => {
         roundingUnit: tenantCfg.roundingUnit,
         roundingMethod: tenantCfg.roundingMethod || 'ROUND',
       })
-      toast.success('租户货币配置已保存')
+      toast.success(t('pages.paymentSettings.toastTenantConfigSaved'))
     } catch (error: any) {
-      toast.error(error.message || '保存配置失败')
+      toast.error(error.message || t('pages.paymentSettings.toastSaveConfigFailed'))
     } finally {
       setTenantConfigLoading(false)
     }
@@ -215,7 +212,7 @@ const PaymentSettings: React.FC = () => {
       setStripeConnectStatus(status)
     } catch (error: any) {
       console.error('[Stripe Connect] 加载状态失败:', error.message, error)
-      setStripeConnectStatus({ status: 'not_connected', message: error.message || '无法连接 Stripe，请检查网络设置' })
+      setStripeConnectStatus({ status: 'not_connected', message: error.message || t('pages.paymentSettings.toastCannotConnectStripe') })
     } finally {
       setStripeConnectLoading(false)
     }
@@ -226,13 +223,13 @@ const PaymentSettings: React.FC = () => {
     try {
       setStripeConnectLoading(true)
       const userEmail = user?.email || ''
-      if (!userEmail) { toast.error('无法获取用户邮箱，请确保已登录'); return }
+      if (!userEmail) { toast.error(t('pages.paymentSettings.toastNoUserEmail')); return }
       const response = await onboardStripeConnect({ tenantId, email: userEmail, businessType: 'individual', country: 'US' })
-      toast.success('正在跳转到 Stripe 设置页面...')
+      toast.success(t('pages.paymentSettings.toastRedirectingStripe'))
       window.location.href = response.onboardingUrl
     } catch (error: any) {
       console.error('[Stripe Onboard] 失败:', error.message, error)
-      toast.error(error.message || 'Stripe 设置失败')
+      toast.error(error.message || t('pages.paymentSettings.toastStripeSetupFailed'))
     } finally {
       setStripeConnectLoading(false)
     }
@@ -243,12 +240,12 @@ const PaymentSettings: React.FC = () => {
     try {
       setStripeConnectLoading(true)
       await bindParentStripeAccount(tenantId)
-      toast.success('已绑定主店收款账户')
+      toast.success(t('pages.paymentSettings.toastBoundParentAccount'))
       await loadStripeConnectStatus(tenantId)
     } catch (error: any) {
       console.error('[Stripe Bind] 失败:', error.message, error)
       const backendMsg = error?.response?.data?.message
-      toast.error(backendMsg || error.message || '绑定主店收款账户失败')
+      toast.error(backendMsg || error.message || t('pages.paymentSettings.toastBindParentFailed'))
     } finally {
       setStripeConnectLoading(false)
     }
@@ -259,11 +256,11 @@ const PaymentSettings: React.FC = () => {
     try {
       setStripeConnectLoading(true)
       const response = await refreshStripeOnboarding(tenantId)
-      toast.success('正在跳转到 Stripe 设置页面...')
+      toast.success(t('pages.paymentSettings.toastRedirectingStripe'))
       window.location.href = response.onboardingUrl
     } catch (error: any) {
       console.error('[Stripe Refresh] 失败:', error.message, error)
-      toast.error(error.message || '刷新 Stripe 链接失败')
+      toast.error(error.message || t('pages.paymentSettings.toastRefreshStripeFailed'))
     } finally {
       setStripeConnectLoading(false)
     }
@@ -285,7 +282,7 @@ const PaymentSettings: React.FC = () => {
       }
       setDevices(list)
     } catch (error: any) {
-      toast.error(error.message || '加载设备失败')
+      toast.error(error.message || t('pages.paymentSettings.toastLoadDevicesFailed'))
     } finally {
       setLoading(false)
     }
@@ -298,14 +295,14 @@ const PaymentSettings: React.FC = () => {
       setLoading(true)
       if (method.isEnabled) {
         await disableDevicePaymentMethod(tenantId, device.id, method.paymentMethod)
-        toast.success(`已禁用 ${method.displayName}`)
+        toast.success(t('pages.paymentSettings.toastMethodDisabled', { name: method.displayName }))
       } else {
         await enableDevicePaymentMethod(tenantId, device.id, method.paymentMethod)
-        toast.success(`已启用 ${method.displayName}`)
+        toast.success(t('pages.paymentSettings.toastMethodEnabled', { name: method.displayName }))
       }
       await loadDevices(tenantId)
     } catch (error: any) {
-      toast.error(error.message || '操作失败')
+      toast.error(error.message || t('pages.paymentSettings.toastOperationFailed'))
     } finally {
       setLoading(false)
     }
@@ -318,11 +315,11 @@ const PaymentSettings: React.FC = () => {
     try {
       setLoading(true)
       await deleteDevicePaymentMethod(tenantId, device.id!, method.paymentMethod)
-      toast.success('支付方式已删除')
+      toast.success(t('pages.paymentSettings.toastMethodDeleted'))
       setDeleteTarget(null)
       await loadDevices(tenantId)
     } catch (error: any) {
-      toast.error(error.message || '删除失败')
+      toast.error(error.message || t('pages.paymentSettings.toastDeleteFailed'))
     } finally {
       setLoading(false)
     }
@@ -350,7 +347,7 @@ const PaymentSettings: React.FC = () => {
       }
       await loadDevices(tenantId)
     } catch (error: any) {
-      toast.error(error.message || '操作失败')
+      toast.error(error.message || t('pages.paymentSettings.toastOperationFailed'))
     } finally {
       setLoading(false)
     }
@@ -373,7 +370,7 @@ const PaymentSettings: React.FC = () => {
       }
       await loadDevices(tenantId)
     } catch (error: any) {
-      toast.error(error.message || '操作失败')
+      toast.error(error.message || t('pages.paymentSettings.toastOperationFailed'))
     } finally {
       setLoading(false)
     }
@@ -390,17 +387,17 @@ const PaymentSettings: React.FC = () => {
   // 提交自定义支付
   const handleCustomSubmit = async () => {
     if (!customModalDevice?.id) return
-    if (!customName.trim()) { setCustomError('请输入名称'); return }
+    if (!customName.trim()) { setCustomError(t('pages.paymentSettings.pleaseEnterName')); return }
     setCustomError('')
     try {
       setLoading(true)
       const key = `custom_${Date.now()}`
       await createDevicePaymentMethod(tenantId, customModalDevice.id, { paymentMethod: key, displayName: customName.trim(), isEnabled: true })
-      toast.success('自定义支付方式已添加')
+      toast.success(t('pages.paymentSettings.toastCustomMethodAdded'))
       setCustomModalVisible(false)
       await loadDevices(tenantId)
     } catch (error: any) {
-      toast.error(error.message || '操作失败')
+      toast.error(error.message || t('pages.paymentSettings.toastOperationFailed'))
     } finally {
       setLoading(false)
     }
@@ -411,11 +408,11 @@ const PaymentSettings: React.FC = () => {
     if (!device.id) return
     try {
       setLoading(true)
-      await createDevicePaymentMethod(tenantId, device.id, { paymentMethod: 'cash', displayName: '现金', isEnabled: true })
-      toast.success('现金支付已启用')
+      await createDevicePaymentMethod(tenantId, device.id, { paymentMethod: 'cash', displayName: t('pages.paymentSettings.cashLabel'), isEnabled: true })
+      toast.success(t('pages.paymentSettings.toastCashEnabled'))
       await loadDevices(tenantId)
     } catch (error: any) {
-      toast.error(error.message || '操作失败')
+      toast.error(error.message || t('pages.paymentSettings.toastOperationFailed'))
     } finally {
       setLoading(false)
     }
@@ -433,11 +430,11 @@ const PaymentSettings: React.FC = () => {
       <div className="px-4 pb-4">
         <div className="grid grid-cols-2 gap-4 mb-3">
           <div>
-            <div className="text-xs text-slate-400">设备ID</div>
+            <div className="text-xs text-slate-400">{t('pages.paymentSettings.deviceIdLabel')}</div>
             <div className="mt-1 font-mono text-xs text-slate-600">{device.id}</div>
           </div>
           <div>
-            <div className="text-xs text-slate-400">设备类型</div>
+            <div className="text-xs text-slate-400">{t('pages.paymentSettings.deviceTypeLabel')}</div>
             <div className="mt-1 text-sm text-slate-700">{device.deviceType}</div>
           </div>
         </div>
@@ -446,19 +443,19 @@ const PaymentSettings: React.FC = () => {
 
         {/* ===== 现金支付 ===== */}
         <div className="mb-5">
-          <div className="font-semibold text-[13px] text-slate-700 mb-2.5">现金</div>
+          <div className="font-semibold text-[13px] text-slate-700 mb-2.5">{t('pages.paymentSettings.cashLabel')}</div>
           {cashMethod ? (
             <MethodRow>
               <div className="flex items-center gap-2.5">
                 <DollarSign className="w-[18px] h-[18px] text-green-500" />
-                <div className="font-medium text-slate-700">现金</div>
+                <div className="font-medium text-slate-700">{t('pages.paymentSettings.cashLabel')}</div>
               </div>
               <Switch checked={cashMethod.isEnabled} onCheckedChange={() => handleToggleMethod(device, cashMethod)} disabled={loading} />
             </MethodRow>
           ) : (
             <MethodRow dashed>
-              <span className="text-slate-400 text-[13px]">未启用</span>
-              <Btn variant="secondary" size="sm" onClick={() => handleInitCash(device)} loading={loading}>启用现金</Btn>
+              <span className="text-slate-400 text-[13px]">{t('pages.paymentSettings.notEnabled')}</span>
+              <Btn variant="secondary" size="sm" onClick={() => handleInitCash(device)} loading={loading}>{t('pages.paymentSettings.enableCash')}</Btn>
             </MethodRow>
           )}
         </div>
@@ -466,7 +463,7 @@ const PaymentSettings: React.FC = () => {
         {/* ===== 卡片支付 ===== */}
         <div className="mb-5">
           <div className="font-semibold text-[13px] text-slate-700 mb-2.5">
-            卡片支付<span className="font-normal text-xs text-slate-400 ml-2">同时只能启用一个</span>
+            {t('pages.paymentSettings.cardPaymentTitle')}<span className="font-normal text-xs text-slate-400 ml-2">{t('pages.paymentSettings.onlyOneEnabledHint')}</span>
           </div>
           <div className="flex flex-col gap-2">
             {/* Clover */}
@@ -476,14 +473,14 @@ const PaymentSettings: React.FC = () => {
             </MethodRow>
             {cloverMethod?.isEnabled && (
               <div className="px-3 py-2 bg-blue-50 rounded-md border border-blue-200 text-xs text-blue-600">
-                要将此设备与 Clover terminal 配对，请前往 POS 端完成连接设置。
+                {t('pages.paymentSettings.cloverPairHint')}
               </div>
             )}
             {/* Stripe - 即将推出 */}
             <MethodRow faded>
               <div className="flex items-center gap-2.5">
                 <img src={stripeLogo} alt="Stripe" className="h-5 shrink-0" />
-                <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-slate-200 text-slate-500">即将推出</span>
+                <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-slate-200 text-slate-500">{t('pages.paymentSettings.comingSoon')}</span>
               </div>
               <Switch checked={false} onCheckedChange={() => {}} disabled />
             </MethodRow>
@@ -493,7 +490,7 @@ const PaymentSettings: React.FC = () => {
         {/* ===== 扫码支付（微信/支付宝）===== */}
         <div className="mb-5">
           <div className="font-semibold text-[13px] text-slate-700 mb-2.5">
-            国际支付<span className="font-normal text-xs text-slate-400 ml-2">通过 Stripe 处理</span>
+            {t('pages.paymentSettings.internationalPaymentTitle')}<span className="font-normal text-xs text-slate-400 ml-2">{t('pages.paymentSettings.viaStripeHint')}</span>
           </div>
           <div className="flex flex-col gap-2">
             {/* 微信支付 */}
@@ -508,8 +505,8 @@ const PaymentSettings: React.FC = () => {
                   <rect width="24" height="24" rx="4" fill="#1677FF" />
                   <path d="M12 4C7.6 4 4 7.6 4 12s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm3.8 10.8c-.8-.3-1.5-.6-2.1-.9.6-.9 1-2 1.1-3.1H13v-.7h2.2V9.5H13V8.4h-1.1v1.1H9.8v.7h2.1c-.1 1-.5 2-1.1 2.8-.8-.4-1.6-.7-2.3-.8-.9-.2-1.5.1-1.7.7-.2.7.3 1.4 1.4 1.8.8.3 1.7.3 2.6 0 .9.5 1.9.9 3 1.2l.5-1.1z" fill="white" />
                 </svg>
-                <div className="font-medium text-slate-700">支付宝</div>
-                <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-slate-200 text-slate-500">即将推出</span>
+                <div className="font-medium text-slate-700">{t('pages.paymentSettings.alipayLabel')}</div>
+                <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-slate-200 text-slate-500">{t('pages.paymentSettings.comingSoon')}</span>
               </div>
               <Switch checked={false} onCheckedChange={() => {}} disabled />
             </MethodRow>
@@ -520,9 +517,9 @@ const PaymentSettings: React.FC = () => {
         <div>
           <div className="flex items-center justify-between mb-2.5">
             <div className="font-semibold text-[13px] text-slate-700">
-              自定义<span className="font-normal text-xs text-slate-400 ml-2">可添加多个</span>
+              {t('pages.paymentSettings.customTitle')}<span className="font-normal text-xs text-slate-400 ml-2">{t('pages.paymentSettings.addMultipleHint')}</span>
             </div>
-            <Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openCustomModal(device)} loading={loading}>添加</Btn>
+            <Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openCustomModal(device)} loading={loading}>{t('pages.paymentSettings.addBtn')}</Btn>
           </div>
           {customMethods.length > 0 ? (
             <div className="flex flex-col gap-2">
@@ -531,13 +528,13 @@ const PaymentSettings: React.FC = () => {
                   <div className="font-medium text-slate-700">{m.displayName}</div>
                   <div className="flex items-center gap-2">
                     <Switch checked={m.isEnabled} onCheckedChange={() => handleToggleMethod(device, m)} disabled={loading} />
-                    <Btn variant="danger" size="sm" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setDeleteTarget({ device, method: m })}>删除</Btn>
+                    <Btn variant="danger" size="sm" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setDeleteTarget({ device, method: m })}>{t('pages.paymentSettings.deleteBtn')}</Btn>
                   </div>
                 </MethodRow>
               ))}
             </div>
           ) : (
-            <MethodRow dashed><span className="text-slate-400 text-[13px]">暂无自定义支付方式</span></MethodRow>
+            <MethodRow dashed><span className="text-slate-400 text-[13px]">{t('pages.paymentSettings.noCustomMethods')}</span></MethodRow>
           )}
         </div>
       </div>
@@ -557,15 +554,15 @@ const PaymentSettings: React.FC = () => {
     <div className="py-5">
       {!tenantId ? (
         <SectionCard>
-          <EmptyState title="请先在顶部选择一个组织" />
+          <EmptyState title={t('pages.paymentSettings.selectOrgFirst')} />
         </SectionCard>
       ) : (
         <>
           {/* 统计卡片 */}
           <div className="grid grid-cols-3 gap-4 mb-6">
-            <StatCard title="总设备数" value={devices.length} icon={<CreditCard className="w-5 h-5" />} />
-            <StatCard title="总配置数" value={totalMethods} icon={<DollarSign className="w-5 h-5" />} />
-            <StatCard title="已启用设备" value={enabledDevices} icon={<CheckCircle2 className="w-5 h-5" />} />
+            <StatCard title={t('pages.paymentSettings.statTotalDevices')} value={devices.length} icon={<CreditCard className="w-5 h-5" />} />
+            <StatCard title={t('pages.paymentSettings.statTotalConfigs')} value={totalMethods} icon={<DollarSign className="w-5 h-5" />} />
+            <StatCard title={t('pages.paymentSettings.statEnabledDevices')} value={enabledDevices} icon={<CheckCircle2 className="w-5 h-5" />} />
           </div>
 
           {/* 标签页 */}
@@ -573,8 +570,8 @@ const PaymentSettings: React.FC = () => {
             value={activeTab}
             onChange={setActiveTab}
             items={[
-              { key: 'devices', label: '设备支付方式', icon: <CreditCard className="w-4 h-4" /> },
-              { key: 'stripe', label: 'Stripe 配置', icon: <CreditCard className="w-4 h-4" /> },
+              { key: 'devices', label: t('pages.paymentSettings.tabDevices'), icon: <CreditCard className="w-4 h-4" /> },
+              { key: 'stripe', label: t('pages.paymentSettings.tabStripe'), icon: <CreditCard className="w-4 h-4" /> },
             ]}
           />
 
@@ -582,33 +579,36 @@ const PaymentSettings: React.FC = () => {
             {activeTab === 'devices' && (
               <div className="space-y-6">
                 {/* 租户级全局货币配置卡片 */}
-                <SectionCard title="全局货币配置">
+                <SectionCard title={t('pages.paymentSettings.globalCurrencyConfigTitle')}>
                   {tenantConfigLoading && !currencies.length ? (
                     <Spinner className="w-6 h-6 text-slate-400" />
                   ) : (
                     <div className="flex flex-wrap items-end gap-4">
                       <div>
-                        <div className="text-sm text-slate-600 mb-1.5">币种 <span className="text-red-500">*</span></div>
+                        <div className="text-sm text-slate-600 mb-1.5">{t('pages.paymentSettings.currencyLabel')} <span className="text-red-500">*</span></div>
                         <div className="w-52">
-                          <SelectInput className="w-full" placeholder="选择币种（如美元、人民币）"
+                          <SelectInput className="w-full" placeholder={t('pages.paymentSettings.currencyPlaceholder')}
                             value={tenantCfg.currency} onChange={(v) => handleCurrencyChange(String(v))} options={currencyOptions}
                             disabled={currenciesLoading} />
                         </div>
                       </div>
                       <div>
-                        <div className="text-sm text-slate-600 mb-1.5">最小硬币面额</div>
-                        <input type="number" step={0.01} disabled placeholder="自动填充" value={tenantCfg.roundingUnit}
+                        <div className="text-sm text-slate-600 mb-1.5">{t('pages.paymentSettings.minCoinDenomination')}</div>
+                        <input type="number" step={0.01} disabled placeholder={t('pages.paymentSettings.autoFillPlaceholder')} value={tenantCfg.roundingUnit}
                           className="w-36 text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-400" />
                       </div>
                       <div>
-                        <div className="text-sm text-slate-600 mb-1.5">找零方式</div>
+                        <div className="text-sm text-slate-600 mb-1.5">{t('pages.paymentSettings.roundingMethodLabel')}</div>
                         <div className="w-52">
                           <SelectInput className="w-full" value={tenantCfg.roundingMethod}
                             onChange={(v) => setTenantCfg(prev => ({ ...prev, roundingMethod: String(v) }))}
-                            options={ROUNDING_METHOD_VALUES.map(m => ({ label: ROUNDING_METHOD_MAP[m], value: m }))} />
+                            options={ROUNDING_METHOD_VALUES.map(m => ({
+                              label: t(`pages.paymentSettings.rounding${m === 'ROUND' ? 'Round' : m === 'ROUND_UP' ? 'Up' : 'Down'}`),
+                              value: m,
+                            }))} />
                         </div>
                       </div>
-                      <Btn variant="primary" onClick={handleSaveTenantConfig} loading={tenantConfigLoading}>保存</Btn>
+                      <Btn variant="primary" onClick={handleSaveTenantConfig} loading={tenantConfigLoading}>{t('common.save')}</Btn>
                     </div>
                   )}
                   {tenantCfgError && <p className="text-sm text-red-500 mt-2">{tenantCfgError}</p>}
@@ -619,12 +619,12 @@ const PaymentSettings: React.FC = () => {
                   <div className="flex gap-3">
                     <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                     <div className="text-[13px] text-slate-600">
-                      <strong>支付方式配置说明：</strong>
+                      <strong>{t('pages.paymentSettings.configNoteTitle')}</strong>
                       <ul className="list-disc mt-2 ml-5 space-y-0.5">
-                        <li><strong>现金：</strong> 仅可开启或关闭</li>
-                        <li><strong>国际支付：</strong> 微信支付通过 Stripe 处理，顾客扫副屏二维码完成付款</li>
-                        <li><strong>卡片支付：</strong> 每台设备最多配置一个，目前支持 Clover</li>
-                        <li><strong>自定义：</strong> 可添加多个，自行命名（如：房间记账、挂账等）</li>
+                        <li>{t('pages.paymentSettings.configNoteCash')}</li>
+                        <li>{t('pages.paymentSettings.configNoteInternational')}</li>
+                        <li>{t('pages.paymentSettings.configNoteCard')}</li>
+                        <li>{t('pages.paymentSettings.configNoteCustom')}</li>
                       </ul>
                     </div>
                   </div>
@@ -632,11 +632,11 @@ const PaymentSettings: React.FC = () => {
 
                 {/* 设备列表卡片 */}
                 <SectionCard
-                  title={<span className="inline-flex items-center gap-2.5"><CreditCard className="w-5 h-5 text-blue-500" />设备支付方式配置</span>}
-                  action={<Btn variant="ghost" icon={<RotateCw className="w-3.5 h-3.5" />} onClick={() => loadDevices(tenantId)} loading={loading}>刷新</Btn>}
+                  title={<span className="inline-flex items-center gap-2.5"><CreditCard className="w-5 h-5 text-blue-500" />{t('pages.paymentSettings.deviceListTitle')}</span>}
+                  action={<Btn variant="ghost" icon={<RotateCw className="w-3.5 h-3.5" />} onClick={() => loadDevices(tenantId)} loading={loading}>{t('common.refresh')}</Btn>}
                 >
                   {devices.length === 0 ? (
-                    <EmptyState title="暂无设备" description="请先在设备管理中添加设备" />
+                    <EmptyState title={t('pages.paymentSettings.noDevices')} description={t('pages.paymentSettings.noDevicesDesc')} />
                   ) : (
                     <div className="flex flex-col gap-2">
                       {devices.map(device => {
@@ -652,7 +652,7 @@ const PaymentSettings: React.FC = () => {
                                 {device.deviceType}
                               </span>
                               <span className="font-medium text-slate-700">{device.deviceName}</span>
-                              <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-blue-500 text-white" title="配置支付方式数">
+                              <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-blue-500 text-white" title={t('pages.paymentSettings.configCountTooltip')}>
                                 {device.paymentMethods?.length || 0}
                               </span>
                             </button>
@@ -674,13 +674,13 @@ const PaymentSettings: React.FC = () => {
                       <span className="inline-flex items-center gap-2">
                         <span>Stripe Connect</span>
                         {stripeConnectStatus.status === 'active' && (
-                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600 ring-1 ring-green-200"><CheckCircle2 className="w-3 h-3" />已激活</span>
+                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600 ring-1 ring-green-200"><CheckCircle2 className="w-3 h-3" />{t('pages.paymentSettings.stripeActive')}</span>
                         )}
                         {stripeConnectStatus.status === 'pending' && (
-                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 ring-1 ring-amber-200"><AlertCircle className="w-3 h-3" />待完成</span>
+                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 ring-1 ring-amber-200"><AlertCircle className="w-3 h-3" />{t('pages.paymentSettings.stripePending')}</span>
                         )}
                         {stripeConnectStatus.status === 'not_connected' && (
-                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 ring-1 ring-slate-200"><XCircle className="w-3 h-3" />未连接</span>
+                          <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 ring-1 ring-slate-200"><XCircle className="w-3 h-3" />{t('pages.paymentSettings.stripeNotConnected')}</span>
                         )}
                       </span>
                     }
@@ -688,7 +688,7 @@ const PaymentSettings: React.FC = () => {
                       stripeConnectStatus.status === 'active' ? (
                         <a href="https://dashboard.stripe.com" target="_blank" rel="noreferrer"
                           className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
-                          <ExternalLink className="w-3.5 h-3.5" />Stripe 控制台
+                          <ExternalLink className="w-3.5 h-3.5" />{t('pages.paymentSettings.stripeConsoleLink')}
                         </a>
                       ) : undefined
                     }
@@ -696,34 +696,34 @@ const PaymentSettings: React.FC = () => {
                     {stripeConnectStatus.status === 'not_connected' && (
                       <div className="text-[13px] text-slate-600">
                         {isBranch
-                          ? <p className="m-0">直营分店无需单独创建 Stripe 账户，可绑定主店收款账户开通在线支付，资金统一进入主店账户并按门店归账。</p>
-                          : <p className="m-0">尚未连接 Stripe 账户。完成 Stripe Connect 设置后，即可接收在线支付。</p>}
+                          ? <p className="m-0">{t('pages.paymentSettings.branchNoStripeNeeded')}</p>
+                          : <p className="m-0">{t('pages.paymentSettings.notConnectedYetDesc')}</p>}
                       </div>
                     )}
 
                     {stripeConnectStatus.status === 'pending' && (
                       <dl className="text-sm space-y-2">
-                        <div className="flex gap-3"><dt className="text-slate-500 w-24">收款</dt><dd>{stripeConnectStatus.chargesEnabled
-                          ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600 ring-1 ring-green-200">已启用</span>
-                          : <span className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 ring-1 ring-amber-200">未激活</span>}</dd></div>
-                        <div className="flex gap-3"><dt className="text-slate-500 w-24">提现</dt><dd>{stripeConnectStatus.payoutsEnabled
-                          ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600 ring-1 ring-green-200">已启用</span>
-                          : <span className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 ring-1 ring-amber-200">未激活</span>}</dd></div>
+                        <div className="flex gap-3"><dt className="text-slate-500 w-24">{t('pages.paymentSettings.chargesLabel')}</dt><dd>{stripeConnectStatus.chargesEnabled
+                          ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600 ring-1 ring-green-200">{t('pages.paymentSettings.enabledStatus')}</span>
+                          : <span className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 ring-1 ring-amber-200">{t('pages.paymentSettings.notActiveStatus')}</span>}</dd></div>
+                        <div className="flex gap-3"><dt className="text-slate-500 w-24">{t('pages.paymentSettings.payoutsLabel')}</dt><dd>{stripeConnectStatus.payoutsEnabled
+                          ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600 ring-1 ring-green-200">{t('pages.paymentSettings.enabledStatus')}</span>
+                          : <span className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 ring-1 ring-amber-200">{t('pages.paymentSettings.notActiveStatus')}</span>}</dd></div>
                         {(stripeConnectStatus.requirements?.currentlyDue?.length ?? 0) > 0 && (
-                          <div className="flex gap-3"><dt className="text-slate-500 w-24">待补充资料</dt><dd className="text-amber-600 text-xs">{stripeConnectStatus.requirements!.currentlyDue.join('、')}</dd></div>
+                          <div className="flex gap-3"><dt className="text-slate-500 w-24">{t('pages.paymentSettings.pendingRequirementsLabel')}</dt><dd className="text-amber-600 text-xs">{stripeConnectStatus.requirements!.currentlyDue.join('、')}</dd></div>
                         )}
                       </dl>
                     )}
 
                     {stripeConnectStatus.status === 'active' && (
                       <dl className="text-sm space-y-2">
-                        <div className="flex gap-3"><dt className="text-slate-500 w-24">账户 ID</dt><dd className="font-mono text-xs text-slate-600">{stripeConnectStatus.accountId}</dd></div>
-                        <div className="flex gap-3"><dt className="text-slate-500 w-24">收款</dt><dd>{stripeConnectStatus.chargesEnabled
-                          ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600 ring-1 ring-green-200">已启用</span>
-                          : <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-600 ring-1 ring-red-200">已禁用</span>}</dd></div>
-                        <div className="flex gap-3"><dt className="text-slate-500 w-24">提现</dt><dd>{stripeConnectStatus.payoutsEnabled
-                          ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600 ring-1 ring-green-200">已启用</span>
-                          : <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-600 ring-1 ring-red-200">已禁用</span>}</dd></div>
+                        <div className="flex gap-3"><dt className="text-slate-500 w-24">{t('pages.paymentSettings.accountIdLabel')}</dt><dd className="font-mono text-xs text-slate-600">{stripeConnectStatus.accountId}</dd></div>
+                        <div className="flex gap-3"><dt className="text-slate-500 w-24">{t('pages.paymentSettings.chargesLabel')}</dt><dd>{stripeConnectStatus.chargesEnabled
+                          ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600 ring-1 ring-green-200">{t('pages.paymentSettings.enabledStatus')}</span>
+                          : <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-600 ring-1 ring-red-200">{t('pages.paymentSettings.disabledStatus')}</span>}</dd></div>
+                        <div className="flex gap-3"><dt className="text-slate-500 w-24">{t('pages.paymentSettings.payoutsLabel')}</dt><dd>{stripeConnectStatus.payoutsEnabled
+                          ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-600 ring-1 ring-green-200">{t('pages.paymentSettings.enabledStatus')}</span>
+                          : <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-600 ring-1 ring-red-200">{t('pages.paymentSettings.disabledStatus')}</span>}</dd></div>
                       </dl>
                     )}
 
@@ -731,13 +731,13 @@ const PaymentSettings: React.FC = () => {
                     <div className="mt-4">
                       {stripeConnectStatus.status === 'not_connected' && (
                         isBranch
-                          ? <Btn variant="primary" onClick={handleBindParentAccount} loading={stripeConnectLoading}>绑定主店收款账户</Btn>
-                          : <Btn variant="primary" onClick={handleStripeOnboard} loading={stripeConnectLoading}>连接 Stripe</Btn>
+                          ? <Btn variant="primary" onClick={handleBindParentAccount} loading={stripeConnectLoading}>{t('pages.paymentSettings.bindParentAccountBtn')}</Btn>
+                          : <Btn variant="primary" onClick={handleStripeOnboard} loading={stripeConnectLoading}>{t('pages.paymentSettings.connectStripeBtn')}</Btn>
                       )}
                       {stripeConnectStatus.status === 'pending' && (
                         isBranch
-                          ? <Btn variant="secondary" onClick={handleBindParentAccount} loading={stripeConnectLoading}>同步主店账户状态</Btn>
-                          : <Btn variant="primary" onClick={handleRefreshStripeOnboarding} loading={stripeConnectLoading}>继续完成设置</Btn>
+                          ? <Btn variant="secondary" onClick={handleBindParentAccount} loading={stripeConnectLoading}>{t('pages.paymentSettings.syncParentStatusBtn')}</Btn>
+                          : <Btn variant="primary" onClick={handleRefreshStripeOnboarding} loading={stripeConnectLoading}>{t('pages.paymentSettings.continueSetupBtn')}</Btn>
                       )}
                     </div>
                   </SectionCard>
@@ -754,21 +754,21 @@ const PaymentSettings: React.FC = () => {
       <Modal
         open={customModalVisible}
         onOpenChange={(o) => !o && setCustomModalVisible(false)}
-        title="添加自定义支付"
+        title={t('pages.paymentSettings.addCustomPaymentTitle')}
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
-            <Btn variant="secondary" onClick={() => setCustomModalVisible(false)}>取消</Btn>
-            <Btn variant="primary" loading={loading} onClick={handleCustomSubmit}>确定</Btn>
+            <Btn variant="secondary" onClick={() => setCustomModalVisible(false)}>{t('common.cancel')}</Btn>
+            <Btn variant="primary" loading={loading} onClick={handleCustomSubmit}>{t('common.confirm')}</Btn>
           </div>
         }
       >
         <div className="mb-4 px-3 py-2.5 bg-slate-100 rounded-md text-[13px] text-slate-600">
-          设备：{customModalDevice?.deviceName} ({customModalDevice?.deviceType})
+          {t('pages.paymentSettings.deviceLabel')}：{customModalDevice?.deviceName} ({customModalDevice?.deviceType})
         </div>
-        <FormRow label="支付方式名称">
+        <FormRow label={t('pages.paymentSettings.paymentMethodNameLabel')}>
           <TextInput className="w-full" value={customName} onChange={setCustomName} maxLength={30}
-            placeholder="例如：房间记账、挂账、员工账户..." />
+            placeholder={t('pages.paymentSettings.customNamePlaceholder')} />
         </FormRow>
         {customError && <p className="text-sm text-red-500 mt-2">{customError}</p>}
       </Modal>
@@ -777,8 +777,8 @@ const PaymentSettings: React.FC = () => {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
-        title="确认删除"
-        description={deleteTarget ? `确定要删除 ${deleteTarget.method.displayName} 吗？` : ''}
+        title={t('pages.paymentSettings.confirmDeleteTitle')}
+        description={deleteTarget ? t('pages.paymentSettings.confirmDeleteDesc', { name: deleteTarget.method.displayName }) : ''}
         danger
         loading={loading}
         onConfirm={confirmDeleteMethod}

@@ -10,6 +10,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import * as AlertDialog from '@radix-ui/react-alert-dialog'
 import * as RadixSelect from '@radix-ui/react-select'
 import clsx from 'clsx'
+import type { TooltipContentProps } from 'recharts'
 import {
   Loader2, Info, AlertTriangle, CheckCircle2, X, ChevronRight, ChevronLeft,
   Image as ImageIcon, Trash2, Check, ChevronsUpDown, Calendar as CalendarIcon, ArrowRight, Clock,
@@ -295,9 +296,9 @@ export function SectionCard({ title, description, action, children, bodyClassNam
   return (
     <div className="bg-white rounded-xl border border-slate-200">
       {(title || action) && (
-        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-100">
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-100 flex-wrap">
           <div className="min-w-0">
-            {title && <p className="text-sm font-semibold text-slate-900">{title}</p>}
+            {title && <p className="text-sm font-semibold text-slate-900 truncate">{title}</p>}
             {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
           </div>
           {action && <div className="shrink-0">{action}</div>}
@@ -566,7 +567,7 @@ export function DatePicker({ value, onChange, min, max, placeholder, disabled, c
   const month = viewDate.getMonth()
   const cells = monthCells(year, month)
 
-  const isDisabled = (d: Date) => (minD && d < minD) || (maxD && d > maxD)
+  const isDisabled = (d: Date) => !!((minD && d < minD) || (maxD && d > maxD))
   const today = new Date()
 
   return (
@@ -694,7 +695,7 @@ export function DateRangePicker({
 
   const minD = parseDate(min)
   const maxD = parseDate(max)
-  const isDisabled = (d: Date) => (minD && d < minD) || (maxD && d > maxD)
+  const isDisabled = (d: Date) => !!((minD && d < minD) || (maxD && d > maxD))
   const today = new Date()
 
   const rangeStart = pickingEnd ? draftStart : start
@@ -1117,6 +1118,28 @@ export function StatCard({ title, value, icon, tone = 'default' }: {
           {value}
         </p>
       </div>
+    </div>
+  )
+}
+
+// ─── 图表 tooltip（shadcn 风格：白卡片+阴影+色点+数值右对齐，纯 recharts + Tailwind） ──
+export function ChartTooltip({ active, payload, label, formatValue }: TooltipContentProps & {
+  formatValue?: (v: number) => string
+}) {
+  if (!active || !payload?.length) return null
+  const fmt = formatValue ?? ((v: number) => `$${v.toFixed(2)}`)
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md min-w-[9rem]">
+      <p className="text-xs text-slate-400 mb-1.5">{label}</p>
+      {payload.map((item) => (
+        <div key={String(item.dataKey)} className="flex items-center justify-between gap-4 text-sm">
+          <span className="flex items-center gap-1.5 text-slate-600">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
+            {item.name}
+          </span>
+          <span className="font-medium text-slate-900 tabular-nums">{fmt(Number(item.value ?? 0))}</span>
+        </div>
+      ))}
     </div>
   )
 }

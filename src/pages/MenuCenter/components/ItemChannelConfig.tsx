@@ -7,6 +7,7 @@
  *   KIOSK（自助点餐）        → auth-service devices（存在 KIOSK 类型设备）
  */
 import React, { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '../../../auth/AuthProvider'
 import { storeMenuService, type StoreItemChannel } from '../../../services/store-menu'
 import { getSalesChannels, type SalesChannel } from '../../../services/order-config'
@@ -49,6 +50,7 @@ interface Props {
 }
 
 const ItemChannelConfig: React.FC<Props> = ({ open, itemId, itemName, onClose }) => {
+  const { t } = useTranslation()
   const { organizations } = useAuthContext()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -160,7 +162,7 @@ const ItemChannelConfig: React.FC<Props> = ({ open, itemId, itemName, onClose })
     <Modal
       open={open}
       onOpenChange={v => !v && onClose()}
-      title={<span>可售范围 <span className="text-sm font-normal text-slate-400">— {itemName}</span></span>}
+      title={<span>{t('pages.menuCenter.saleRange')} <span className="text-sm font-normal text-slate-400">— {itemName}</span></span>}
       size="lg"
       footer={
         <>

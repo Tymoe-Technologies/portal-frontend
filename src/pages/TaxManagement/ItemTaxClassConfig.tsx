@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Settings, Search } from 'lucide-react'
 import {
   getItems,
@@ -29,6 +30,7 @@ interface ItemWithTaxInfo extends Item {
  * 为商品分配税类并计算含税价格
  */
 const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) => {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<ItemWithTaxInfo[]>([])
   const [taxClasses, setTaxClasses] = useState<TaxClass[]>([])
@@ -62,7 +64,7 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
 
       setItems(itemsWithTax)
     } catch (error: any) {
-      toast.error(`加载商品失败: ${error.message}`)
+      toast.error(t('pages.taxManagement.itemTaxClass.loadItemsFailed', { message: error.message }))
     } finally {
       setLoading(false)
     }
@@ -76,7 +78,7 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
       const classes = await getTaxClasses(regionCode)
       setTaxClasses(classes)
     } catch (error: any) {
-      toast.error(`加载税类失败: ${error.message}`)
+      toast.error(t('pages.taxManagement.itemTaxClass.loadTaxClassesFailed', { message: error.message }))
     }
   }
 
@@ -109,24 +111,24 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
       const result = await calculateItemTax(selectedItem.id, regionCode)
       setTaxResult(result)
     } catch (error: any) {
-      toast.error(`计算税费失败: ${error.message}`)
+      toast.error(t('pages.taxManagement.itemTaxClass.calculateTaxFailed', { message: error.message }))
     }
   }
 
   // 保存税类配置
   const handleSave = async () => {
     if (!selectedItem || selectedTaxClassIds.length === 0) {
-      toast.warning('请选择至少一个税类')
+      toast.warning(t('pages.taxManagement.itemTaxClass.selectAtLeastOneTaxClass'))
       return
     }
 
     try {
       await addMultipleItemTaxClasses(selectedItem.id, { taxClassIds: selectedTaxClassIds })
-      toast.success('税类配置成功')
+      toast.success(t('pages.taxManagement.itemTaxClass.taxClassConfigSuccess'))
       setModalVisible(false)
       loadItems()
     } catch (error: any) {
-      toast.error(`配置失败: ${error.message}`)
+      toast.error(t('pages.taxManagement.itemTaxClass.configFailed', { message: error.message }))
     }
   }
 
@@ -139,19 +141,19 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
   const columns: Column<ItemWithTaxInfo>[] = [
     {
       key: 'name',
-      title: '商品名称',
+      title: t('pages.taxManagement.itemTaxClass.colItemName'),
       width: 200,
       render: (r) => r.name
     },
     {
       key: 'basePrice',
-      title: '基础价格',
+      title: t('pages.taxManagement.itemTaxClass.colBasePrice'),
       width: 120,
       render: (r) => <span className="font-medium text-slate-700">{formatPrice(r.basePrice)}</span>
     },
     {
       key: 'taxClassNames',
-      title: '税类',
+      title: t('pages.taxManagement.itemTaxClass.colTaxClass'),
       width: 200,
       render: (r) =>
         r.taxClassNames && r.taxClassNames.length > 0 ? (
@@ -161,24 +163,24 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
             ))}
           </div>
         ) : (
-          <Badge variant="default">未配置</Badge>
+          <Badge variant="default">{t('pages.taxManagement.itemTaxClass.notConfigured')}</Badge>
         )
     },
     {
       key: 'isActive',
-      title: '状态',
+      title: t('pages.taxManagement.itemTaxClass.colStatus'),
       width: 100,
       align: 'center',
       render: (r) => (
-        <Badge variant={r.isActive ? 'green' : 'default'}>{r.isActive ? '启用' : '禁用'}</Badge>
+        <Badge variant={r.isActive ? 'green' : 'default'}>{r.isActive ? t('pages.taxManagement.itemTaxClass.statusEnabled') : t('pages.taxManagement.itemTaxClass.statusDisabled')}</Badge>
       )
     },
     {
       key: 'action',
-      title: '操作',
+      title: t('pages.taxManagement.itemTaxClass.colAction'),
       width: 120,
       render: (record) => (
-        <Btn variant="link" size="sm" icon={<Settings size={14} />} onClick={() => handleConfigClick(record)}>配置税类</Btn>
+        <Btn variant="link" size="sm" icon={<Settings size={14} />} onClick={() => handleConfigClick(record)}>{t('pages.taxManagement.itemTaxClass.configureTaxClassBtn')}</Btn>
       )
     }
   ]
@@ -190,13 +192,13 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
         <div className="relative w-80">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <TextInput
-            placeholder="搜索商品名称"
+            placeholder={t('pages.taxManagement.itemTaxClass.searchPlaceholder')}
             value={searchText}
             onChange={setSearchText}
             className="pl-9!"
           />
         </div>
-        <Btn variant="primary" onClick={loadItems}>刷新</Btn>
+        <Btn variant="primary" onClick={loadItems}>{t('common.refresh')}</Btn>
       </div>
 
       {/* 商品列表 */}
@@ -212,18 +214,18 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
         open={modalVisible}
         onOpenChange={(o) => { if (!o) setModalVisible(false) }}
         size="lg"
-        title={`配置商品税类: ${selectedItem?.name || ''}`}
+        title={t('pages.taxManagement.itemTaxClass.configModalTitle', { name: selectedItem?.name || '' })}
         footer={
           <>
-            <Btn variant="secondary" onClick={() => setModalVisible(false)}>取消</Btn>
-            <Btn variant="primary" onClick={handleSave}>保存</Btn>
+            <Btn variant="secondary" onClick={() => setModalVisible(false)}>{t('common.cancel')}</Btn>
+            <Btn variant="primary" onClick={handleSave}>{t('common.save')}</Btn>
           </>
         }
       >
         <div className="space-y-6">
           {/* 商品基本信息 */}
           <div>
-            <span className="text-slate-400">商品基础价格：</span>
+            <span className="text-slate-400">{t('pages.taxManagement.itemTaxClass.basePriceLabel')}</span>
             <span className="ml-2 text-base font-medium text-slate-700">
               {selectedItem && formatPrice(selectedItem.basePrice)}
             </span>
@@ -231,9 +233,9 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
 
           {/* 税类选择（多选） */}
           <div>
-            <div className="mb-2 font-medium text-slate-700">选择税类（可多选）：</div>
+            <div className="mb-2 font-medium text-slate-700">{t('pages.taxManagement.itemTaxClass.selectTaxClassLabel')}</div>
             {taxClasses.length === 0 ? (
-              <div className="text-sm text-slate-400">暂无可用税类</div>
+              <div className="text-sm text-slate-400">{t('pages.taxManagement.itemTaxClass.noTaxClassesAvailable')}</div>
             ) : (
               <div className="space-y-2">
                 {taxClasses.map(taxClass => (
@@ -266,17 +268,17 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
 
           {/* 计算税费按钮 */}
           <Btn variant="secondary" onClick={handleCalculateTax} disabled={selectedTaxClassIds.length === 0} className="w-full">
-            预览税费计算
+            {t('pages.taxManagement.itemTaxClass.previewTaxCalcBtn')}
           </Btn>
 
           {/* 税费计算结果 */}
           {taxResult && (
             <AlertBox
               type="success"
-              title="税费计算结果"
+              title={t('pages.taxManagement.itemTaxClass.taxCalcResultTitle')}
               description={
                 <div className="space-y-1">
-                  <div><span>基础价格：</span><span className="font-medium">{taxResult.basePriceDisplay}</span></div>
+                  <div><span>{t('pages.taxManagement.itemTaxClass.basePriceLabel2')}</span><span className="font-medium">{taxResult.basePriceDisplay}</span></div>
 
                   {taxResult.taxes.map((tax, idx) => (
                     <div key={idx}>
@@ -287,12 +289,12 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
                   ))}
 
                   <div className="mt-2 border-t border-slate-200 pt-2">
-                    <span>总税费：</span>
+                    <span>{t('pages.taxManagement.itemTaxClass.totalTaxLabel')}</span>
                     <span className="font-medium text-red-500">{taxResult.totalTaxDisplay}</span>
                   </div>
 
                   <div>
-                    <span>最终价格：</span>
+                    <span>{t('pages.taxManagement.itemTaxClass.finalPriceLabel')}</span>
                     <span className="text-base font-medium text-green-600">{taxResult.finalPriceDisplay}</span>
                   </div>
                 </div>

@@ -31,10 +31,7 @@ import './OrganizationManagement.css'
 // ============ 营业时间编辑器 ============
 
 const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
-const WEEKDAY_LABELS: Record<string, string> = {
-  monday: '周一', tuesday: '周二', wednesday: '周三', thursday: '周四',
-  friday: '周五', saturday: '周六', sunday: '周日',
-}
+const weekdayLabelKey = (day: string) => `organization.weekday${day.charAt(0).toUpperCase()}${day.slice(1)}`
 
 interface DayPeriod { open: string; close: string; nextDay?: boolean }
 interface DayHours { closed: boolean; periods: DayPeriod[] }
@@ -62,6 +59,7 @@ function fromDayState(state: DayState): DayHours {
 }
 
 function DayEditor({ day, state, onChange, onCopy }: { day: string; state: DayState; onChange: (s: DayState) => void; onCopy: () => void }) {
+  const { t } = useTranslation()
   const setPeriod = (i: number, patch: Partial<PeriodState>) => {
     const periods = state.periods.map((p, idx) => idx === i ? { ...p, ...patch } : p)
     onChange({ ...state, periods })
@@ -71,13 +69,13 @@ function DayEditor({ day, state, onChange, onCopy }: { day: string; state: DaySt
 
   return (
     <div className="flex items-start gap-3 mb-3">
-      <span className="w-14 shrink-0 text-sm font-semibold text-slate-700 leading-8">{WEEKDAY_LABELS[day]}</span>
+      <span className="w-14 shrink-0 text-sm font-semibold text-slate-700 leading-8">{t(weekdayLabelKey(day))}</span>
       <div className="w-20 shrink-0 leading-8">
-        <Checkbox checked={state.closed} onCheckedChange={v => onChange({ ...state, closed: v })} label="休息" />
+        <Checkbox checked={state.closed} onCheckedChange={v => onChange({ ...state, closed: v })} label={t('organization.closedLabel')} />
       </div>
       <div className="flex-1 min-w-0">
         {state.closed ? (
-          <span className="text-sm text-slate-400 leading-8">全天休息</span>
+          <span className="text-sm text-slate-400 leading-8">{t('organization.allDayClosed')}</span>
         ) : (
           <div className="flex flex-col gap-1.5">
             {state.periods.map((period, i) => (
@@ -95,8 +93,8 @@ function DayEditor({ day, state, onChange, onCopy }: { day: string; state: DaySt
                   onChange={e => setPeriod(i, { close: e.target.value })}
                   className="text-sm bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
                 />
-                <span title="结束时间是次日（跨午夜）">
-                  <Checkbox checked={period.nextDay} onCheckedChange={v => setPeriod(i, { nextDay: v })} label="次日" />
+                <span title={t('organization.nextDayTooltip')}>
+                  <Checkbox checked={period.nextDay} onCheckedChange={v => setPeriod(i, { nextDay: v })} label={t('organization.nextDayLabel')} />
                 </span>
                 {state.periods.length > 1 && (
                   <Btn variant="ghost" size="sm" icon={<Trash2 className="w-3.5 h-3.5 text-red-500" />} onClick={() => removePeriod(i)} />
@@ -104,13 +102,13 @@ function DayEditor({ day, state, onChange, onCopy }: { day: string; state: DaySt
               </div>
             ))}
             <div className="mt-0.5">
-              <Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={addPeriod}>加一段</Btn>
+              <Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={addPeriod}>{t('organization.addPeriodBtn')}</Btn>
             </div>
           </div>
         )}
       </div>
       <div className="shrink-0 mt-0.5">
-        <Btn variant="secondary" size="sm" icon={<Copy className="w-3.5 h-3.5" />} onClick={onCopy}>复制到其他天</Btn>
+        <Btn variant="secondary" size="sm" icon={<Copy className="w-3.5 h-3.5" />} onClick={onCopy}>{t('organization.copyToOtherDaysBtn')}</Btn>
       </div>
     </div>
   )
@@ -396,7 +394,7 @@ const OrganizationManagement: React.FC = () => {
     if (!name) {
       next.orgName = t('organization.orgNameRequired')
     } else if (name.length < 2 || name.length > 100) {
-      next.orgName = '组织名称长度为2-100字符'
+      next.orgName = t('organization.orgNameLength')
     }
     if (!form.orgType) {
       next.orgType = t('organization.orgTypeRequired')
@@ -508,7 +506,7 @@ const OrganizationManagement: React.FC = () => {
 
         // 验证必填字段
         if (!createPayload.orgName || !createPayload.orgType) {
-          throw new Error('组织名称和组织类型是必填项')
+          throw new Error(t('organization.orgNameAndTypeRequired'))
         }
 
         const newOrg = await createOrganization(createPayload, 'beverage')
@@ -591,7 +589,7 @@ const OrganizationManagement: React.FC = () => {
     }))
     setErrors(prev => ({ ...prev, location: undefined }))
     if (detectedTz) {
-      toast.info(`已自动识别时区：${detectedTz}`)
+      toast.info(t('organization.timezoneAutoDetected', { tz: detectedTz }))
     }
   }
 
@@ -766,7 +764,7 @@ const OrganizationManagement: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <div className="p-6 text-center">
-        <span className="text-slate-600">请先登录以使用组织管理功能</span>
+        <span className="text-slate-600">{t('organization.pleaseLoginFirst')}</span>
       </div>
     )
   }
@@ -774,9 +772,9 @@ const OrganizationManagement: React.FC = () => {
   const isMainOrg = form.orgType === 'MAIN'
 
   const tabItems = [
-    { key: 'basic', label: '基本信息' },
-    { key: 'address', label: '地址信息' },
-    { key: 'hours', label: '营业时间' },
+    { key: 'basic', label: t('organization.tabBasic') },
+    { key: 'address', label: t('organization.tabAddress') },
+    { key: 'hours', label: t('organization.tabHours') },
   ]
 
   return (
@@ -1057,7 +1055,7 @@ const OrganizationManagement: React.FC = () => {
                       </Btn>
                       {currentLogoUrl && (
                         <Btn variant="link" size="sm" onClick={() => setLogoDeleteConfirm(true)} className="text-red-500! hover:text-red-600! px-0!">
-                          删除 Logo
+                          {t('organization.deleteLogoBtn')}
                         </Btn>
                       )}
                     </div>
@@ -1079,7 +1077,7 @@ const OrganizationManagement: React.FC = () => {
                         alt="Logo"
                         className="w-20 h-20 object-contain rounded-lg border border-slate-200"
                       />
-                      <Badge variant="blue">继承自 {parentOrg?.orgName}</Badge>
+                      <Badge variant="blue">{t('organization.inheritedFromBadge', { name: parentOrg?.orgName })}</Badge>
                     </div>
                   </div>
                 )
@@ -1140,18 +1138,18 @@ const OrganizationManagement: React.FC = () => {
                 label={
                   <span className="inline-flex items-center gap-1">
                     <Globe className="w-4 h-4" />
-                    {t('organization.timezone', '门店时区')}
+                    {t('organization.timezone')}
                   </span>
                 }
-                hint={t('organization.timezoneTooltip', '设置门店所在时区，用于订单时间、营业日和报表的正确展示。未设置时使用设备本地时区。')}
+                hint={t('organization.timezoneTooltip')}
               >
                 <SelectInput
                   value={form.timezone || ''}
                   onChange={(v) => setField('timezone', v || undefined)}
-                  placeholder={t('organization.timezonePlaceholder', '选择门店时区')}
+                  placeholder={t('organization.timezonePlaceholder')}
                   className="w-full"
                   options={[
-                    { label: t('organization.timezonePlaceholder', '选择门店时区'), value: '' },
+                    { label: t('organization.timezonePlaceholder'), value: '' },
                     ...TIMEZONE_OPTIONS,
                   ]}
                 />
@@ -1177,7 +1175,7 @@ const OrganizationManagement: React.FC = () => {
                       }
                       return next
                     })
-                    toast.success(`已将 ${WEEKDAY_LABELS[day]} 的营业时间复制到其他天`)
+                    toast.success(t('organization.businessHoursCopiedToast', { day: t(weekdayLabelKey(day)) }))
                   }}
                 />
               ))}

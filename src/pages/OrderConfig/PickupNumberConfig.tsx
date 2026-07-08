@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Save, RotateCcw } from 'lucide-react'
 import {
   getPickupNumberConfig,
@@ -20,12 +21,12 @@ const DEFAULT_PREFIX: Record<string, string> = {
   KIOSK: 'K',
 }
 
-// 终端显示名称与徽章配色
-const TERMINAL_DISPLAY: Record<string, { label: string; variant: 'blue' | 'green' | 'gold' }> = {
-  POS: { label: 'POS 收银', variant: 'blue' },
-  WEB: { label: '在线点单', variant: 'green' },
-  KIOSK: { label: '自助点单', variant: 'gold' },
-}
+// 终端显示名称与徽章配色（需要 t 函数，在组件内调用）
+const getTerminalDisplay = (t: (key: string) => string): Record<string, { label: string; variant: 'blue' | 'green' | 'gold' }> => ({
+  POS: { label: t('pages.orderConfig.pickupNumberConfig.posTerminal'), variant: 'blue' },
+  WEB: { label: t('pages.orderConfig.pickupNumberConfig.webTerminal'), variant: 'green' },
+  KIOSK: { label: t('pages.orderConfig.pickupNumberConfig.kioskTerminal'), variant: 'gold' },
+})
 
 interface TerminalRow {
   terminal: string   // 订单终端类型：POS / WEB / KIOSK
@@ -34,6 +35,8 @@ interface TerminalRow {
 
 const PickupNumberConfig: React.FC = () => {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+  const TERMINAL_DISPLAY = getTerminalDisplay(t)
 
   const [config, setConfig] = useState<PickupNumberConfigType>({ startAt: 1, showPrefix: true, channelPrefixes: {}, queueDisplayEnabled: false })
   const [loading, setLoading] = useState(true)
@@ -65,7 +68,7 @@ const PickupNumberConfig: React.FC = () => {
       setEditPrefixes({ ...(data.channelPrefixes ?? {}) })
       setEditQueueDisplay(data.queueDisplayEnabled ?? false)
     } catch {
-      notify('error', '获取取餐号配置失败')
+      notify('error', t('pages.orderConfig.pickupNumberConfig.loadConfigFailed'))
     } finally {
       setLoading(false)
     }
@@ -85,11 +88,11 @@ const PickupNumberConfig: React.FC = () => {
       const rows: TerminalRow[] = []
 
       // POS 终端固定显示
-      rows.push({ terminal: 'POS', displayName: 'POS 收银' })
+      rows.push({ terminal: 'POS', displayName: t('pages.orderConfig.pickupNumberConfig.posTerminal') })
 
       // WEB 终端：在线点单功能开启时显示
       if (onlineConfig?.enabled) {
-        rows.push({ terminal: 'WEB', displayName: '在线点单' })
+        rows.push({ terminal: 'WEB', displayName: t('pages.orderConfig.pickupNumberConfig.webTerminal') })
       }
 
       // KIOSK 终端：销售渠道中有激活的 SELF_SERVICE 时显示
@@ -101,7 +104,7 @@ const PickupNumberConfig: React.FC = () => {
       setTerminalRows(rows)
     } catch {
       // 出错时至少保留 POS
-      setTerminalRows([{ terminal: 'POS', displayName: 'POS 收银' }])
+      setTerminalRows([{ terminal: 'POS', displayName: t('pages.orderConfig.pickupNumberConfig.errorFallbackPos') }])
     } finally {
       setTerminalsLoading(false)
     }
@@ -120,10 +123,10 @@ const PickupNumberConfig: React.FC = () => {
         if (val) channelPrefixes[row.terminal] = val
       }
       await updatePickupNumberConfig({ startAt: editStartAt, showPrefix: editShowPrefix, channelPrefixes, queueDisplayEnabled: editQueueDisplay })
-      notify('success', '取餐号配置已保存')
+      notify('success', t('pages.orderConfig.pickupNumberConfig.savedSuccess'))
       fetchConfig()
     } catch {
-      notify('error', '保存失败，请重试')
+      notify('error', t('pages.orderConfig.pickupNumberConfig.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -153,7 +156,7 @@ const PickupNumberConfig: React.FC = () => {
   const terminalColumns: Column<TerminalRow>[] = [
     {
       key: 'terminal',
-      title: '终端',
+      title: t('pages.orderConfig.pickupNumberConfig.terminalColumn'),
       width: 220,
       render: row => (
         <div className="flex items-center gap-2">
@@ -166,14 +169,14 @@ const PickupNumberConfig: React.FC = () => {
     },
     {
       key: 'prefix',
-      title: '终端标识',
+      title: t('pages.orderConfig.pickupNumberConfig.terminalIdentifierColumn'),
       width: 160,
       render: row => (
         <div className="w-32">
           <TextInput
             value={editPrefixes[row.terminal] ?? DEFAULT_PREFIX[row.terminal] ?? ''}
             onChange={val => setEditPrefixes(prev => ({ ...prev, [row.terminal]: val.slice(0, 5) }))}
-            placeholder={`默认：${DEFAULT_PREFIX[row.terminal] ?? row.terminal}`}
+            placeholder={t('pages.orderConfig.pickupNumberConfig.terminalIdentifierPlaceholder', { defaultPrefix: DEFAULT_PREFIX[row.terminal] ?? row.terminal })}
             maxLength={5}
           />
         </div>
@@ -181,7 +184,7 @@ const PickupNumberConfig: React.FC = () => {
     },
     {
       key: 'preview',
-      title: '预览效果',
+      title: t('pages.orderConfig.pickupNumberConfig.previewColumn'),
       render: row => (
         <span className="text-slate-500 font-mono text-xs">
           {previewNums.map(n => formatPreview(n, row.terminal)).join('  →  ')}
@@ -193,8 +196,8 @@ const PickupNumberConfig: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto px-6 py-8">
       <PageHeader
-        title="取餐号配置"
-        description="所有终端共享一个递增计数器，每天自动重置，通过终端标识区分订单终端类型。"
+        title={t('pages.orderConfig.pickupNumberConfig.pageTitle')}
+        description={t('pages.orderConfig.pickupNumberConfig.pageDescription')}
         onBack={() => navigate('/order-config')}
       />
 
@@ -203,7 +206,7 @@ const PickupNumberConfig: React.FC = () => {
 
         <AlertBox
           type="info"
-          title="修改起始号后，当天已生成的取餐号不受影响，从下一个订单起生效。"
+          title={t('pages.orderConfig.pickupNumberConfig.resetNoticeBanner')}
         />
 
         {loading ? (
@@ -211,21 +214,21 @@ const PickupNumberConfig: React.FC = () => {
         ) : (
           <>
             {/* 基础配置 */}
-            <SectionCard title="基础配置">
-              <FormRow label="当日起始号" hint="每天第一单的取餐号">
+            <SectionCard title={t('pages.orderConfig.pickupNumberConfig.basicConfigTitle')}>
+              <FormRow label={t('pages.orderConfig.pickupNumberConfig.startAtLabel')} hint={t('pages.orderConfig.pickupNumberConfig.startAtHint')}>
                 <NumberInput value={editStartAt} onChange={v => v > 0 && setEditStartAt(v)} min={1} max={99999} />
               </FormRow>
 
               <FormRow
-                label="显示终端标识"
-                hint={editShowPrefix ? '开启：取餐号前加终端标识' : '关闭：仅显示数字'}
+                label={t('pages.orderConfig.pickupNumberConfig.showPrefixLabel')}
+                hint={editShowPrefix ? t('pages.orderConfig.pickupNumberConfig.showPrefixHintOn') : t('pages.orderConfig.pickupNumberConfig.showPrefixHintOff')}
               >
                 <Switch checked={editShowPrefix} onCheckedChange={setEditShowPrefix} />
               </FormRow>
 
               <FormRow
-                label="叫号屏模式"
-                hint={editQueueDisplay ? '已开启：订单需经过 制作中 → 待取餐 流程' : '已关闭：订单可直接完成'}
+                label={t('pages.orderConfig.pickupNumberConfig.queueDisplayLabel')}
+                hint={editQueueDisplay ? t('pages.orderConfig.pickupNumberConfig.queueDisplayHintOn') : t('pages.orderConfig.pickupNumberConfig.queueDisplayHintOff')}
               >
                 <Switch checked={editQueueDisplay} onCheckedChange={setEditQueueDisplay} />
               </FormRow>
@@ -234,26 +237,26 @@ const PickupNumberConfig: React.FC = () => {
                 <div className="pt-3">
                   <AlertBox
                     type="warning"
-                    title="开启后，POS 订单不能直接完成，必须依次流转：确认 → 制作中 → 待取餐 → 完成"
+                    title={t('pages.orderConfig.pickupNumberConfig.queueDisplayWarning')}
                   />
                 </div>
               )}
             </SectionCard>
 
             {/* 终端标识配置 / 预览 */}
-            <SectionCard title="终端标识配置" description={terminalsLoading ? '加载终端中…' : undefined}>
+            <SectionCard title={t('pages.orderConfig.pickupNumberConfig.terminalConfigTitle')} description={terminalsLoading ? t('pages.orderConfig.pickupNumberConfig.terminalsLoading') : undefined}>
               {editShowPrefix ? (
                 <Table
                   columns={terminalColumns}
                   data={terminalRows}
                   rowKey={row => row.terminal}
-                  empty="暂无可配置的终端"
+                  empty={t('pages.orderConfig.pickupNumberConfig.noConfigurableTerminals')}
                 />
               ) : (
                 <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <span className="text-slate-400">预览效果：</span>
+                  <span className="text-slate-400">{t('pages.orderConfig.pickupNumberConfig.previewLabel')}</span>
                   <span className="font-mono">{previewNums.join('  →  ')}</span>
-                  <span className="text-xs text-slate-400">（所有终端共享）</span>
+                  <span className="text-xs text-slate-400">{t('pages.orderConfig.pickupNumberConfig.sharedAcrossTerminals')}</span>
                 </div>
               )}
             </SectionCard>
@@ -261,10 +264,10 @@ const PickupNumberConfig: React.FC = () => {
             {/* 操作按钮 */}
             <div className="flex justify-end gap-2 pt-2">
               <Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} onClick={handleReset} disabled={saving}>
-                重置
+                {t('pages.orderConfig.pickupNumberConfig.resetBtn')}
               </Btn>
               <Btn variant="primary" icon={<Save className="w-3.5 h-3.5" />} loading={saving} disabled={!hasChanges} onClick={handleSave}>
-                保存配置
+                {t('pages.orderConfig.pickupNumberConfig.saveConfigBtn')}
               </Btn>
             </div>
           </>

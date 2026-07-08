@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Pencil, RotateCcw, GitBranch } from 'lucide-react'
 import { storeMenuService, type StoreMenuItem } from '../../services/store-menu'
 import { itemManagementService, type ItemModifierGroup } from '../../services/item-management'
@@ -19,6 +20,7 @@ const fmtYuan = (v: number | undefined | null) => (v != null ? Number(v).toFixed
 const numCls = 'text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 w-24 focus:outline-2 focus:outline-slate-900'
 
 const StoreMenuManager: React.FC = () => {
+  const { t } = useTranslation()
   const [items, setItems] = useState<StoreMenuItem[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -41,7 +43,7 @@ const StoreMenuManager: React.FC = () => {
       const menu = await storeMenuService.getStoreMenu()
       setItems(menu.items)
     } catch {
-      toast.error('加载商品列表失败')
+      toast.error(t('pages.menuCenter.storeMenuManager.loadItemsFailed'))
     } finally {
       setLoading(false)
     }
@@ -51,9 +53,9 @@ const StoreMenuManager: React.FC = () => {
     try {
       await storeMenuService.upsertStoreMenuConfig(item.id, { isAvailable })
       setItems(prev => prev.map(i => i.id === item.id ? { ...i, isAvailable } : i))
-      toast.success(isAvailable ? '商品已启用' : '商品已停用')
+      toast.success(isAvailable ? t('pages.menuCenter.storeMenuManager.itemEnabled') : t('pages.menuCenter.storeMenuManager.itemDisabled'))
     } catch {
-      toast.error('操作失败')
+      toast.error(t('pages.menuCenter.storeMenuManager.operationFailed'))
     }
   }
 
@@ -86,11 +88,11 @@ const StoreMenuManager: React.FC = () => {
       if (modifierPrices.length > 0) {
         await storeMenuService.setStoreModifierPrices(priceOverrideModal.item.id, modifierPrices)
       }
-      toast.success('价格已保存')
+      toast.success(t('pages.menuCenter.storeMenuManager.priceSaved'))
       setPriceOverrideModal(null)
       loadItems()
     } catch {
-      toast.error('保存失败')
+      toast.error(t('pages.menuCenter.storeMenuManager.saveFailed'))
     } finally {
       setSavingPrice(false)
     }
@@ -98,35 +100,35 @@ const StoreMenuManager: React.FC = () => {
 
   const columns: Column<StoreMenuItem>[] = [
     {
-      key: 'name', title: '商品名称',
+      key: 'name', title: t('pages.menuCenter.storeMenuManager.columnName'),
       render: r => (
         <div className="flex items-center gap-2">
           <span className="text-slate-800">{r.name}</span>
-          {r.scope === 'STORE_EXCLUSIVE' && <Badge variant="gold">专属</Badge>}
-          {r.hasStoreOverride && <Badge variant="blue">已配置</Badge>}
+          {r.scope === 'STORE_EXCLUSIVE' && <Badge variant="gold">{t('pages.menuCenter.storeMenuManager.exclusiveBadge')}</Badge>}
+          {r.hasStoreOverride && <Badge variant="blue">{t('pages.menuCenter.storeMenuManager.configuredBadge')}</Badge>}
         </div>
       ),
     },
-    { key: 'basePrice', title: '品牌定价', width: 110, render: r => fmtYuan(r.basePrice) },
+    { key: 'basePrice', title: t('pages.menuCenter.storeMenuManager.columnBasePrice'), width: 110, render: r => fmtYuan(r.basePrice) },
     {
-      key: 'effectivePrice', title: '门店售价', width: 140,
+      key: 'effectivePrice', title: t('pages.menuCenter.storeMenuManager.columnEffectivePrice'), width: 140,
       render: r => (
         <div className="flex items-center gap-2">
           <span className="font-semibold text-slate-800">{fmtYuan(r.effectivePrice)}</span>
-          {r.effectivePrice !== r.basePrice && <Badge variant="gold">已覆盖</Badge>}
+          {r.effectivePrice !== r.basePrice && <Badge variant="gold">{t('pages.menuCenter.storeMenuManager.overriddenBadge')}</Badge>}
         </div>
       ),
     },
     {
-      key: 'isAvailable', title: '本店可用', width: 100,
+      key: 'isAvailable', title: t('pages.menuCenter.storeMenuManager.columnIsAvailable'), width: 100,
       render: r => <Switch checked={r.isAvailable} onCheckedChange={v => handleToggleAvailability(r, v)} />,
     },
     {
-      key: 'actions', title: '操作', width: 160,
+      key: 'actions', title: t('pages.menuCenter.storeMenuManager.columnActions'), width: 160,
       render: r => (
         <div className="flex items-center gap-1.5">
-          <Btn variant="secondary" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openPriceOverride(r)}>改价</Btn>
-          <Btn variant="secondary" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: r.id, name: r.name })}>渠道</Btn>
+          <Btn variant="secondary" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openPriceOverride(r)}>{t('pages.menuCenter.storeMenuManager.priceOverrideAction')}</Btn>
+          <Btn variant="secondary" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: r.id, name: r.name })}>{t('pages.menuCenter.storeMenuManager.channelAction')}</Btn>
         </div>
       ),
     },
@@ -135,14 +137,14 @@ const StoreMenuManager: React.FC = () => {
   return (
     <>
       <SectionCard
-        title={<span className="inline-flex items-center gap-2">本店菜单
-          <Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading} onClick={loadItems}>刷新</Btn>
+        title={<span className="inline-flex items-center gap-2">{t('pages.menuCenter.storeMenuManager.pageTitle')}
+          <Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading} onClick={loadItems}>{t('pages.menuCenter.storeMenuManager.refreshAction')}</Btn>
         </span>}
-        description="金色「专属」= 仅本店可见的商品"
+        description={t('pages.menuCenter.storeMenuManager.pageDescription')}
         bodyClassName="p-0"
       >
         <div className="p-4">
-          <Table columns={columns} data={items} rowKey={r => r.id} loading={loading} empty="暂无商品" />
+          <Table columns={columns} data={items} rowKey={r => r.id} loading={loading} empty={t('pages.menuCenter.storeMenuManager.emptyItems')} />
         </div>
       </SectionCard>
 
@@ -150,17 +152,17 @@ const StoreMenuManager: React.FC = () => {
       <Modal
         open={!!priceOverrideModal}
         onOpenChange={v => !v && setPriceOverrideModal(null)}
-        title={`覆盖价格 — ${priceOverrideModal?.item.name ?? ''}`}
+        title={t('pages.menuCenter.storeMenuManager.priceOverrideModalTitle', { name: priceOverrideModal?.item.name ?? '' })}
         size="lg"
-        footer={<><Btn variant="secondary" onClick={() => setPriceOverrideModal(null)}>取消</Btn><Btn variant="primary" loading={savingPrice} onClick={handleSavePriceOverride}>保存</Btn></>}
+        footer={<><Btn variant="secondary" onClick={() => setPriceOverrideModal(null)}>{t('pages.menuCenter.storeMenuManager.cancelAction')}</Btn><Btn variant="primary" loading={savingPrice} onClick={handleSavePriceOverride}>{t('pages.menuCenter.storeMenuManager.saveAction')}</Btn></>}
       >
         <div className="space-y-4">
           <div>
-            <p className="text-sm font-medium text-slate-700">品牌定价：{priceOverrideModal ? fmtYuan(priceOverrideModal.item.basePrice) : ''}</p>
-            <p className="text-xs text-slate-400 mt-0.5">留空则恢复使用品牌定价</p>
+            <p className="text-sm font-medium text-slate-700">{t('pages.menuCenter.storeMenuManager.basePriceLabel', { price: priceOverrideModal ? fmtYuan(priceOverrideModal.item.basePrice) : '' })}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{t('pages.menuCenter.storeMenuManager.basePriceHint')}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">本店售价（元）</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('pages.menuCenter.storeMenuManager.storePriceLabel')}</label>
             <NumberInput value={priceOverride} onChange={setPriceOverride} min={0} className="w-full" />
           </div>
 
@@ -169,10 +171,10 @@ const StoreMenuManager: React.FC = () => {
           ) : itemModifierGroups.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-medium text-slate-400">自定义选项价格覆盖</span>
+                <span className="text-xs font-medium text-slate-400">{t('pages.menuCenter.storeMenuManager.modifierOverrideTitle')}</span>
                 <span className="flex-1 h-px bg-slate-100" />
               </div>
-              <p className="text-xs text-slate-400 mb-3">留空使用品牌价格；填入后仅本店生效</p>
+              <p className="text-xs text-slate-400 mb-3">{t('pages.menuCenter.storeMenuManager.modifierOverrideHint')}</p>
               {itemModifierGroups.map(ig => (
                 <div key={ig.modifierGroupId} className="mb-4">
                   <p className="text-xs text-slate-500 mb-1.5">{ig.group?.displayName || ig.modifierGroupId}</p>
@@ -180,9 +182,9 @@ const StoreMenuManager: React.FC = () => {
                     {(ig.group?.options || []).map((opt: any) => (
                       <div key={opt.id} className="flex items-center gap-1.5">
                         <span className="flex-1 min-w-0 truncate text-xs text-slate-700" title={opt.displayName}>{opt.displayName}</span>
-                        <span className="text-[11px] text-slate-400 shrink-0">品牌 {fmtYuan(opt.defaultPrice)}</span>
+                        <span className="text-[11px] text-slate-400 shrink-0">{t('pages.menuCenter.storeMenuManager.brandPriceLabel', { price: fmtYuan(opt.defaultPrice) })}</span>
                         <input
-                          type="number" min={0} step="0.01" placeholder="覆盖" className={numCls}
+                          type="number" min={0} step="0.01" placeholder={t('pages.menuCenter.storeMenuManager.overridePlaceholder')} className={numCls}
                           value={modifierPriceOverrides[opt.id] ?? ''}
                           onChange={e => setModifierPriceOverrides(prev => ({ ...prev, [opt.id]: e.target.value }))}
                         />

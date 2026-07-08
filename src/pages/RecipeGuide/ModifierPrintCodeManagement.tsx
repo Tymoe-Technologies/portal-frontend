@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { RefreshCw, Save } from 'lucide-react'
 import {
   SectionCard,
@@ -18,6 +19,7 @@ import {
 } from '../../services/item-management'
 
 const ModifierPrintCodeManagement: React.FC = () => {
+  const { t } = useTranslation()
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -57,7 +59,7 @@ const ModifierPrintCodeManagement: React.FC = () => {
       setEditingUsageValues({})
     } catch (error) {
       console.error('Failed to load modifier groups:', error)
-      toast.error('加载自定义选项组失败')
+      toast.error(t('pages.recipeGuide.modifierPrintCode.loadFailed') as string)
       setModifierGroups([])
     } finally {
       setLoading(false)
@@ -129,9 +131,9 @@ const ModifierPrintCodeManagement: React.FC = () => {
         const status = error?.response?.status
         const errMsg = error?.response?.data?.error || error?.message || ''
         if (status === 409) {
-          errors.push(errMsg || `「${option.displayName}」打印代码重复`)
+          errors.push(errMsg || (t('pages.recipeGuide.modifierPrintCode.duplicatePrintCode', { name: option.displayName }) as string))
         } else {
-          errors.push(`「${option.displayName}」保存失败`)
+          errors.push(t('pages.recipeGuide.modifierPrintCode.saveOneFailed', { name: option.displayName }) as string)
         }
       }
     }
@@ -139,9 +141,9 @@ const ModifierPrintCodeManagement: React.FC = () => {
     setSaving(false)
 
     if (errors.length === 0) {
-      toast.success(`已保存 ${changed.length} 条`)
+      toast.success(t('pages.recipeGuide.modifierPrintCode.savedCount', { count: changed.length }) as string)
     } else if (errors.length < changed.length) {
-      toast.warning(`部分保存失败：${errors.join('；')}`)
+      toast.warning(t('pages.recipeGuide.modifierPrintCode.partialSaveFailed', { errors: errors.join('；') }) as string)
     } else {
       toast.error(errors.join('；'))
     }
@@ -152,19 +154,19 @@ const ModifierPrintCodeManagement: React.FC = () => {
     const options = group.options || []
 
     if (options.length === 0) {
-      return <EmptyState title="该组暂无选项" />
+      return <EmptyState title={t('pages.recipeGuide.modifierPrintCode.noOptionsInGroup') as string} />
     }
 
     const subColumns: Column<ModifierOption>[] = [
       {
         key: 'displayName',
-        title: '选项名称',
+        title: t('pages.recipeGuide.modifierPrintCode.optionName') as string,
         width: 140,
         render: (r) => r.displayName
       },
       {
         key: 'code',
-        title: '打印代码',
+        title: t('pages.recipeGuide.modifierPrintCode.printCode') as string,
         width: 160,
         render: (record) => {
           const savedBase = record.printBaseCode ?? ''
@@ -173,7 +175,7 @@ const ModifierPrintCodeManagement: React.FC = () => {
           return (
             <TextInput
               value={editValue}
-              placeholder="如: LICE, P, C"
+              placeholder={t('pages.recipeGuide.modifierPrintCode.printCodePlaceholder') as string}
               maxLength={20}
               onChange={(v) => setEditingValues(prev => ({ ...prev, [record.id]: v }))}
               className={isDirty ? 'border-amber-400' : ''}
@@ -183,7 +185,7 @@ const ModifierPrintCodeManagement: React.FC = () => {
       },
       {
         key: 'instruction',
-        title: '用量',
+        title: t('pages.recipeGuide.modifierPrintCode.usage') as string,
         width: 160,
         render: (record) => {
           const savedUsage = record.printInstruction ?? ''
@@ -192,7 +194,7 @@ const ModifierPrintCodeManagement: React.FC = () => {
           return (
             <TextInput
               value={editValue}
-              placeholder="如: 50%, 30g, 2份"
+              placeholder={t('pages.recipeGuide.modifierPrintCode.usagePlaceholder') as string}
               maxLength={50}
               onChange={(v) => setEditingUsageValues(prev => ({ ...prev, [record.id]: v }))}
               className={isDirty ? 'border-amber-400' : ''}
@@ -202,7 +204,7 @@ const ModifierPrintCodeManagement: React.FC = () => {
       },
       {
         key: 'combined',
-        title: '组合预览',
+        title: t('pages.recipeGuide.modifierPrintCode.combinedPreview') as string,
         width: 160,
         render: (record) => {
           const base = editingValues[record.id] !== undefined
@@ -228,18 +230,18 @@ const ModifierPrintCodeManagement: React.FC = () => {
   const columns: Column<ModifierGroup>[] = [
     {
       key: 'displayName',
-      title: '选项组名称',
+      title: t('pages.recipeGuide.modifierPrintCode.groupName') as string,
       width: 200,
       render: (r) => r.displayName
     },
     {
       key: 'optionCount',
-      title: '选项数量',
+      title: t('pages.recipeGuide.modifierPrintCode.optionCount') as string,
       width: 100,
       align: 'center',
       render: (record) => {
         const count = record.options?.length || 0
-        return <Badge variant={count > 0 ? 'blue' : 'default'}>{count} 个</Badge>
+        return <Badge variant={count > 0 ? 'blue' : 'default'}>{t('pages.recipeGuide.modifierPrintCode.optionCountUnit', { count }) as string}</Badge>
       }
     }
   ]
@@ -248,13 +250,15 @@ const ModifierPrintCodeManagement: React.FC = () => {
 
   return (
     <SectionCard
-      title="自定义选项打印代码管理"
-      description="为每个自定义选项配置打印代码，用于标签打印"
+      title={t('pages.recipeGuide.modifierPrintCode.title') as string}
+      description={t('pages.recipeGuide.modifierPrintCode.description') as string}
       action={
         <div className="flex items-center gap-2">
-          <Btn variant="secondary" icon={<RefreshCw size={16} />} onClick={loadModifierGroups} loading={loading}>刷新</Btn>
+          <Btn variant="secondary" icon={<RefreshCw size={16} />} onClick={loadModifierGroups} loading={loading}>{t('pages.recipeGuide.modifierPrintCode.refresh') as string}</Btn>
           <Btn variant="primary" icon={<Save size={16} />} loading={saving} disabled={changedCount === 0} onClick={handleSaveAll}>
-            保存{changedCount > 0 ? `（${changedCount} 项）` : ''}
+            {changedCount > 0
+              ? (t('pages.recipeGuide.modifierPrintCode.saveWithCount', { count: changedCount }) as string)
+              : (t('pages.recipeGuide.modifierPrintCode.save') as string)}
           </Btn>
         </div>
       }
@@ -262,14 +266,27 @@ const ModifierPrintCodeManagement: React.FC = () => {
       <div className="mb-4">
         <AlertBox
           type="info"
-          title="使用说明"
+          title={t('pages.recipeGuide.modifierPrintCode.usageGuideTitle') as string}
           description={
             <div className="space-y-1 text-[13px]">
-              <div>• 展开选项组，填写打印代码和用量，完成后点击右上角<strong>保存</strong>按钮</div>
-              <div>• <strong>打印代码</strong>：标签上的缩写标识，如 LICE、P、C，同一品牌内不能重复</div>
-              <div>• <strong>用量</strong>：具体用量说明，如 50%、30g、2份（可为空）</div>
-              <div>• <strong>组合预览</strong>：打印代码 + 用量的最终标签内容，如 "LICE50%"</div>
-              <div className="text-amber-600">• 输入框变为橙色边框表示有未保存的修改</div>
+              <div>
+                • {t('pages.recipeGuide.modifierPrintCode.usageGuideStep1Prefix') as string}
+                <strong>{t('pages.recipeGuide.modifierPrintCode.usageGuideStep1Save') as string}</strong>
+                {t('pages.recipeGuide.modifierPrintCode.usageGuideStep1Suffix') as string}
+              </div>
+              <div>
+                • <strong>{t('pages.recipeGuide.modifierPrintCode.usageGuideStep2Label') as string}</strong>
+                {t('pages.recipeGuide.modifierPrintCode.usageGuideStep2') as string}
+              </div>
+              <div>
+                • <strong>{t('pages.recipeGuide.modifierPrintCode.usageGuideStep3Label') as string}</strong>
+                {t('pages.recipeGuide.modifierPrintCode.usageGuideStep3') as string}
+              </div>
+              <div>
+                • <strong>{t('pages.recipeGuide.modifierPrintCode.usageGuideStep4Label') as string}</strong>
+                {t('pages.recipeGuide.modifierPrintCode.usageGuideStep4') as string}
+              </div>
+              <div className="text-amber-600">• {t('pages.recipeGuide.modifierPrintCode.usageGuideStep5') as string}</div>
             </div>
           }
         />
@@ -280,7 +297,7 @@ const ModifierPrintCodeManagement: React.FC = () => {
         data={modifierGroups}
         rowKey={(r) => r.id}
         loading={loading}
-        empty="暂无自定义选项组"
+        empty={t('pages.recipeGuide.modifierPrintCode.noOptionGroups') as string}
         expandable={{ render: expandedRowRender }}
       />
     </SectionCard>

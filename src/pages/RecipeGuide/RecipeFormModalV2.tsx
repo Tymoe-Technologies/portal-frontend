@@ -27,7 +27,7 @@ const RecipeFormModalV2: React.FC<RecipeFormModalV2Props> = ({
   onClose,
   onSuccess
 }) => {
-  const { t: _t } = useTranslation()
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [stepTypes, setStepTypes] = useState<StepType[]>([])
   const [steps, setSteps] = useState<Array<RecipeStep & { _tempId?: string }>>([])
@@ -91,14 +91,14 @@ const RecipeFormModalV2: React.FC<RecipeFormModalV2Props> = ({
       setStepTypes(data || [])
     } catch (error: any) {
       console.error('加载步骤类型失败:', error)
-      toast.error(error.message || '加载步骤类型失败')
+      toast.error(error.message || t('pages.recipeGuide.formModal.loadStepTypesFailed'))
       setStepTypes([])
     }
   }
 
   const handleSubmit = async () => {
     if (!printCode.trim()) {
-      setPrintCodeError('请输入打印代码')
+      setPrintCodeError(t('pages.recipeGuide.formModal.printCodeRequired'))
       return
     }
     setPrintCodeError(undefined)
@@ -110,7 +110,7 @@ const RecipeFormModalV2: React.FC<RecipeFormModalV2Props> = ({
       if (steps.length > 0) {
         const invalidSteps = steps.filter(step => !step.stepTypeId)
         if (invalidSteps.length > 0) {
-          toast.error('请为所有步骤选择步骤类型！')
+          toast.error(t('pages.recipeGuide.formModal.allStepsRequireType'))
           setLoading(false)
           return
         }
@@ -130,11 +130,11 @@ const RecipeFormModalV2: React.FC<RecipeFormModalV2Props> = ({
           })
         }
 
-        toast.success('配方更新成功')
+        toast.success(t('pages.recipeGuide.formModal.updateRecipeSuccess'))
       } else {
         // 创建模式
         if (!initialModifierConditions || initialModifierConditions.length === 0) {
-          toast.error('缺少自定义选项条件')
+          toast.error(t('pages.recipeGuide.formModal.missingModifierConditions'))
           setLoading(false)
           return
         }
@@ -152,13 +152,13 @@ const RecipeFormModalV2: React.FC<RecipeFormModalV2Props> = ({
           }))
         })
 
-        toast.success('配方创建成功')
+        toast.success(t('pages.recipeGuide.createRecipeSuccess'))
       }
 
       onSuccess()
       onClose()
     } catch (error: any) {
-      toast.error(error.message || '操作失败')
+      toast.error(error.message || t('pages.recipeGuide.formModal.operationFailed'))
     } finally {
       setLoading(false)
     }
@@ -207,7 +207,7 @@ const RecipeFormModalV2: React.FC<RecipeFormModalV2Props> = ({
 
           return (
             <Badge key={index} variant="blue">
-              {group?.group?.displayName || '自定义选项'}: {option?.displayName || option?.name || '未知'}
+              {group?.group?.displayName || t('pages.recipeGuide.formModal.customOption')}: {option?.displayName || option?.name || t('pages.recipeGuide.byModifierManager.unknownOption')}
             </Badge>
           )
         })}
@@ -222,49 +222,49 @@ const RecipeFormModalV2: React.FC<RecipeFormModalV2Props> = ({
       size="xl"
       title={
         <div className="flex items-center gap-2">
-          <span>{recipe ? '编辑配方' : '创建配方'}</span>
+          <span>{recipe ? t('pages.recipeGuide.editRecipe') : t('pages.recipeGuide.createRecipe')}</span>
           {itemName && <Badge variant="blue">{itemName}</Badge>}
         </div>
       }
       footer={
         <>
-          <Btn variant="secondary" onClick={onClose}>取消</Btn>
-          <Btn variant="primary" loading={loading} onClick={handleSubmit}>保存</Btn>
+          <Btn variant="secondary" onClick={onClose}>{t('common.cancel')}</Btn>
+          <Btn variant="primary" loading={loading} onClick={handleSubmit}>{t('common.save')}</Btn>
         </>
       }
     >
       <div className="space-y-4">
         {/* 显示自定义选项条件 */}
         {!recipe && initialModifierConditions && initialModifierConditions.length > 0 && (
-          <Field label="适用条件">{renderConditionTags()}</Field>
+          <Field label={t('pages.recipeGuide.formModal.applicableConditions')}>{renderConditionTags()}</Field>
         )}
 
-        <Field label="打印代码" required error={printCodeError} hint="用于订单打印的代码，如 LICE、MHOT">
-          <TextInput value={printCode} onChange={setPrintCode} placeholder="如: LICE, MHOT" maxLength={20} />
+        <Field label={t('pages.recipeGuide.printCode')} required error={printCodeError} hint={t('pages.recipeGuide.formModal.printCodeHint')}>
+          <TextInput value={printCode} onChange={setPrintCode} placeholder={t('pages.recipeGuide.formModal.printCodePlaceholderExample')} maxLength={20} />
         </Field>
 
-        <Field label="显示代码" hint="用于显示的代码，如 L-ICE、M-HOT">
-          <TextInput value={displayCodeString} onChange={setDisplayCodeString} placeholder="如: L-ICE, M-HOT" />
+        <Field label={t('pages.recipeGuide.displayCode')} hint={t('pages.recipeGuide.formModal.displayCodeHint')}>
+          <TextInput value={displayCodeString} onChange={setDisplayCodeString} placeholder={t('pages.recipeGuide.formModal.displayCodePlaceholderExample')} />
         </Field>
 
-        <Field label="描述">
-          <Textarea value={description} onChange={setDescription} placeholder="配方描述" rows={2} />
+        <Field label={t('pages.recipeGuide.recipeDescription')}>
+          <Textarea value={description} onChange={setDescription} placeholder={t('pages.recipeGuide.recipeDescriptionPlaceholder')} rows={2} />
         </Field>
 
         <div className="rounded-lg border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-            <span className="text-sm font-semibold text-slate-700">制作步骤</span>
-            <Btn variant="secondary" size="sm" icon={<Plus size={14} />} onClick={addStep}>添加步骤</Btn>
+            <span className="text-sm font-semibold text-slate-700">{t('pages.recipeGuide.stepsConfig')}</span>
+            <Btn variant="secondary" size="sm" icon={<Plus size={14} />} onClick={addStep}>{t('pages.recipeGuide.addStep')}</Btn>
           </div>
           <div className="p-3">
             {steps.length === 0 ? (
-              <div className="py-5 text-center text-sm text-slate-400">暂无步骤，点击上方按钮添加</div>
+              <div className="py-5 text-center text-sm text-slate-400">{t('pages.recipeGuide.formModal.noStepsHint')}</div>
             ) : (
               <div className="space-y-3">
                 {steps.map((step, index) => (
                   <div key={step._tempId || step.id || index} className="rounded-lg border border-slate-200">
                     <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-                      <span className="text-sm font-medium text-slate-700">步骤 {index + 1}</span>
+                      <span className="text-sm font-medium text-slate-700">{t('pages.recipeGuide.formModal.stepNumber', { number: index + 1 })}</span>
                       <div className="flex items-center gap-1">
                         <Btn variant="ghost" size="sm" icon={<ArrowUp size={14} />} disabled={index === 0} onClick={() => moveStep(index, 'up')} />
                         <Btn variant="ghost" size="sm" icon={<ArrowDown size={14} />} disabled={index === steps.length - 1} onClick={() => moveStep(index, 'down')} />
@@ -272,17 +272,17 @@ const RecipeFormModalV2: React.FC<RecipeFormModalV2Props> = ({
                       </div>
                     </div>
                     <div className="space-y-3 px-3 py-3">
-                      <Field label="步骤类型" required error={!step.stepTypeId ? '请选择步骤类型' : undefined}>
+                      <Field label={t('pages.recipeGuide.stepType')} required error={!step.stepTypeId ? t('pages.recipeGuide.formModal.selectStepTypeRequired') : undefined}>
                         <SelectInput
-                          placeholder="请选择步骤类型（必填）"
+                          placeholder={t('pages.recipeGuide.formModal.selectStepTypeRequiredPlaceholder')}
                           value={step.stepTypeId || ''}
                           onChange={(value) => updateStep(index, 'stepTypeId', value)}
                           options={stepTypes.map(type => ({ value: type.id, label: `${type.code} ${type.name}` }))}
                         />
                       </Field>
-                      <Field label="操作说明">
+                      <Field label={t('pages.recipeGuide.formModal.operationInstructions')}>
                         <Textarea
-                          placeholder="详细的操作说明（可选）"
+                          placeholder={t('pages.recipeGuide.formModal.operationInstructionsPlaceholder')}
                           value={step.instructions || ''}
                           onChange={(v) => updateStep(index, 'instructions', v)}
                           rows={2}

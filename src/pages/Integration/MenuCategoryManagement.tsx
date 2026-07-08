@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Pencil, Trash2, LayoutGrid } from 'lucide-react'
 import { uberService, MenuCategory, MenuCategoryItem } from '@/services/uber'
 import { itemManagementService } from '@/services/item-management'
@@ -24,6 +25,7 @@ interface POSItem {
  * 允许用户为 Uber 创建分类并配置商品
  */
 const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integrationId, tenantId: propTenantId }) => {
+  const { t } = useTranslation()
   const [categories, setCategories] = useState<MenuCategory[]>([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
@@ -49,7 +51,7 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
       const data = await uberService.getMenuCategories(integrationId)
       setCategories(data)
     } catch (error: any) {
-      toast.error(error.message || '加载分类失败')
+      toast.error(error.message || t('pages.menuCategoryManagement.loadCategoriesFailed'))
     } finally {
       setLoading(false)
     }
@@ -61,7 +63,7 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
       const items = await itemManagementService.getItems(tenantId)
       setPosItems(items || [])
     } catch (error: any) {
-      toast.error(error.message || '加载商品失败')
+      toast.error(error.message || t('pages.menuCategoryManagement.loadItemsFailed'))
     } finally {
       setItemsLoading(false)
     }
@@ -74,7 +76,7 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
       setCategoryItems(items)
       setSelectedItems(items.map(item => item.posItemId))
     } catch (error: any) {
-      toast.error(error.message || '加载分类商品失败')
+      toast.error(error.message || t('pages.menuCategoryManagement.loadCategoryItemsFailed'))
     } finally {
       setItemsLoading(false)
     }
@@ -94,20 +96,20 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
   }
 
   const handleSaveCategory = async () => {
-    if (!fName.trim()) { setFError('请输入分类名称'); return }
+    if (!fName.trim()) { setFError(t('pages.menuCategoryManagement.pleaseEnterCategoryName')); return }
     setFError('')
     try {
       if (editingCategory) {
         await uberService.updateMenuCategory(editingCategory.id, fName, fOrder)
-        toast.success('更新成功')
+        toast.success(t('pages.menuCategoryManagement.updateSuccess'))
       } else {
         await uberService.createMenuCategory(integrationId, fName, fOrder)
-        toast.success('创建成功')
+        toast.success(t('pages.menuCategoryManagement.createSuccess'))
       }
       setModalVisible(false)
       loadCategories()
     } catch (error: any) {
-      toast.error(error.message || '保存失败')
+      toast.error(error.message || t('pages.menuCategoryManagement.saveFailed'))
     }
   }
 
@@ -115,11 +117,11 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
     if (!deleteId) return
     try {
       await uberService.deleteMenuCategory(deleteId)
-      toast.success('删除成功')
+      toast.success(t('pages.menuCategoryManagement.deleteSuccess'))
       setDeleteId(null)
       loadCategories()
     } catch (error: any) {
-      toast.error(error.message || '删除失败')
+      toast.error(error.message || t('pages.menuCategoryManagement.deleteFailed'))
     }
   }
 
@@ -131,7 +133,7 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
 
   const handleAddItems = async () => {
     if (!selectedCategory || selectedItems.length === 0) {
-      toast.warning('请选择商品')
+      toast.warning(t('pages.menuCategoryManagement.pleaseSelectItems'))
       return
     }
     try {
@@ -141,35 +143,35 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
         const item = posItems.find(p => p.id === itemId)
         await uberService.addItemToMenuCategory(selectedCategory.id, itemId, item?.name, categoryItems.length + newItemIds.indexOf(itemId))
       }
-      toast.success(`添加了 ${newItemIds.length} 个商品`)
+      toast.success(t('pages.menuCategoryManagement.addedItemsCount', { count: newItemIds.length }))
       await loadCategoryItems(selectedCategory.id)
       setSelectedItems([])
     } catch (error: any) {
-      toast.error(error.message || '添加失败')
+      toast.error(error.message || t('pages.menuCategoryManagement.addItemsFailed'))
     }
   }
 
   const handleRemoveItem = async (itemId: string) => {
     try {
       await uberService.removeItemFromMenuCategory(itemId)
-      toast.success('移除成功')
+      toast.success(t('pages.menuCategoryManagement.removeSuccess'))
       await loadCategoryItems(selectedCategory!.id)
     } catch (error: any) {
-      toast.error(error.message || '移除失败')
+      toast.error(error.message || t('pages.menuCategoryManagement.removeFailed'))
     }
   }
 
   const columns: Column<MenuCategory>[] = [
-    { key: 'name', title: '分类名称', width: 200, render: (r) => r.name },
-    { key: 'itemCount', title: '商品数', width: 100, render: (r: any) => <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded ring-1 bg-blue-50 text-blue-600 ring-blue-200">{r.itemCount}</span> },
-    { key: 'displayOrder', title: '显示顺序', width: 100, render: (r) => r.displayOrder },
+    { key: 'name', title: t('pages.menuCategoryManagement.columnCategoryName'), width: 200, render: (r) => r.name },
+    { key: 'itemCount', title: t('pages.menuCategoryManagement.columnItemCount'), width: 100, render: (r: any) => <span className="inline-flex items-center text-xs px-1.5 py-0.5 rounded ring-1 bg-blue-50 text-blue-600 ring-blue-200">{r.itemCount}</span> },
+    { key: 'displayOrder', title: t('pages.menuCategoryManagement.columnDisplayOrder'), width: 100, render: (r) => r.displayOrder },
     {
-      key: 'actions', title: '操作', width: 240,
+      key: 'actions', title: t('pages.menuCategoryManagement.columnActions'), width: 240,
       render: (r) => (
         <div className="flex items-center gap-1">
-          <Btn variant="link" icon={<LayoutGrid className="w-3.5 h-3.5" />} onClick={() => handleOpenItemsDrawer(r)}>配置商品</Btn>
-          <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleOpenModal(r)}>编辑</Btn>
-          <Btn variant="link" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setDeleteId(r.id)}>删除</Btn>
+          <Btn variant="link" icon={<LayoutGrid className="w-3.5 h-3.5" />} onClick={() => handleOpenItemsDrawer(r)}>{t('pages.menuCategoryManagement.configureItemsBtn')}</Btn>
+          <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleOpenModal(r)}>{t('pages.menuCategoryManagement.editBtn')}</Btn>
+          <Btn variant="link" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setDeleteId(r.id)}>{t('pages.menuCategoryManagement.deleteBtn')}</Btn>
         </div>
       ),
     },
@@ -182,11 +184,11 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
   return (
     <div className="p-6">
       <SectionCard
-        title="菜单分类管理"
-        action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => handleOpenModal()}>创建分类</Btn>}
+        title={t('pages.menuCategoryManagement.pageTitle')}
+        action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => handleOpenModal()}>{t('pages.menuCategoryManagement.createCategoryBtn')}</Btn>}
       >
         {categories.length === 0 ? (
-          <EmptyState title="还没有创建任何分类" description="点击「创建分类」按钮开始。" />
+          <EmptyState title={t('pages.menuCategoryManagement.emptyCategoriesTitle')} description={t('pages.menuCategoryManagement.emptyCategoriesDescription')} />
         ) : (
           <Table columns={columns} data={categories} rowKey={(r) => r.id} loading={loading} />
         )}
@@ -194,22 +196,22 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
 
       {/* 分类编辑模态框 */}
       <Modal
-        title={editingCategory ? '编辑分类' : '创建分类'}
+        title={editingCategory ? t('pages.menuCategoryManagement.editCategoryModalTitle') : t('pages.menuCategoryManagement.createCategoryModalTitle')}
         open={modalVisible}
         onOpenChange={(o) => !o && setModalVisible(false)}
         size="md"
         footer={
           <div className="flex justify-end gap-2">
-            <Btn variant="secondary" onClick={() => setModalVisible(false)}>取消</Btn>
-            <Btn variant="primary" onClick={handleSaveCategory}>保存</Btn>
+            <Btn variant="secondary" onClick={() => setModalVisible(false)}>{t('pages.menuCategoryManagement.cancelBtn')}</Btn>
+            <Btn variant="primary" onClick={handleSaveCategory}>{t('pages.menuCategoryManagement.saveBtn')}</Btn>
           </div>
         }
       >
         <div className="space-y-4">
-          <FormRow label="分类名称">
-            <TextInput className="w-full" value={fName} onChange={(v) => { setFName(v); if (fError) setFError('') }} placeholder="例如：热销商品、新品上市" />
+          <FormRow label={t('pages.menuCategoryManagement.categoryNameLabel')}>
+            <TextInput className="w-full" value={fName} onChange={(v) => { setFName(v); if (fError) setFError('') }} placeholder={t('pages.menuCategoryManagement.categoryNamePlaceholder')} />
           </FormRow>
-          <FormRow label="显示顺序">
+          <FormRow label={t('pages.menuCategoryManagement.displayOrderLabel')}>
             <NumberInput value={fOrder} onChange={setFOrder} min={0} />
           </FormRow>
           {fError && <p className="text-sm text-red-500">{fError}</p>}
@@ -218,7 +220,7 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
 
       {/* 分类商品管理抽屉 */}
       <Drawer
-        title={selectedCategory ? `管理分类：${selectedCategory.name}` : '管理分类商品'}
+        title={selectedCategory ? t('pages.menuCategoryManagement.manageCategoryDrawerTitle', { name: selectedCategory.name }) : t('pages.menuCategoryManagement.manageCategoryDrawerTitleDefault')}
         width={600}
         open={drawerVisible}
         onOpenChange={setDrawerVisible}
@@ -227,18 +229,18 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
           <div>
             {/* 已添加的商品列表 */}
             <div className="mb-6">
-              <h4 className="text-base font-semibold text-slate-800 mb-2">已添加的商品 ({categoryItems.length})</h4>
+              <h4 className="text-base font-semibold text-slate-800 mb-2">{t('pages.menuCategoryManagement.addedItemsTitle', { count: categoryItems.length })}</h4>
               {categoryItems.length === 0 ? (
-                <EmptyState title="暂无商品" />
+                <EmptyState title={t('pages.menuCategoryManagement.emptyItemsTitle')} />
               ) : (
                 <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg">
                   {categoryItems.map(item => (
                     <li key={item.id} className="flex items-center justify-between px-3 py-2.5">
                       <div>
                         <div className="text-slate-700 text-sm">{item.posItemName || item.posItemId}</div>
-                        <div className="text-xs text-slate-400">显示顺序: {item.displayOrder}</div>
+                        <div className="text-xs text-slate-400">{t('pages.menuCategoryManagement.itemDisplayOrderLabel', { order: item.displayOrder })}</div>
                       </div>
-                      <Btn variant="link" onClick={() => handleRemoveItem(item.id)}>移除</Btn>
+                      <Btn variant="link" onClick={() => handleRemoveItem(item.id)}>{t('pages.menuCategoryManagement.removeBtn')}</Btn>
                     </li>
                   ))}
                 </ul>
@@ -247,11 +249,11 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
 
             {/* 添加商品 */}
             <div className="pt-4 border-t border-slate-100">
-              <h4 className="text-base font-semibold text-slate-800 mb-2">添加商品</h4>
+              <h4 className="text-base font-semibold text-slate-800 mb-2">{t('pages.menuCategoryManagement.addItemsTitle')}</h4>
               {itemsLoading ? (
                 <Spinner className="w-6 h-6 text-slate-400" />
               ) : availableItems.length === 0 ? (
-                <p className="text-sm text-slate-400">没有可添加的商品</p>
+                <p className="text-sm text-slate-400">{t('pages.menuCategoryManagement.noAvailableItems')}</p>
               ) : (
                 <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 mb-4">
                   {availableItems.map(item => (
@@ -262,14 +264,14 @@ const MenuCategoryManagement: React.FC<MenuCategoryManagementProps> = ({ integra
                   ))}
                 </div>
               )}
-              <Btn variant="primary" className="w-full" disabled={selectedItems.length === 0} onClick={handleAddItems}>添加选中的商品</Btn>
+              <Btn variant="primary" className="w-full" disabled={selectedItems.length === 0} onClick={handleAddItems}>{t('pages.menuCategoryManagement.addSelectedItemsBtn')}</Btn>
             </div>
           </div>
         )}
       </Drawer>
 
       {/* 删除确认 */}
-      <ConfirmDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)} title="确定删除？" danger confirmText="删除" onConfirm={handleDeleteCategory} />
+      <ConfirmDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)} title={t('pages.menuCategoryManagement.confirmDeleteTitle')} danger confirmText={t('pages.menuCategoryManagement.confirmDeleteBtn')} onConfirm={handleDeleteCategory} />
     </div>
   )
 }

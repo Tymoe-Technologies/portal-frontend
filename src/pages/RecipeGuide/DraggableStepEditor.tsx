@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd'
 import { GripVertical, Trash2, Plus } from 'lucide-react'
 import { TextInput, NumberInput, Switch, Btn, Badge, EmptyState } from '@/components/ui-kit'
@@ -15,6 +16,8 @@ const DraggableStepEditor: React.FC<DraggableStepEditorProps> = ({
   stepTypes,
   onChange
 }) => {
+  const { t } = useTranslation()
+
   // 直接使用传入的stepTypes
   const availableStepTypes = stepTypes
 
@@ -79,9 +82,9 @@ const DraggableStepEditor: React.FC<DraggableStepEditorProps> = ({
       <div className="flex gap-4">
         {/* 左侧：步骤类型库 */}
         <div className="w-[280px] flex-shrink-0 rounded-lg border border-slate-200 bg-white">
-          <div className="border-b border-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">步骤类型库</div>
+          <div className="border-b border-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">{t('pages.recipeGuide.stepTypeLibrary')}</div>
           <div className="max-h-[500px] overflow-y-auto p-2">
-            <div className="mb-2 text-xs text-slate-400">💡 拖拽到右侧添加步骤</div>
+            <div className="mb-2 text-xs text-slate-400">💡 {t('pages.recipeGuide.dragToAddHint')}</div>
             <Droppable droppableId="stepTypes" isDropDisabled={true}>
               {(provided) => (
                 <div ref={provided.innerRef} {...provided.droppableProps}>
@@ -115,10 +118,10 @@ const DraggableStepEditor: React.FC<DraggableStepEditorProps> = ({
         <div className="flex-1 rounded-lg border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-slate-700">制作步骤</span>
-              <Badge variant="blue">{steps.length} 个步骤</Badge>
+              <span className="text-sm font-semibold text-slate-700">{t('pages.recipeGuide.makingStepsField')}</span>
+              <Badge variant="blue">{t('pages.recipeGuide.stepsCount', { count: steps.length })}</Badge>
             </div>
-            <Btn variant="secondary" size="sm" icon={<Plus size={14} />} onClick={addBlankStep}>添加空白步骤</Btn>
+            <Btn variant="secondary" size="sm" icon={<Plus size={14} />} onClick={addBlankStep}>{t('pages.recipeGuide.addBlankStep')}</Btn>
           </div>
 
           <Droppable droppableId="steps">
@@ -130,7 +133,7 @@ const DraggableStepEditor: React.FC<DraggableStepEditorProps> = ({
               >
                 {steps.length === 0 ? (
                   <div className="py-16">
-                    <EmptyState title="从左侧拖拽步骤类型到这里，或点击上方按钮添加空白步骤" />
+                    <EmptyState title={t('pages.recipeGuide.dragOrClickHint')} />
                   </div>
                 ) : (
                   steps.map((step, index) => (
@@ -147,7 +150,7 @@ const DraggableStepEditor: React.FC<DraggableStepEditorProps> = ({
                               <div {...provided.dragHandleProps} className="cursor-grab">
                                 <GripVertical size={16} className="text-slate-400" />
                               </div>
-                              <Badge variant="blue">步骤 {index + 1}</Badge>
+                              <Badge variant="blue">{t('pages.recipeGuide.stepIndexLabel', { number: index + 1 })}</Badge>
                               {step.stepTypeId && (
                                 <Badge variant="green">{stepTypes.find(t => t.id === step.stepTypeId)?.code}</Badge>
                               )}
@@ -158,7 +161,7 @@ const DraggableStepEditor: React.FC<DraggableStepEditorProps> = ({
                           <div className="space-y-2 px-3 py-3">
                             {/* 步骤标题 */}
                             <TextInput
-                              placeholder="步骤标题"
+                              placeholder={t('pages.recipeGuide.stepTitle')}
                               value={step.title || ''}
                               onChange={(v) => updateStep(index, 'title', v)}
                               className="font-medium"
@@ -168,7 +171,7 @@ const DraggableStepEditor: React.FC<DraggableStepEditorProps> = ({
                             <div className="flex items-center gap-2">
                               <div className="w-52">
                                 <TextInput
-                                  placeholder="数量/用量 (如: 200ml, 8块)"
+                                  placeholder={t('pages.recipeGuide.stepAmountHint')}
                                   value={step.amount || ''}
                                   onChange={(v) => updateStep(index, 'amount', v)}
                                 />
@@ -178,7 +181,7 @@ const DraggableStepEditor: React.FC<DraggableStepEditorProps> = ({
                                   value={step.duration ?? undefined}
                                   onChange={(v) => updateStep(index, 'duration', v)}
                                   min={0}
-                                  suffix="秒"
+                                  suffix={t('pages.recipeGuide.secondsSuffix')}
                                 />
                               </div>
                             </div>
@@ -186,7 +189,7 @@ const DraggableStepEditor: React.FC<DraggableStepEditorProps> = ({
                             {/* 打印代码预览 */}
                             {step.printCode && (
                               <div className="text-xs text-slate-400">
-                                打印代码: <code className="text-blue-600">{step.printCode}</code>
+                                {t('pages.recipeGuide.printCodeLabel')}: <code className="text-blue-600">{step.printCode}</code>
                               </div>
                             )}
 
@@ -196,11 +199,11 @@ const DraggableStepEditor: React.FC<DraggableStepEditorProps> = ({
                             <div className="flex items-center gap-6">
                               <label className="flex items-center gap-2 text-sm text-slate-700">
                                 <Switch checked={!!step.isCritical} onCheckedChange={(c) => updateStep(index, 'isCritical', c)} />
-                                关键步骤
+                                {t('pages.recipeGuide.isCritical')}
                               </label>
                               <label className="flex items-center gap-2 text-sm text-slate-700">
                                 <Switch checked={!!step.isOptional} onCheckedChange={(c) => updateStep(index, 'isOptional', c)} />
-                                可选步骤
+                                {t('pages.recipeGuide.isOptional')}
                               </label>
                             </div>
                           </div>

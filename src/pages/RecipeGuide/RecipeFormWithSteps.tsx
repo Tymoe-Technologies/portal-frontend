@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Modal, Field, Textarea, Btn, Badge, toast } from '@/components/ui-kit'
 import { getStepTypes, createRecipe, updateRecipe, updateRecipeSteps } from '@/services/recipe'
 import type { Recipe, StepType, StepEditorItem } from '@/services/recipe/types'
@@ -23,6 +24,7 @@ const RecipeFormWithSteps: React.FC<RecipeFormWithStepsProps> = ({
   onClose,
   onSuccess
 }) => {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [stepTypes, setStepTypes] = useState<StepType[]>([])
   const [steps, setSteps] = useState<StepEditorItem[]>([])
@@ -77,25 +79,25 @@ const RecipeFormWithSteps: React.FC<RecipeFormWithStepsProps> = ({
       const types = await getStepTypes()
       setStepTypes(types)
     } catch (error: any) {
-      toast.error('加载步骤类型失败: ' + error.message)
+      toast.error(t('pages.recipeGuide.loadStepTypesFailed', { message: error.message }))
     }
   }
 
   const handleSubmit = async () => {
     try {
       if (steps.length === 0) {
-        toast.error('请至少添加一个制作步骤')
+        toast.error(t('pages.recipeGuide.addAtLeastOneStep'))
         return
       }
 
       const hasEmptyType = steps.some(s => s.subSteps.some(sub => !sub.stepTypeId))
       if (hasEmptyType) {
-        toast.error('请为所有步骤类型选择类型')
+        toast.error(t('pages.recipeGuide.selectStepTypeForAllSteps'))
         return
       }
 
       if (!printCode) {
-        toast.error('打印代码生成失败，请检查步骤配置')
+        toast.error(t('pages.recipeGuide.printCodeGenerationFailed'))
         return
       }
 
@@ -111,7 +113,7 @@ const RecipeFormWithSteps: React.FC<RecipeFormWithStepsProps> = ({
       if (recipe) {
         await updateRecipe(recipe.id, { printCode, description })
         await updateRecipeSteps(recipe.id, { steps: stepsPayload })
-        toast.success('更新配方成功')
+        toast.success(t('pages.recipeGuide.updateRecipeSuccess'))
       } else {
         await createRecipe({
           itemId,
@@ -120,12 +122,12 @@ const RecipeFormWithSteps: React.FC<RecipeFormWithStepsProps> = ({
           conditions: initialModifierConditions || [],
           steps: stepsPayload
         })
-        toast.success('创建配方成功')
+        toast.success(t('pages.recipeGuide.createRecipeSuccess'))
       }
 
       onSuccess()
     } catch (error: any) {
-      toast.error(error.message || '操作失败')
+      toast.error(error.message || t('pages.recipeGuide.operationFailed'))
     } finally {
       setLoading(false)
     }
@@ -138,28 +140,28 @@ const RecipeFormWithSteps: React.FC<RecipeFormWithStepsProps> = ({
       size="xl"
       title={
         <div className="flex flex-wrap items-center gap-2">
-          <span>{recipe ? '编辑配方' : '创建配方'}</span>
+          <span>{recipe ? t('pages.recipeGuide.editRecipe') : t('pages.recipeGuide.createRecipe')}</span>
           {itemName && <Badge variant="blue">{itemName}</Badge>}
           {/* 显示绑定的自定义选项（只读） */}
           {initialModifierConditions && initialModifierConditions.length > 0
             ? initialModifierConditions.map((cond, i) => (
                 <Badge key={i} variant="gold">{cond.displayName || cond.modifierOptionId}</Badge>
               ))
-            : <Badge variant="default">默认配方</Badge>
+            : <Badge variant="default">{t('pages.recipeGuide.isDefault')}</Badge>
           }
         </div>
       }
       footer={
         <>
-          <Btn variant="secondary" onClick={onClose}>取消</Btn>
-          <Btn variant="primary" loading={loading} onClick={handleSubmit}>确定</Btn>
+          <Btn variant="secondary" onClick={onClose}>{t('common.cancel')}</Btn>
+          <Btn variant="primary" loading={loading} onClick={handleSubmit}>{t('common.confirm')}</Btn>
         </>
       }
     >
       <div className="space-y-4">
         {/* 生成的打印代码 */}
         {printCode && (
-          <Field label="打印代码">
+          <Field label={t('pages.recipeGuide.printCode')}>
             <span className="inline-block rounded bg-green-50 px-3.5 py-1.5 font-mono text-[15px] text-green-600 ring-1 ring-green-200">
               {printCode}
             </span>
@@ -167,12 +169,12 @@ const RecipeFormWithSteps: React.FC<RecipeFormWithStepsProps> = ({
         )}
 
         {/* 描述 */}
-        <Field label="描述">
-          <Textarea value={description} onChange={setDescription} rows={2} placeholder="配方描述（可选）" />
+        <Field label={t('pages.recipeGuide.recipeDescription')}>
+          <Textarea value={description} onChange={setDescription} rows={2} placeholder={t('pages.recipeGuide.recipeDescriptionFieldPlaceholder')} />
         </Field>
 
         {/* 步骤编辑器 */}
-        <Field label="制作步骤" required>
+        <Field label={t('pages.recipeGuide.makingStepsField')} required>
           <RecipeStepEditor
             value={steps}
             onChange={setSteps}

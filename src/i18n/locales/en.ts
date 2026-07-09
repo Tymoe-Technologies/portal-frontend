@@ -2168,6 +2168,26 @@ const en = {
         no: 'No',
         oneClickCopyToAll: 'One-Click Copy to All',
 
+        // RecipeFormWithSteps
+        loadStepTypesFailed: 'Failed to load step types: {{message}}',
+        addAtLeastOneStep: 'Please add at least one preparation step',
+        selectStepTypeForAllSteps: 'Please select a type for all steps',
+        printCodeGenerationFailed: 'Failed to generate print code, please check step configuration',
+        updateRecipeSuccess: 'Recipe updated successfully',
+        recipeDescriptionFieldPlaceholder: 'Recipe description (optional)',
+        makingStepsField: 'Preparation Steps',
+
+        // DraggableStepEditor
+        stepTypeLibrary: 'Step Type Library',
+        dragToAddHint: 'Drag to the right to add a step',
+        stepsCount: '{{count}} step(s)',
+        addBlankStep: 'Add Blank Step',
+        dragOrClickHint: 'Drag a step type from the left, or click the button above to add a blank step',
+        stepIndexLabel: 'Step {{number}}',
+        stepAmountHint: 'Quantity/Amount (e.g. 200ml, 8pcs)',
+        secondsSuffix: 'sec',
+        printCodeLabel: 'Print Code',
+
         byModifierManager: {
           unknownOption: 'Unknown Option',
           loadRecipesFailed: 'Failed to load recipes or combinations',
@@ -3970,6 +3990,21 @@ const en = {
           exclusionGroupLabel: 'Exclusion Group Name',
           exclusionGroupHint: 'Offers with the same group name are mutually exclusive',
           exclusionGroupPlaceholder: 'e.g. order_discount',
+        },
+        editorModal: {
+          titleCreate: 'New Points Reward',
+          titleEdit: 'Edit Points Reward',
+          pointsCostLabel: 'Points Required',
+          pointsCostPlaceholder: 'e.g. 500',
+          validateName: 'Please enter reward name',
+          validateDescription: 'Please enter description',
+          validatePointsCost: 'Please enter points',
+          validateDiscountAmount: 'Please enter discount amount',
+          validateDiscountPercentage: 'Please enter discount percentage',
+          validateValidityDays: 'Please enter validity days',
+          validatePickCount: 'Please enter pickable quantity',
+          updateSuccess: 'Reward updated',
+          createSuccess: 'Reward created',
         },
       },
       uberOrders: {

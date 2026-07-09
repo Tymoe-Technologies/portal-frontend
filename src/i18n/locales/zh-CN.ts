@@ -2161,7 +2161,27 @@ const zhCN = {
         yes: '是',
         no: '否',
         oneClickCopyToAll: '一键复制到全部',
-        
+
+        // RecipeFormWithSteps
+        loadStepTypesFailed: '加载步骤类型失败: {{message}}',
+        addAtLeastOneStep: '请至少添加一个制作步骤',
+        selectStepTypeForAllSteps: '请为所有步骤类型选择类型',
+        printCodeGenerationFailed: '打印代码生成失败，请检查步骤配置',
+        updateRecipeSuccess: '更新配方成功',
+        recipeDescriptionFieldPlaceholder: '配方描述（可选）',
+        makingStepsField: '制作步骤',
+
+        // DraggableStepEditor
+        stepTypeLibrary: '步骤类型库',
+        dragToAddHint: '拖拽到右侧添加步骤',
+        stepsCount: '{{count}} 个步骤',
+        addBlankStep: '添加空白步骤',
+        dragOrClickHint: '从左侧拖拽步骤类型到这里，或点击上方按钮添加空白步骤',
+        stepIndexLabel: '步骤 {{number}}',
+        stepAmountHint: '数量/用量 (如: 200ml, 8块)',
+        secondsSuffix: '秒',
+        printCodeLabel: '打印代码',
+
         // 通用
         save: '保存',
         cancel: '取消',
@@ -4014,6 +4034,21 @@ const zhCN = {
           exclusionGroupLabel: '互斥分组名称',
           exclusionGroupHint: '相同分组名互斥',
           exclusionGroupPlaceholder: '如：order_discount',
+        },
+        editorModal: {
+          titleCreate: '新建积分奖励',
+          titleEdit: '编辑积分奖励',
+          pointsCostLabel: '所需积分',
+          pointsCostPlaceholder: '如：500',
+          validateName: '请填写奖励名称',
+          validateDescription: '请填写说明文字',
+          validatePointsCost: '请填写积分',
+          validateDiscountAmount: '请填写折扣金额',
+          validateDiscountPercentage: '请填写折扣百分比',
+          validateValidityDays: '请填写有效期天数',
+          validatePickCount: '请填写可选件数',
+          updateSuccess: '奖励已更新',
+          createSuccess: '奖励已创建',
         },
       },
       uberOrders: {

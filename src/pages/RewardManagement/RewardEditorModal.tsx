@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   memberRewardService,
   type RedeemItem,
@@ -25,6 +26,7 @@ export interface RewardEditorModalProps {
 const DEFAULT_VALUES: RewardFormValues = { rewardType: 'FREE_ITEM', selectionMode: 'FIXED', stackingMode: 'STACKABLE', validityMode: 'PERMANENT' }
 
 const RewardEditorModal: React.FC<RewardEditorModalProps> = ({ open, editing, onClose, onSaved }) => {
+  const { t } = useTranslation()
   const [saving, setSaving] = useState(false)
   const [linkedItems, setLinkedItems] = useState<LinkedItemLite[]>([])
   const [values, setValues] = useState<RewardFormValues>(DEFAULT_VALUES)
@@ -61,13 +63,13 @@ const RewardEditorModal: React.FC<RewardEditorModalProps> = ({ open, editing, on
   }, [open, editing])
 
   const validate = (): string => {
-    if (!values.name?.trim()) return '请填写奖励名称'
-    if (!values.description?.trim()) return '请填写说明文字'
-    if (values.pointsCost == null || values.pointsCost < 1) return '请填写积分'
-    if (values.rewardType === 'DISCOUNT_AMOUNT' && values.discountAmount == null) return '请填写折扣金额'
-    if (values.rewardType === 'DISCOUNT_PERCENTAGE' && values.discountPercentage == null) return '请填写折扣百分比'
-    if (values.validityMode === 'DAYS' && values.validityDays == null) return '请填写有效期天数'
-    if (values.rewardType === 'FREE_ITEM' && values.selectionMode === 'PICK_N' && values.pickCount == null) return '请填写可选件数'
+    if (!values.name?.trim()) return t('pages.rewardManagement.editorModal.validateName')
+    if (!values.description?.trim()) return t('pages.rewardManagement.editorModal.validateDescription')
+    if (values.pointsCost == null || values.pointsCost < 1) return t('pages.rewardManagement.editorModal.validatePointsCost')
+    if (values.rewardType === 'DISCOUNT_AMOUNT' && values.discountAmount == null) return t('pages.rewardManagement.editorModal.validateDiscountAmount')
+    if (values.rewardType === 'DISCOUNT_PERCENTAGE' && values.discountPercentage == null) return t('pages.rewardManagement.editorModal.validateDiscountPercentage')
+    if (values.validityMode === 'DAYS' && values.validityDays == null) return t('pages.rewardManagement.editorModal.validateValidityDays')
+    if (values.rewardType === 'FREE_ITEM' && values.selectionMode === 'PICK_N' && values.pickCount == null) return t('pages.rewardManagement.editorModal.validatePickCount')
     return ''
   }
 
@@ -86,17 +88,17 @@ const RewardEditorModal: React.FC<RewardEditorModalProps> = ({ open, editing, on
       if (editing) {
         const res = await memberRewardService.update(editing.id, payload)
         saved = (res.data as any).data
-        toast.success('奖励已更新')
+        toast.success(t('pages.rewardManagement.editorModal.updateSuccess'))
       } else {
         const res = await memberRewardService.create(payload)
         saved = (res.data as any).data
-        toast.success('奖励已创建')
+        toast.success(t('pages.rewardManagement.editorModal.createSuccess'))
       }
       onSaved(saved)
       onClose()
     } catch (err: any) {
       if (isRateLimited(err)) return
-      toast.error(err?.response?.data?.error?.message ?? '保存失败')
+      toast.error(err?.response?.data?.error?.message ?? t('common.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -104,22 +106,22 @@ const RewardEditorModal: React.FC<RewardEditorModalProps> = ({ open, editing, on
 
   return (
     <Modal
-      title={editing ? '编辑积分奖励' : '新建积分奖励'}
+      title={editing ? t('pages.rewardManagement.editorModal.titleEdit') : t('pages.rewardManagement.editorModal.titleCreate')}
       open={open}
       onOpenChange={(o) => !o && onClose()}
       size="lg"
       footer={
         <div className="flex justify-end gap-2">
-          <Btn variant="secondary" onClick={onClose}>取消</Btn>
-          <Btn variant="primary" loading={saving} onClick={handleSave}>保存</Btn>
+          <Btn variant="secondary" onClick={onClose}>{t('common.cancel')}</Btn>
+          <Btn variant="primary" loading={saving} onClick={handleSave}>{t('common.save')}</Btn>
         </div>
       }
     >
       <div>
         <RewardFields values={values} setValue={setValue} linkedItems={linkedItems} onLinkedItemsChange={setLinkedItems} active={open} />
-        <FormRow label="所需积分">
+        <FormRow label={t('pages.rewardManagement.editorModal.pointsCostLabel')}>
           <div className="flex items-center gap-1.5">
-            <input type="number" min={1} value={values.pointsCost ?? ''} placeholder="如：500"
+            <input type="number" min={1} value={values.pointsCost ?? ''} placeholder={t('pages.rewardManagement.editorModal.pointsCostPlaceholder')}
               onChange={e => setValue({ pointsCost: e.target.value === '' ? undefined : Number(e.target.value) })}
               className="w-52 text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0" />
             <span className="text-xs text-slate-400">pts</span>

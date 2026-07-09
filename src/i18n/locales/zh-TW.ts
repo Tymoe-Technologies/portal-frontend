@@ -2137,6 +2137,26 @@ const zhTW = {
         no: '否',
         oneClickCopyToAll: '一鍵複製到全部',
 
+        // RecipeFormWithSteps
+        loadStepTypesFailed: '載入步驟類型失敗: {{message}}',
+        addAtLeastOneStep: '請至少新增一個製作步驟',
+        selectStepTypeForAllSteps: '請為所有步驟類型選擇類型',
+        printCodeGenerationFailed: '列印代碼生成失敗，請檢查步驟設定',
+        updateRecipeSuccess: '更新配方成功',
+        recipeDescriptionFieldPlaceholder: '配方描述（選填）',
+        makingStepsField: '製作步驟',
+
+        // DraggableStepEditor
+        stepTypeLibrary: '步驟類型庫',
+        dragToAddHint: '拖曳到右側新增步驟',
+        stepsCount: '{{count}} 個步驟',
+        addBlankStep: '新增空白步驟',
+        dragOrClickHint: '從左側拖曳步驟類型到這裡，或點擊上方按鈕新增空白步驟',
+        stepIndexLabel: '步驟 {{number}}',
+        stepAmountHint: '數量/用量 (如: 200ml, 8塊)',
+        secondsSuffix: '秒',
+        printCodeLabel: '列印代碼',
+
         byModifierManager: {
           unknownOption: '未知選項',
           loadRecipesFailed: '載入配方或組合列表失敗',
@@ -2569,6 +2589,21 @@ const zhTW = {
         priceSourceChannel: '渠道定價',
         priceSourceItem: '商品定價',
         priceSourceDefault: '默認價格',
+        noCustomOptionsData: '該商品的自定義選項暫無定價資料',
+        noModifiersConfigured: '該商品尚未配置修飾符',
+        pleaseConfigureModifiersFirst: '請先在商品管理中為該商品配置修飾符群組和選項',
+
+        // 商品定價彈窗
+        itemPricingDetail: '商品定價詳情',
+        itemBasePrice: '商品基礎價格',
+        itemBasePriceTip: '設置該商品在此渠道的基礎價格，留空則使用默認價格',
+        itemPriceModified: '商品價格已修改，點擊保存按鈕以應用更改',
+        customOptionPricingDesc: '設置該商品在此渠道的自定義選項價格',
+        unsavedChanges: '您有尚未保存的更改',
+        pendingSave: '待保存',
+        batchPricingApplied: '批量定價已套用',
+        enterPercentage: '請輸入百分比',
+        enterAdjustment: '請輸入增減金額',
 
         // 取餐號配置
         pickupNumberConfig: {
@@ -3923,6 +3958,21 @@ const zhTW = {
           exclusionGroupLabel: '互斥分組名稱',
           exclusionGroupHint: '相同分組名互斥',
           exclusionGroupPlaceholder: '如：order_discount',
+        },
+        editorModal: {
+          titleCreate: '新建點數獎勵',
+          titleEdit: '編輯點數獎勵',
+          pointsCostLabel: '所需點數',
+          pointsCostPlaceholder: '如：500',
+          validateName: '請填寫獎勵名稱',
+          validateDescription: '請填寫說明文字',
+          validatePointsCost: '請填寫點數',
+          validateDiscountAmount: '請填寫折扣金額',
+          validateDiscountPercentage: '請填寫折扣百分比',
+          validateValidityDays: '請填寫有效期天數',
+          validatePickCount: '請填寫可選件數',
+          updateSuccess: '獎勵已更新',
+          createSuccess: '獎勵已建立',
         },
       },
       uberOrders: {

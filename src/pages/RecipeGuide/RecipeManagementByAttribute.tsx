@@ -64,12 +64,12 @@ const RecipeManagementByAttribute: React.FC<RecipeManagementByAttributeProps> = 
   }
 
   if (!item) {
-    return <AlertBox type="error" title="商品不存在" description="无法加载商品信息，请重新选择" />
+    return <AlertBox type="error" title={t('pages.recipeGuide.itemNotFound')} description={t('pages.recipeGuide.itemNotFoundDesc')} />
   }
 
   // 检查商品是否有属性定义
   if (!item.attributes || item.attributes.length === 0) {
-    return <AlertBox type="warning" title="商品未配置属性" description="此商品没有配置属性（如杯型、温度等），无法使用按属性组合管理配方。请先在商品管理中配置属性。" />
+    return <AlertBox type="warning" title={t('pages.recipeGuide.itemAttributesNotConfigured')} description={t('pages.recipeGuide.itemAttributesNotConfiguredDesc')} />
   }
 
   // 转换属性格式

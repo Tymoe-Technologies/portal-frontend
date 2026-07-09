@@ -828,6 +828,14 @@ const zhCN = {
         apiExampleSummary: 'API 使用示例',
         errorHandlingSummary: '错误处理'
       },
+      brandLocaleSettings: {
+        loadFailed: '获取语言配置失败',
+        saveSuccess: '语言配置已保存',
+        saveFailed: '保存失败',
+        pageTitle: '菜单语言设置',
+        pageDesc: '商品名称支持所有语言的翻译。设置默认语言后，当某语言没有对应译名时将显示默认语言的名称。',
+        defaultLocaleLabel: '默认语言（无对应译名时显示）'
+      },
       supplyManagement: {
         pageTitle: '耗材管理',
         pageDescription: '管理餐具、吸管、包装等一次性消耗品',
@@ -2289,6 +2297,14 @@ const zhCN = {
         deleteFailed: '删除失败',
         calculateFailed: '计算失败',
         loadFailed: '加载数据失败',
+        loadRecipesFailed: '加载配方失败',
+        batchCopyConfirmDesc: '确定要将此配方复制到其他 {{count}} 个属性组合吗？已存在的配方将被覆盖。',
+        batchCopyResultMsg: '成功创建 {{created}} 个配方，更新 {{updated}} 个配方',
+        itemNotFound: '商品不存在',
+        itemNotFoundDesc: '无法加载商品信息，请重新选择',
+        itemAttributesNotConfigured: '商品未配置属性',
+        itemAttributesNotConfiguredDesc: '此商品没有配置属性（如杯型、温度等），无法使用按属性组合管理配方。请先在商品管理中配置属性。',
+        unnamedItem: '未命名商品',
 
         // 旧版属性配方表单（RecipeFormModal.tsx）
         recipeNameAutoPlaceholder: '留空自动生成',
@@ -2901,6 +2917,13 @@ const zhCN = {
           recurring: '循环排班',
           recurringDesc: '按排班计划重复',
           saveChanges: '保存更改',
+          tabTable: '餐桌 / 座位',
+          tabSpace: '空间 / 场地',
+          tabProduct: '服务 / 产品',
+          tabPerson: '人员',
+          spaceLabel: '空间',
+          comingSoonTitle: '{{label}} 管理',
+          comingSoonHint: '即将推出',
         },
         bookings: {
           title: '预约管理',
@@ -2946,7 +2969,15 @@ const zhCN = {
           depositConfig: '押金配置',
           depositRequired: '需要押金',
           depositRequiredDesc: '预约时要求客人支付押金',
+          depositEnabled: '需要押金',
+          depositEnabledDesc: '预约时要求客人支付押金',
           depositAmount: '押金金额',
+          resourceSettingsHint: '各资源类型的专属设置在对应管理页面中配置',
+          minAdvanceHours: '最少提前时间（小时）',
+          requireCustomerPhone: '要求客户手机号',
+          requireCustomerPhoneDesc: '创建预约时必须填写手机号',
+          requireCustomerEmail: '要求客户邮箱',
+          requireCustomerEmailDesc: '创建预约时必须填写邮箱',
         },
         public: {
           notFound: '未找到该商户页面。',

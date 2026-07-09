@@ -56,7 +56,7 @@ const RecipeManagementByModifiers: React.FC<RecipeManagementByModifiersProps> = 
   }
 
   if (!item) {
-    return <AlertBox type="error" title="商品不存在" description="无法加载商品信息，请重新选择" />
+    return <AlertBox type="error" title={t('pages.recipeGuide.itemNotFound')} description={t('pages.recipeGuide.itemNotFoundDesc')} />
   }
 
   // 无论是否有自定义选项，都允许创建配方指引
@@ -64,7 +64,7 @@ const RecipeManagementByModifiers: React.FC<RecipeManagementByModifiersProps> = 
   return (
     <RecipeByModifierManager
       itemId={item.id}
-      itemName={item.name || '未命名商品'}
+      itemName={item.name || t('pages.recipeGuide.unnamedItem')}
       modifierGroups={modifierGroups}
     />
   )

@@ -983,6 +983,14 @@ const fr = {
         apiExampleSummary: "Exemple d'utilisation de l'API",
         errorHandlingSummary: 'Gestion des erreurs'
       },
+      brandLocaleSettings: {
+        loadFailed: 'Échec du chargement des paramètres de langue',
+        saveSuccess: 'Paramètres de langue enregistrés',
+        saveFailed: "Échec de l'enregistrement",
+        pageTitle: 'Paramètres de langue du menu',
+        pageDesc: "Les noms d'articles prennent en charge les traductions dans toutes les langues. Une fois la langue par défaut définie, elle sera affichée chaque fois qu'une langue n'a pas de traduction correspondante.",
+        defaultLocaleLabel: "Langue par défaut (affichée en l'absence de traduction)"
+      },
       supplyManagement: {
         pageTitle: 'Gestion des fournitures',
         pageDescription: 'Gérer les fournitures à usage unique telles que la vaisselle, les pailles et les emballages',
@@ -2550,6 +2558,14 @@ const fr = {
         updateSuccess: 'Mis à jour avec succès',
         createFailed: 'Échec de la création',
         loadFailed: 'Échec du chargement des données',
+        loadRecipesFailed: 'Échec du chargement des recettes',
+        batchCopyConfirmDesc: 'Voulez-vous vraiment copier cette recette vers les {{count}} autres combinaisons d\'attributs ? Les recettes existantes seront écrasées.',
+        batchCopyResultMsg: '{{created}} recette(s) créée(s), {{updated}} recette(s) mise(s) à jour avec succès',
+        itemNotFound: 'Article introuvable',
+        itemNotFoundDesc: 'Impossible de charger les informations de l\'article, veuillez le resélectionner',
+        itemAttributesNotConfigured: 'Attributs de l\'article non configurés',
+        itemAttributesNotConfiguredDesc: "Cet article n'a aucun attribut configuré (par ex. taille de tasse, température), il est donc impossible de gérer les recettes par combinaison d'attributs. Veuillez d'abord configurer les attributs dans la gestion des articles.",
+        unnamedItem: 'Article sans nom',
 
         // Ancien formulaire de recette par attribut (RecipeFormModal.tsx)
         recipeNameAutoPlaceholder: 'Laisser vide pour générer automatiquement',
@@ -2993,6 +3009,26 @@ const fr = {
         },
       },
       booking: {
+        resources: {
+          tabTable: 'Tables / Places',
+          tabSpace: 'Espaces / Lieux',
+          tabProduct: 'Services / Produits',
+          tabPerson: 'Personnel',
+          spaceLabel: 'Espace',
+          comingSoonTitle: 'Gestion des {{label}}',
+          comingSoonHint: 'Bientôt disponible',
+        },
+        settings: {
+          advanceBookingDays: 'Réservation anticipée (jours)',
+          minAdvanceHours: 'Délai minimum (heures)',
+          requireCustomerPhone: 'Exiger le téléphone du client',
+          requireCustomerPhoneDesc: 'Les clients doivent fournir un numéro de téléphone lors de la réservation',
+          requireCustomerEmail: 'Exiger l\'e-mail du client',
+          requireCustomerEmailDesc: 'Les clients doivent fournir une adresse e-mail lors de la réservation',
+          depositEnabled: 'Exiger un acompte',
+          depositEnabledDesc: 'Exiger que les clients versent un acompte lors de la réservation',
+          resourceSettingsHint: 'Les paramètres spécifiques à chaque type de ressource sont configurés sur leurs pages de gestion respectives',
+        },
         floorPlanEditor: {
           dayLabels: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
           capacityRange: '{{min}}–{{max}} personnes',

@@ -830,6 +830,14 @@ const en = {
         apiExampleSummary: 'API Usage Example',
         errorHandlingSummary: 'Error Handling'
       },
+      brandLocaleSettings: {
+        loadFailed: 'Failed to load language settings',
+        saveSuccess: 'Language settings saved',
+        saveFailed: 'Save failed',
+        pageTitle: 'Menu Language Settings',
+        pageDesc: 'Item names support translations in all languages. Once a default language is set, it will be shown whenever a language has no matching translation.',
+        defaultLocaleLabel: 'Default Language (shown when no translation is available)'
+      },
       supplyManagement: {
         pageTitle: 'Supply Management',
         pageDescription: 'Manage disposable supplies such as tableware, straws, and packaging',
@@ -2195,6 +2203,14 @@ const en = {
         deleteFailed: 'Failed to delete',
         calculateFailed: 'Failed to calculate',
         loadFailed: 'Failed to load data',
+        loadRecipesFailed: 'Failed to load recipes',
+        batchCopyConfirmDesc: 'Are you sure you want to copy this recipe to the other {{count}} attribute combinations? Existing recipes will be overwritten.',
+        batchCopyResultMsg: 'Successfully created {{created}} recipe(s), updated {{updated}} recipe(s)',
+        itemNotFound: 'Item Not Found',
+        itemNotFoundDesc: 'Unable to load item information, please reselect',
+        itemAttributesNotConfigured: 'Item Attributes Not Configured',
+        itemAttributesNotConfiguredDesc: 'This item has no attributes configured (e.g. cup size, temperature), so recipes cannot be managed by attribute combination. Please configure attributes in item management first.',
+        unnamedItem: 'Unnamed Item',
 
         // Legacy attribute recipe form (RecipeFormModal.tsx)
         recipeNameAutoPlaceholder: 'Leave empty to auto-generate',
@@ -2857,6 +2873,13 @@ const en = {
           recurring: 'Recurring',
           recurringDesc: 'Repeats on a schedule',
           saveChanges: 'Save Changes',
+          tabTable: 'Tables / Seats',
+          tabSpace: 'Spaces / Venues',
+          tabProduct: 'Services / Products',
+          tabPerson: 'Staff',
+          spaceLabel: 'Space',
+          comingSoonTitle: '{{label}} Management',
+          comingSoonHint: 'Coming soon',
         },
         bookings: {
           title: 'Bookings',
@@ -2902,7 +2925,15 @@ const en = {
           depositConfig: 'Deposit Configuration',
           depositRequired: 'Require Deposit',
           depositRequiredDesc: 'Require customers to pay a deposit when booking',
+          depositEnabled: 'Require Deposit',
+          depositEnabledDesc: 'Require customers to pay a deposit when booking',
           depositAmount: 'Deposit Amount',
+          resourceSettingsHint: 'Resource-specific settings are configured on their respective management pages',
+          minAdvanceHours: 'Minimum Advance Notice (hours)',
+          requireCustomerPhone: 'Require Customer Phone',
+          requireCustomerPhoneDesc: 'Customers must provide a phone number when booking',
+          requireCustomerEmail: 'Require Customer Email',
+          requireCustomerEmailDesc: 'Customers must provide an email when booking',
         },
         public: {
           notFound: 'This business page was not found.',

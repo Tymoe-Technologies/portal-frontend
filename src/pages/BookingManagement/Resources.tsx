@@ -8,12 +8,12 @@ import ProductManagement from './ProductManagement'
 import BookingLinkDisplay from './BookingLinkDisplay'
 
 // SPACE 类型的管理页面（后续实现）
-function ComingSoon({ label }: { label: string }) {
+function ComingSoon({ label, t }: { label: string; t: (key: string, opts?: Record<string, unknown>) => string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-slate-300 gap-2">
       <div className="text-4xl">🚧</div>
-      <div className="text-base font-medium">{label} 管理</div>
-      <div className="text-[13px]">即将推出</div>
+      <div className="text-base font-medium">{t('pages.booking.resources.comingSoonTitle', { label })}</div>
+      <div className="text-[13px]">{t('pages.booking.resources.comingSoonHint')}</div>
     </div>
   )
 }
@@ -23,10 +23,10 @@ export default function BookingResources() {
   const [activeTab, setActiveTab] = useState('TABLE')
 
   const tabs = [
-    { key: 'TABLE', label: '餐桌 / 座位' },
-    { key: 'SPACE', label: '空间 / 场地' },
-    { key: 'PRODUCT', label: '服务 / 产品' },
-    { key: 'PERSON', label: '人员' },
+    { key: 'TABLE', label: t('pages.booking.resources.tabTable') },
+    { key: 'SPACE', label: t('pages.booking.resources.tabSpace') },
+    { key: 'PRODUCT', label: t('pages.booking.resources.tabProduct') },
+    { key: 'PERSON', label: t('pages.booking.resources.tabPerson') },
   ]
 
   return (
@@ -42,7 +42,7 @@ export default function BookingResources() {
         </div>
 
         {activeTab === 'TABLE' && <FloorPlanEditor />}
-        {activeTab === 'SPACE' && <ComingSoon label="空间" />}
+        {activeTab === 'SPACE' && <ComingSoon label={t('pages.booking.resources.spaceLabel')} t={t} />}
         {activeTab === 'PRODUCT' && <ProductManagement />}
         {activeTab === 'PERSON' && <PersonManagement />}
       </div>

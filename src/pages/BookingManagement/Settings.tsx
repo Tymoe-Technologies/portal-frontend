@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { settingsApi } from '@/services/booking'
 import type { BookingSettings } from '@/types/booking'
 import { SectionCard, Btn, Switch, NumberInput, Spinner, toast } from '@/components/ui-kit'
+import { getCurrencySymbol } from '@/config/currencyConfig'
 import BookingPageLayout from './BookingPageLayout'
 
 interface FormState {
@@ -90,7 +91,7 @@ export default function BookingSettingsPage() {
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="m-0 text-xl font-semibold text-slate-800">{t('pages.booking.settings.title')}</h2>
-              {settings && <p className="text-[13px] text-slate-400 mt-0.5">各资源类型的专属设置在对应管理页面中配置</p>}
+              {settings && <p className="text-[13px] text-slate-400 mt-0.5">{t('pages.booking.settings.resourceSettingsHint')}</p>}
             </div>
             <div className="flex gap-2">
               <Btn variant="secondary" icon={<Undo2 className="w-3.5 h-3.5" />} onClick={handleReset}>{t('common.reset')}</Btn>
@@ -103,17 +104,17 @@ export default function BookingSettingsPage() {
             <SectionCard title={<span className="inline-flex items-center gap-2"><Calendar className="w-4 h-4" />{t('pages.booking.settings.bookingRules')}</span>}>
               <div className="flex gap-4 mb-2">
                 <div className="flex-1">
-                  <div className="text-sm text-slate-600 mb-1.5">最多提前预约（天）</div>
+                  <div className="text-sm text-slate-600 mb-1.5">{t('pages.booking.settings.advanceBookingDays')}</div>
                   <NumberInput className="w-full" value={form.advanceBookingDays} onChange={(v) => set('advanceBookingDays', v)} min={1} max={90} />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm text-slate-600 mb-1.5">最少提前时间（小时）</div>
+                  <div className="text-sm text-slate-600 mb-1.5">{t('pages.booking.settings.minAdvanceHours')}</div>
                   <NumberInput className="w-full" value={form.minAdvanceHours} onChange={(v) => set('minAdvanceHours', v)} min={0} max={72} />
                 </div>
               </div>
-              <SettingToggle label="要求客户手机号" description="创建预约时必须填写手机号"
+              <SettingToggle label={t('pages.booking.settings.requireCustomerPhone')} description={t('pages.booking.settings.requireCustomerPhoneDesc')}
                 checked={form.requireCustomerPhone} onChange={(v) => set('requireCustomerPhone', v)} />
-              <SettingToggle label="要求客户邮箱" description="创建预约时必须填写邮箱"
+              <SettingToggle label={t('pages.booking.settings.requireCustomerEmail')} description={t('pages.booking.settings.requireCustomerEmailDesc')}
                 checked={form.requireCustomerEmail} onChange={(v) => set('requireCustomerEmail', v)} />
             </SectionCard>
           </div>
@@ -124,7 +125,7 @@ export default function BookingSettingsPage() {
               checked={form.depositEnabled} onChange={(v) => set('depositEnabled', v)} />
             <div className="pt-3">
               <div className="text-sm text-slate-600 mb-1.5">{t('pages.booking.settings.depositAmount')}</div>
-              <NumberInput value={form.depositAmount} onChange={(v) => set('depositAmount', v)} min={0} suffix="元" />
+              <NumberInput value={form.depositAmount} onChange={(v) => set('depositAmount', v)} min={0} suffix={getCurrencySymbol()} />
             </div>
           </SectionCard>
         </div>

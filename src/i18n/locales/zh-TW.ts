@@ -823,6 +823,14 @@ const zhTW = {
         apiExampleSummary: 'API 使用示例',
         errorHandlingSummary: '錯誤處理'
       },
+      brandLocaleSettings: {
+        loadFailed: '獲取語言配置失敗',
+        saveSuccess: '語言配置已保存',
+        saveFailed: '保存失敗',
+        pageTitle: '菜單語言設置',
+        pageDesc: '商品名稱支持所有語言的翻譯。設置默認語言後，當某語言沒有對應譯名時將顯示默認語言的名稱。',
+        defaultLocaleLabel: '默認語言（無對應譯名時顯示）'
+      },
       supplyManagement: {
         pageTitle: '耗材管理',
         pageDescription: '管理餐具、吸管、包裝等一次性消耗品',
@@ -2164,6 +2172,14 @@ const zhTW = {
         deleteFailed: '刪除失敗',
         calculateFailed: '計算失敗',
         loadFailed: '加載數據失敗',
+        loadRecipesFailed: '加載配方失敗',
+        batchCopyConfirmDesc: '確定要將此配方複製到其他 {{count}} 個屬性組合嗎？已存在的配方將被覆蓋。',
+        batchCopyResultMsg: '成功創建 {{created}} 個配方，更新 {{updated}} 個配方',
+        itemNotFound: '商品不存在',
+        itemNotFoundDesc: '無法加載商品信息，請重新選擇',
+        itemAttributesNotConfigured: '商品未配置屬性',
+        itemAttributesNotConfiguredDesc: '此商品沒有配置屬性（如杯型、溫度等），無法使用按屬性組合管理配方。請先在商品管理中配置屬性。',
+        unnamedItem: '未命名商品',
 
         // 舊版屬性配方表單（RecipeFormModal.tsx）
         recipeNameAutoPlaceholder: '留空自動生成',
@@ -2825,6 +2841,13 @@ const zhTW = {
           recurring: '循環排班',
           recurringDesc: '按排班計劃重複',
           saveChanges: '保存更改',
+          tabTable: '餐桌 / 座位',
+          tabSpace: '空間 / 場地',
+          tabProduct: '服務 / 產品',
+          tabPerson: '人員',
+          spaceLabel: '空間',
+          comingSoonTitle: '{{label}} 管理',
+          comingSoonHint: '即將推出',
         },
         bookings: {
           title: '預約管理',
@@ -2870,7 +2893,15 @@ const zhTW = {
           depositConfig: '押金配置',
           depositRequired: '需要押金',
           depositRequiredDesc: '預約時要求客人支付押金',
+          depositEnabled: '需要押金',
+          depositEnabledDesc: '預約時要求客人支付押金',
           depositAmount: '押金金額',
+          resourceSettingsHint: '各資源類型的專屬設置在對應管理頁面中配置',
+          minAdvanceHours: '最少提前時間（小時）',
+          requireCustomerPhone: '要求客戶手機號',
+          requireCustomerPhoneDesc: '創建預約時必須填寫手機號',
+          requireCustomerEmail: '要求客戶郵箱',
+          requireCustomerEmailDesc: '創建預約時必須填寫郵箱',
         },
         public: {
           notFound: '未找到該商戶頁面。',

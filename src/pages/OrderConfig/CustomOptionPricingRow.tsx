@@ -173,7 +173,7 @@ const CustomOptionPricingRow: React.FC<CustomOptionPricingRowProps> = ({
       return
     }
     if (newPrice < 0) {
-      setEditError('价格不能为负数')
+      setEditError(t('pages.orderConfig.modifierPricing.priceCannotBeNegative'))
       return
     }
 

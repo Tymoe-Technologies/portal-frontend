@@ -50,7 +50,7 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({ ite
       const data = await getRecipes(itemId)
       setRecipes(data)
     } catch (error: any) {
-      toast.error(error.message || '加载配方失败')
+      toast.error(error.message || t('pages.recipeGuide.loadRecipesFailed'))
     } finally {
       setLoading(false)
     }
@@ -117,8 +117,8 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({ ite
     })
 
     setConfirm({
-      title: '批量复制配方',
-      description: `确定要将此配方复制到其他 ${targetCombinations.length} 个属性组合吗？已存在的配方将被覆盖。`,
+      title: t('pages.recipeGuide.byModifierManager.batchCopyTitle'),
+      description: t('pages.recipeGuide.batchCopyConfirmDesc', { count: targetCombinations.length }),
       onConfirm: async () => {
         let successCount = 0
         let updateCount = 0
@@ -151,7 +151,7 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({ ite
             console.error('复制失败:', error)
           }
         }
-        toast.success(`成功创建 ${successCount} 个配方，更新 ${updateCount} 个配方`)
+        toast.success(t('pages.recipeGuide.batchCopyResultMsg', { created: successCount, updated: updateCount }))
         setConfirm(null)
         loadRecipes()
       },
@@ -161,15 +161,15 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({ ite
   const handleDeleteRecipe = (recipe: Recipe) => {
     setConfirm({
       title: t('pages.recipeGuide.deleteRecipe'),
-      description: '确定要删除这个配方吗？',
+      description: t('pages.recipeGuide.deleteRecipeConfirm'),
       onConfirm: async () => {
         try {
           await deleteRecipe(recipe.id!)
-          toast.success('删除成功')
+          toast.success(t('pages.recipeGuide.deleteSuccess'))
           setConfirm(null)
           loadRecipes()
         } catch (error: any) {
-          toast.error(error.message || '删除失败')
+          toast.error(error.message || t('pages.recipeGuide.deleteFailed'))
         }
       },
     })
@@ -215,7 +215,7 @@ const RecipeByAttributeManager: React.FC<RecipeByAttributeManagerProps> = ({ ite
         <div className="flex items-center gap-1">
           {row.hasRecipe ? (
             <>
-              <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditRecipe(row.recipe!)}>编辑</Btn>
+              <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditRecipe(row.recipe!)}>{t('pages.recipeGuide.edit')}</Btn>
               <Btn variant="link" icon={<Copy className="w-3.5 h-3.5" />} onClick={() => handleCopyToAll(row.recipe!)} />
               <Btn variant="link" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => handleDeleteRecipe(row.recipe!)} />
             </>

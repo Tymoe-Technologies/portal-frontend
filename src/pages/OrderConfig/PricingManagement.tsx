@@ -119,7 +119,7 @@ const PricingManagement: React.FC = () => {
 
       const channel = channels.find(c => c.id === channelId)
       if (!channel) {
-        toast.error('渠道信息不完整')
+        toast.error(t('pages.orderConfig.channelInfoIncomplete'))
         return
       }
 
@@ -210,17 +210,17 @@ const PricingManagement: React.FC = () => {
   // 批量应用定价器到选中的商品
   const applyGlobalPricing = () => {
     if (pricingMode === 'none') {
-      toast.warning('请先选择定价方式')
+      toast.warning(t('pages.orderConfig.selectPricingMethodFirst'))
       return
     }
 
     if (pricingMode === 'percentage' && globalPercentage === undefined) {
-      toast.warning('请输入百分比')
+      toast.warning(t('pages.orderConfig.enterPercentageWarning'))
       return
     }
 
     if (pricingMode === 'adjustment' && globalAdjustment === undefined) {
-      toast.warning('请输入增减金额')
+      toast.warning(t('pages.orderConfig.enterAdjustmentAmountWarning'))
       return
     }
 
@@ -255,9 +255,16 @@ const PricingManagement: React.FC = () => {
     setCombos(updateList(combos))
 
     if (pricingMode === 'percentage') {
-      toast.success(`已批量应用 ${globalPercentage! > 0 ? '+' : ''}${globalPercentage}% 定价`)
+      toast.success(t('pages.orderConfig.batchAppliedPercentage', {
+        sign: globalPercentage! > 0 ? '+' : '',
+        value: globalPercentage
+      }))
     } else {
-      toast.success(`已批量应用 ${globalAdjustment! > 0 ? '+' : ''}${getCurrencySymbol()}${globalAdjustment} 定价`)
+      toast.success(t('pages.orderConfig.batchAppliedAdjustment', {
+        sign: globalAdjustment! > 0 ? '+' : '',
+        symbol: getCurrencySymbol(),
+        value: globalAdjustment
+      }))
     }
   }
 
@@ -277,7 +284,7 @@ const PricingManagement: React.FC = () => {
 
     const sourceCode = selectedChannel.sourceType || selectedChannel.sourceName
     if (!sourceCode) {
-      toast.error('渠道代码不完整')
+      toast.error(t('pages.orderConfig.channelCodeIncomplete'))
       return
     }
 
@@ -309,7 +316,7 @@ const PricingManagement: React.FC = () => {
         })
 
       if (itemPrices.length === 0 && comboPrices.length === 0) {
-        toast.info(t('pages.orderConfig.noChanges') || '没有任何更改')
+        toast.info(t('pages.orderConfig.noChanges'))
         setSaving(false)
         return
       }
@@ -434,7 +441,7 @@ const PricingManagement: React.FC = () => {
                 {t('pages.orderConfig.selectedChannel')}: <strong>{selectedChannel.sourceName}</strong>
               </p>
               <p className="m-0 text-xs text-slate-400">
-                {selectedChannel.description && `描述: ${selectedChannel.description}`}
+                {selectedChannel.description && `${t('pages.orderConfig.channelDescriptionLabel')}: ${selectedChannel.description}`}
               </p>
             </div>
 
@@ -545,8 +552,8 @@ const PricingManagement: React.FC = () => {
                   value={activeTab}
                   onChange={(k) => setActiveTab(k as any)}
                   items={[
-                    { key: 'items', label: `商品定价 (${items.length})` },
-                    { key: 'combos', label: `套餐定价 (${combos.length})` }
+                    { key: 'items', label: t('pages.orderConfig.itemPricingTab', { count: items.length }) },
+                    { key: 'combos', label: t('pages.orderConfig.comboPricingTab', { count: combos.length }) }
                   ]}
                 />
                 <div className="mt-4">
@@ -558,7 +565,7 @@ const PricingManagement: React.FC = () => {
 
             <div className="mt-6 flex items-center justify-between">
               <div className="text-[13px] text-slate-400">
-                {saving && <span className="inline-flex items-center gap-2"><Spinner className="h-4 w-4" />保存中...</span>}
+                {saving && <span className="inline-flex items-center gap-2"><Spinner className="h-4 w-4" />{t('pages.orderConfig.savingInProgress')}</span>}
               </div>
               <Btn variant="primary" icon={<Save size={16} />} onClick={handleSave} loading={saving} disabled={loading}>
                 {t('pages.orderConfig.applyAll')}

@@ -104,7 +104,7 @@ const RecipeFormModal: React.FC<RecipeFormModalProps> = ({
           try {
             parsedConditions = JSON.parse(parsedConditions)
           } catch (e) {
-            toast.error('属性条件格式错误，请输入有效的JSON格式')
+            toast.error(t('pages.recipeGuide.attributeConditionsParseError'))
             setLoading(false)
             return
           }
@@ -118,7 +118,7 @@ const RecipeFormModal: React.FC<RecipeFormModalProps> = ({
       // 验证步骤：每个步骤必须有stepTypeId
       const invalidSteps = steps.filter(step => !step.stepTypeId)
       if (invalidSteps.length > 0) {
-        toast.error('请为所有步骤选择步骤类型！')
+        toast.error(t('pages.recipeGuide.stepTypeRequiredToast'))
         setLoading(false)
         return
       }
@@ -152,18 +152,18 @@ const RecipeFormModal: React.FC<RecipeFormModalProps> = ({
       if (recipe) {
         result = await updateRecipe(recipe.id, payload)
         if (payload.steps.length > 0 && (!result.steps || result.steps.length === 0)) {
-          toast.warning('配方更新成功，但步骤未保存。这是后端问题。')
+          toast.warning(t('pages.recipeGuide.updateSuccessStepsNotSaved'))
         } else {
           toast.success(t('pages.recipeGuide.updateSuccess'))
         }
       } else {
         result = await createRecipe(payload)
         const issues = []
-        if (!result.attributeConditions && parsedConditions) issues.push('属性条件')
-        if (payload.steps.length > 0 && (!result.steps || result.steps.length === 0)) issues.push('步骤')
+        if (!result.attributeConditions && parsedConditions) issues.push(t('pages.recipeGuide.issueAttributeConditions'))
+        if (payload.steps.length > 0 && (!result.steps || result.steps.length === 0)) issues.push(t('pages.recipeGuide.issueSteps'))
 
         if (issues.length > 0) {
-          toast.warning(`配方创建成功，但${issues.join('和')}未保存。这是后端问题。`)
+          toast.warning(t('pages.recipeGuide.createSuccessWithIssues', { issues: issues.join(t('pages.recipeGuide.issueJoiner')) }))
         } else {
           toast.success(t('pages.recipeGuide.createSuccess'))
         }
@@ -226,20 +226,20 @@ const RecipeFormModal: React.FC<RecipeFormModalProps> = ({
       }
     >
       <div className="space-y-4">
-        <Field label={t('pages.recipeGuide.recipeName')} hint="留空将自动生成为「商品名称配方 #序号」">
-          <TextInput value={name} onChange={setName} placeholder="留空自动生成" />
+        <Field label={t('pages.recipeGuide.recipeName')} hint={t('pages.recipeGuide.recipeNameAutoGenerate')}>
+          <TextInput value={name} onChange={setName} placeholder={t('pages.recipeGuide.recipeNameAutoPlaceholder')} />
         </Field>
 
         <Field label={t('pages.recipeGuide.recipeDescription')}>
           <Textarea value={description} onChange={setDescription} placeholder={t('pages.recipeGuide.recipeDescriptionPlaceholder')} rows={2} />
         </Field>
 
-        <Field label="属性条件" hint="指定此配方适用的属性组合，如 size=large, temperature=cold。留空表示默认配方">
-          <Textarea value={attributeConditions} onChange={setAttributeConditions} placeholder='例如: {"size": "large", "temperature": "cold"}' rows={2} />
+        <Field label={t('pages.recipeGuide.attributeConditions')} hint={t('pages.recipeGuide.attributeConditionsHint')}>
+          <Textarea value={attributeConditions} onChange={setAttributeConditions} placeholder={t('pages.recipeGuide.attributeConditionsJsonPlaceholder')} rows={2} />
         </Field>
 
         <div className="flex items-end gap-8">
-          <Field label="优先级" hint="数字越大优先级越高">
+          <Field label={t('pages.recipeGuide.priority')} hint={t('pages.recipeGuide.priorityTooltip')}>
             <div className="w-32">
               <NumberInput value={priority} onChange={setPriority} min={0} max={100} />
             </div>
@@ -275,9 +275,9 @@ const RecipeFormModal: React.FC<RecipeFormModalProps> = ({
                       </div>
                     </div>
                     <div className="space-y-3 px-3 py-3">
-                      <Field label="步骤类型" required error={!step.stepTypeId ? '请选择步骤类型' : undefined}>
+                      <Field label={t('pages.recipeGuide.stepType')} required error={!step.stepTypeId ? t('pages.recipeGuide.stepTypeRequiredError') : undefined}>
                         <SelectInput
-                          placeholder="请选择步骤类型（必填）"
+                          placeholder={t('pages.recipeGuide.stepTypeSelectPlaceholder')}
                           value={step.stepTypeId || ''}
                           onChange={(value) => updateStep(index, 'stepTypeId', value)}
                           options={stepTypes.map(type => ({ value: type.id, label: `${type.code} ${type.name}` }))}
@@ -285,7 +285,7 @@ const RecipeFormModal: React.FC<RecipeFormModalProps> = ({
                       </Field>
 
                       <TextInput
-                        placeholder="数量/说明（如: 200ml, 8oz, 按1键）"
+                        placeholder={t('pages.recipeGuide.stepAmountPlaceholder')}
                         value={(step.amount as any) || ''}
                         onChange={(v) => updateStep(index, 'amount', v)}
                       />
@@ -295,12 +295,12 @@ const RecipeFormModal: React.FC<RecipeFormModalProps> = ({
                           value={step.duration ?? undefined}
                           onChange={(v) => updateStep(index, 'duration', v)}
                           min={0}
-                          suffix="秒"
+                          suffix={t('pages.recipeGuide.seconds')}
                         />
                       </div>
 
                       <div className="rounded bg-blue-50 px-3 py-2 text-xs text-slate-600">
-                        💡 <strong>打印代码</strong>由后端根据步骤类型和原料信息自动生成，保存后可查看
+                        💡 {t('pages.recipeGuide.printCodeAutoGenNote')}
                       </div>
                     </div>
                   </div>

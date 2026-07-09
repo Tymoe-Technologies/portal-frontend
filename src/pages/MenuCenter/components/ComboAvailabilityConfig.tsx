@@ -1,16 +1,18 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import clsx from 'clsx'
 import type { ComboAvailabilityRules } from '@/services/item-management'
 import { Checkbox } from '@/components/ui-kit'
 
-const DAYS_OF_WEEK = [
-  { value: 0, label: '周日', short: '日' },
-  { value: 1, label: '周一', short: '一' },
-  { value: 2, label: '周二', short: '二' },
-  { value: 3, label: '周三', short: '三' },
-  { value: 4, label: '周四', short: '四' },
-  { value: 5, label: '周五', short: '五' },
-  { value: 6, label: '周六', short: '六' },
+const getDaysOfWeek = (t: TFunction) => [
+  { value: 0, label: t('pages.menuCenter.comboAvailabilityConfig.dayNames.sunday'), short: t('pages.menuCenter.comboAvailabilityConfig.dayShorts.sunday') },
+  { value: 1, label: t('pages.menuCenter.comboAvailabilityConfig.dayNames.monday'), short: t('pages.menuCenter.comboAvailabilityConfig.dayShorts.monday') },
+  { value: 2, label: t('pages.menuCenter.comboAvailabilityConfig.dayNames.tuesday'), short: t('pages.menuCenter.comboAvailabilityConfig.dayShorts.tuesday') },
+  { value: 3, label: t('pages.menuCenter.comboAvailabilityConfig.dayNames.wednesday'), short: t('pages.menuCenter.comboAvailabilityConfig.dayShorts.wednesday') },
+  { value: 4, label: t('pages.menuCenter.comboAvailabilityConfig.dayNames.thursday'), short: t('pages.menuCenter.comboAvailabilityConfig.dayShorts.thursday') },
+  { value: 5, label: t('pages.menuCenter.comboAvailabilityConfig.dayNames.friday'), short: t('pages.menuCenter.comboAvailabilityConfig.dayShorts.friday') },
+  { value: 6, label: t('pages.menuCenter.comboAvailabilityConfig.dayNames.saturday'), short: t('pages.menuCenter.comboAvailabilityConfig.dayShorts.saturday') },
 ]
 
 interface ComboAvailabilityConfigProps {
@@ -19,6 +21,8 @@ interface ComboAvailabilityConfigProps {
 }
 
 export const ComboAvailabilityConfig: React.FC<ComboAvailabilityConfigProps> = ({ value, onChange }) => {
+  const { t } = useTranslation()
+  const DAYS_OF_WEEK = getDaysOfWeek(t)
   const rules = value || { enabled: false }
 
   const handleEnabledChange = (enabled: boolean) => {
@@ -72,19 +76,19 @@ export const ComboAvailabilityConfig: React.FC<ComboAvailabilityConfigProps> = (
 
   return (
     <div className="rounded-lg border border-slate-200">
-      <div className="px-3 py-2 border-b border-slate-100 text-sm font-medium text-slate-700">时段限制（可选）</div>
+      <div className="px-3 py-2 border-b border-slate-100 text-sm font-medium text-slate-700">{t('pages.menuCenter.comboAvailabilityConfig.title')}</div>
       <div className="p-3 space-y-3">
-        <Checkbox checked={!!rules.enabled} onCheckedChange={handleEnabledChange} label="启用时段限制" />
+        <Checkbox checked={!!rules.enabled} onCheckedChange={handleEnabledChange} label={t('pages.menuCenter.comboAvailabilityConfig.enableLabel')} />
 
         {rules.enabled && (
           <>
             {/* 时间段 */}
             <div className="ml-6 space-y-2">
-              <Checkbox checked={!!rules.timeRange} onCheckedChange={handleTimeRangeToggle} label="限制可用时间段" />
+              <Checkbox checked={!!rules.timeRange} onCheckedChange={handleTimeRangeToggle} label={t('pages.menuCenter.comboAvailabilityConfig.limitTimeRangeLabel')} />
               {rules.timeRange && (
                 <div className="ml-6 flex items-center gap-2">
                   <input type="time" step={900} value={rules.timeRange.start} onChange={e => handleTimeRangeChange('start', e.target.value)} className={timeCls} />
-                  <span className="text-xs text-slate-400">至</span>
+                  <span className="text-xs text-slate-400">{t('pages.menuCenter.comboAvailabilityConfig.to')}</span>
                   <input type="time" step={900} value={rules.timeRange.end} onChange={e => handleTimeRangeChange('end', e.target.value)} className={timeCls} />
                 </div>
               )}
@@ -92,7 +96,7 @@ export const ComboAvailabilityConfig: React.FC<ComboAvailabilityConfigProps> = (
 
             {/* 星期 */}
             <div className="ml-6 space-y-2">
-              <Checkbox checked={!!rules.daysOfWeek?.length} onCheckedChange={handleDaysToggle} label="限制可用星期" />
+              <Checkbox checked={!!rules.daysOfWeek?.length} onCheckedChange={handleDaysToggle} label={t('pages.menuCenter.comboAvailabilityConfig.limitDaysLabel')} />
               {rules.daysOfWeek !== undefined && (
                 <div className="ml-6 space-y-2">
                   <div className="flex flex-wrap gap-1">
@@ -111,9 +115,9 @@ export const ComboAvailabilityConfig: React.FC<ComboAvailabilityConfigProps> = (
                     })}
                   </div>
                   <div className="flex gap-1.5">
-                    <button className={quickCls} onClick={selectWeekdays}>工作日</button>
-                    <button className={quickCls} onClick={selectWeekends}>周末</button>
-                    <button className={quickCls} onClick={selectAll}>全选</button>
+                    <button className={quickCls} onClick={selectWeekdays}>{t('pages.menuCenter.comboAvailabilityConfig.weekdays')}</button>
+                    <button className={quickCls} onClick={selectWeekends}>{t('pages.menuCenter.comboAvailabilityConfig.weekends')}</button>
+                    <button className={quickCls} onClick={selectAll}>{t('pages.menuCenter.comboAvailabilityConfig.selectAll')}</button>
                   </div>
                 </div>
               )}
@@ -121,14 +125,14 @@ export const ComboAvailabilityConfig: React.FC<ComboAvailabilityConfigProps> = (
 
             {/* 预览 */}
             <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
-              <span className="font-medium text-slate-700">可用时段预览：</span>
+              <span className="font-medium text-slate-700">{t('pages.menuCenter.comboAvailabilityConfig.previewLabel')}</span>
               <span className="text-slate-500">
                 {rules.timeRange && <span>{rules.timeRange.start} - {rules.timeRange.end}</span>}
                 {rules.daysOfWeek?.length ? (
-                  <span>{' | '}{rules.daysOfWeek.map(d => DAYS_OF_WEEK.find(day => day.value === d)?.short).join('、')}</span>
+                  <span>{' | '}{rules.daysOfWeek.map(d => DAYS_OF_WEEK.find(day => day.value === d)?.short).join(', ')}</span>
                 ) : null}
                 {!rules.timeRange && !rules.daysOfWeek?.length && (
-                  <span className="text-red-500">请至少设置一项限制</span>
+                  <span className="text-red-500">{t('pages.menuCenter.comboAvailabilityConfig.pleaseSetAtLeastOne')}</span>
                 )}
               </span>
             </div>

@@ -1,5 +1,6 @@
 import React from 'react'
 import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Btn } from '@/components/ui-kit'
 
 interface RouteError {
@@ -10,37 +11,38 @@ interface RouteError {
 }
 
 const ErrorPage: React.FC = () => {
+  const { t } = useTranslation()
   const error = useRouteError() as RouteError
   const navigate = useNavigate()
 
   let errorStatus = 500
-  let errorTitle = '应用发生错误'
-  let errorSubtitle = '抱歉，应用遇到了一个意外错误'
+  let errorTitle = t('pages.errorPage.genericErrorTitle')
+  let errorSubtitle = t('pages.errorPage.genericErrorSubtitle')
   let errorDetails = ''
 
   if (isRouteErrorResponse(error)) {
     errorStatus = error.status
-    errorTitle = error.statusText || '错误'
+    errorTitle = error.statusText || t('pages.errorPage.errorTitle')
 
     switch (error.status) {
       case 404:
-        errorTitle = '页面未找到'
-        errorSubtitle = '抱歉，您访问的页面不存在'
+        errorTitle = t('pages.errorPage.notFoundTitle')
+        errorSubtitle = t('pages.errorPage.notFoundSubtitle')
         break
       case 401:
-        errorTitle = '未授权'
-        errorSubtitle = '您需要登录才能访问此页面'
+        errorTitle = t('pages.errorPage.unauthorizedTitle')
+        errorSubtitle = t('pages.errorPage.unauthorizedSubtitle')
         break
       case 403:
-        errorTitle = '禁止访问'
-        errorSubtitle = '您没有权限访问此页面'
+        errorTitle = t('pages.errorPage.forbiddenTitle')
+        errorSubtitle = t('pages.errorPage.forbiddenSubtitle')
         break
       case 500:
-        errorTitle = '服务器错误'
-        errorSubtitle = '服务器遇到了一个错误'
+        errorTitle = t('pages.errorPage.serverErrorTitle')
+        errorSubtitle = t('pages.errorPage.serverErrorSubtitle')
         break
       default:
-        errorSubtitle = `错误代码: ${error.status}`
+        errorSubtitle = t('pages.errorPage.errorCodeSubtitle', { code: error.status })
     }
 
     if (error.data?.message) errorDetails = error.data.message
@@ -61,15 +63,15 @@ const ErrorPage: React.FC = () => {
 
         {errorDetails && process.env.NODE_ENV === 'development' && (
           <details className="mt-5 p-3 bg-slate-50 rounded-md text-left">
-            <summary className="cursor-pointer font-bold text-slate-700">错误详情（仅开发环境显示）</summary>
+            <summary className="cursor-pointer font-bold text-slate-700">{t('pages.errorPage.errorDetailsSummary')}</summary>
             <pre className="mt-2.5 text-xs whitespace-pre-wrap break-words max-h-52 overflow-auto text-slate-600">{errorDetails}</pre>
           </details>
         )}
 
         <div className="flex items-center justify-center gap-2.5 mt-6">
-          <Btn variant="secondary" onClick={handleGoBack}>返回上一页</Btn>
-          <Btn variant="primary" onClick={handleGoHome}>返回首页</Btn>
-          <Btn variant="secondary" onClick={handleReload}>刷新页面</Btn>
+          <Btn variant="secondary" onClick={handleGoBack}>{t('pages.errorPage.goBack')}</Btn>
+          <Btn variant="primary" onClick={handleGoHome}>{t('pages.errorPage.goHome')}</Btn>
+          <Btn variant="secondary" onClick={handleReload}>{t('pages.errorPage.reload')}</Btn>
         </div>
       </div>
     </div>

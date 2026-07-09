@@ -1,36 +1,40 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy, Pencil, Globe, Table, LayoutGrid, Users } from 'lucide-react'
 import { orgProfileApi, OrganizationProfile } from '@/services/booking'
 import { SectionCard, Btn, toast } from '@/components/ui-kit'
+import type { TFunction } from 'i18next'
 
-const BOOKING_TYPES = [
+// 模块级函数：接收 t 以获取翻译（无法在模块作用域直接调用 t）
+const getBookingTypes = (t: TFunction) => [
   {
     key: 'table',
-    label: '餐桌预约',
+    label: t('pages.booking.bookingLinkDisplay.typeTable.label'),
     icon: <Table className="w-3.5 h-3.5" />,
     cls: 'bg-blue-50 text-blue-600 ring-blue-200',
     param: '',           // 默认，无 type 参数
-    desc: '客户直接选时间预约餐桌',
+    desc: t('pages.booking.bookingLinkDisplay.typeTable.desc'),
   },
   {
     key: 'services',
-    label: '服务预约',
+    label: t('pages.booking.bookingLinkDisplay.typeServices.label'),
     icon: <LayoutGrid className="w-3.5 h-3.5" />,
     cls: 'bg-slate-100 text-slate-600 ring-slate-200',   // 原紫色，改 slate（严禁紫色）
     param: '?type=services',
-    desc: '客户先浏览服务项目，再选时间',
+    desc: t('pages.booking.bookingLinkDisplay.typeServices.desc'),
   },
   {
     key: 'staff',
-    label: '人员预约',
+    label: t('pages.booking.bookingLinkDisplay.typeStaff.label'),
     icon: <Users className="w-3.5 h-3.5" />,
     cls: 'bg-green-50 text-green-600 ring-green-200',
     param: '?type=staff',
-    desc: '客户先选员工，再选服务和时间',
+    desc: t('pages.booking.bookingLinkDisplay.typeStaff.desc'),
   },
 ]
 
 export default function BookingLinkDisplay() {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<OrganizationProfile | null>(null)
 
@@ -45,7 +49,7 @@ export default function BookingLinkDisplay() {
       setProfile(data)
     } catch (error: any) {
       console.error('加载组织配置失败:', error)
-      toast.error('加载预约链接失败')
+      toast.error(t('pages.booking.bookingLinkDisplay.loadLinkFailed'))
     } finally {
       setLoading(false)
     }
@@ -53,7 +57,7 @@ export default function BookingLinkDisplay() {
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text)
-    toast.success(`${label}已复制`)
+    toast.success(t('pages.booking.bookingLinkDisplay.copiedSuffix', { label }))
   }
 
   const frontendBaseUrl = 'http://localhost:8173'
@@ -73,15 +77,16 @@ export default function BookingLinkDisplay() {
   if (!profile) return null
 
   const baseUrl = `${frontendBaseUrl}/book/${profile.slug}`
+  const bookingTypes = getBookingTypes(t)
 
   return (
     <div className="mb-4">
       <SectionCard
-        title={<span className="inline-flex items-center gap-2"><Globe className="w-4 h-4" />客户预约链接</span>}
-        action={<Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => toast.info('即将推出')}>编辑</Btn>}
+        title={<span className="inline-flex items-center gap-2"><Globe className="w-4 h-4" />{t('pages.booking.bookingLinkDisplay.title')}</span>}
+        action={<Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => toast.info(t('pages.booking.bookingLinkDisplay.editComingSoon'))}>{t('pages.booking.bookingLinkDisplay.edit')}</Btn>}
       >
         <div className="flex flex-col gap-3">
-          {BOOKING_TYPES.map(type => {
+          {bookingTypes.map(type => {
             const url = `${baseUrl}${type.param}`
             return (
               <div key={type.key}>
@@ -102,7 +107,7 @@ export default function BookingLinkDisplay() {
                   </a>
                   <button
                     onClick={() => copyToClipboard(url, type.label)}
-                    title="复制链接"
+                    title={t('pages.booking.bookingLinkDisplay.copyLinkTitle')}
                     className="px-3 border border-l-0 border-slate-300 rounded-r-md bg-white text-slate-500 hover:bg-slate-50 cursor-pointer"
                   >
                     <Copy className="w-3.5 h-3.5" />
@@ -112,7 +117,7 @@ export default function BookingLinkDisplay() {
             )
           })}
 
-          <p className="text-xs text-slate-400">💡 将链接分享给客户，或嵌入到您的网站中</p>
+          <p className="text-xs text-slate-400">{t('pages.booking.bookingLinkDisplay.shareHint')}</p>
         </div>
       </SectionCard>
     </div>

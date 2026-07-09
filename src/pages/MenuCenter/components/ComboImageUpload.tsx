@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { itemManagementService } from '@/services/item-management'
 import { ImageUpload, toast } from '@/components/ui-kit'
 
@@ -15,6 +16,7 @@ export const ComboImageUpload: React.FC<ComboImageUploadProps> = ({
   onImageChange,
   onFileSelect,
 }) => {
+  const { t } = useTranslation()
   const [uploading, setUploading] = useState(false)
   // 本地预览 URL（仅新建套餐时使用，还未上传到服务器）
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | undefined>()
@@ -37,9 +39,9 @@ export const ComboImageUpload: React.FC<ComboImageUploadProps> = ({
     try {
       const result = await itemManagementService.uploadComboImage(comboId, file)
       onImageChange(result.image.url)
-      toast.success('图片上传成功')
+      toast.success(t('pages.menuCenter.itemImageUploadSuccess'))
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || '图片上传失败')
+      toast.error(error?.response?.data?.error || t('pages.menuCenter.itemImageUploadFailed'))
     } finally {
       setUploading(false)
     }
@@ -57,9 +59,9 @@ export const ComboImageUpload: React.FC<ComboImageUploadProps> = ({
     try {
       await itemManagementService.deleteComboImage(comboId)
       onImageChange(undefined)
-      toast.success('图片删除成功')
+      toast.success(t('pages.menuCenter.itemImageDeleteSuccess'))
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || '图片删除失败')
+      toast.error(error?.response?.data?.error || t('pages.menuCenter.itemImageDeleteFailed'))
     } finally {
       setUploading(false)
     }
@@ -71,7 +73,7 @@ export const ComboImageUpload: React.FC<ComboImageUploadProps> = ({
       loading={uploading}
       onPick={handlePick}
       onRemove={handleRemove}
-      hint="支持 JPG、PNG、WebP，最大 5MB"
+      hint={t('pages.menuCenter.comboImageUpload.hint')}
     />
   )
 }

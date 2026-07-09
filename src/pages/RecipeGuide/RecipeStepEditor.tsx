@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, ArrowUp, ArrowDown, X } from 'lucide-react'
 import { SelectInput, TextInput, Btn, Badge } from '@/components/ui-kit'
 import type { StepType, StepEditorItem } from '@/services/recipe/types'
@@ -24,6 +25,7 @@ const RecipeStepEditor: React.FC<RecipeStepEditorProps> = ({
   onPrintCodeChange,
   stepTypes
 }) => {
+  const { t } = useTranslation()
   // 步骤类型映射
   const stepTypeMap = new Map<string, StepType>()
   stepTypes.forEach(st => stepTypeMap.set(st.id, st))
@@ -82,7 +84,7 @@ const RecipeStepEditor: React.FC<RecipeStepEditorProps> = ({
             {/* 卡片头 */}
             <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
               <div className="flex items-center gap-2 text-xs">
-                <span className="font-semibold text-slate-700">步骤 {i + 1}</span>
+                <span className="font-semibold text-slate-700">{t('pages.recipeGuide.stepIndexLabel', { number: i + 1 })}</span>
                 {code && <Badge variant="green"><span className="font-mono">{code}</span></Badge>}
               </div>
               <div className="flex items-center gap-0.5">
@@ -95,7 +97,7 @@ const RecipeStepEditor: React.FC<RecipeStepEditorProps> = ({
             <div className="px-3 py-2.5">
               {/* subStep 列表 */}
               <div className="mb-2">
-                <div className="mb-1.5 text-xs font-medium text-slate-500">步骤类型</div>
+                <div className="mb-1.5 text-xs font-medium text-slate-500">{t('pages.recipeGuide.stepType')}</div>
                 {step.subSteps.map((sub, j) => {
                   const type = stepTypeMap.get(sub.stepTypeId)
                   return (
@@ -105,13 +107,13 @@ const RecipeStepEditor: React.FC<RecipeStepEditorProps> = ({
                         <SelectInput
                           value={sub.stepTypeId}
                           onChange={v => updateSubStep(i, j, 'stepTypeId', v)}
-                          placeholder="选择类型"
+                          placeholder={t('pages.recipeGuide.selectStepType')}
                           options={stepTypes.map(st => ({ value: st.id, label: `${st.code} ${st.name}` }))}
                         />
                       </div>
                       {/* 用量输入 */}
                       <div className="flex-1">
-                        <TextInput value={sub.instruction} onChange={v => updateSubStep(i, j, 'instruction', v)} placeholder="用量" />
+                        <TextInput value={sub.instruction} onChange={v => updateSubStep(i, j, 'instruction', v)} placeholder={t('pages.recipeGuide.subStepAmountPlaceholder')} />
                       </div>
                       {/* 预览 */}
                       {type && (
@@ -124,12 +126,12 @@ const RecipeStepEditor: React.FC<RecipeStepEditorProps> = ({
                     </div>
                   )
                 })}
-                <Btn variant="secondary" size="sm" icon={<Plus size={14} />} onClick={() => addSubStep(i)} className="w-full">添加类型</Btn>
+                <Btn variant="secondary" size="sm" icon={<Plus size={14} />} onClick={() => addSubStep(i)} className="w-full">{t('pages.recipeGuide.addStepType')}</Btn>
               </div>
 
               {/* 包裹符号 + 步骤说明 */}
               <div className="border-t border-slate-100 pt-2">
-                <div className="mb-1.5 text-xs font-medium text-slate-500">包裹符号</div>
+                <div className="mb-1.5 text-xs font-medium text-slate-500">{t('pages.recipeGuide.wrapSymbolLabel')}</div>
                 <div className="flex flex-wrap gap-1">
                   {WRAP_SYMBOLS.map(sym => (
                     <button
@@ -148,9 +150,9 @@ const RecipeStepEditor: React.FC<RecipeStepEditorProps> = ({
                 </div>
 
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="whitespace-nowrap text-xs text-slate-500">步骤说明</span>
+                  <span className="whitespace-nowrap text-xs text-slate-500">{t('pages.recipeGuide.stepInstructionLabel')}</span>
                   <div className="w-32">
-                    <TextInput value={step.stepInstruction} onChange={v => updateStep(i, { stepInstruction: v })} placeholder="如：2、热" />
+                    <TextInput value={step.stepInstruction} onChange={v => updateStep(i, { stepInstruction: v })} placeholder={t('pages.recipeGuide.stepInstructionPlaceholder')} />
                   </div>
                 </div>
               </div>
@@ -159,7 +161,7 @@ const RecipeStepEditor: React.FC<RecipeStepEditorProps> = ({
         )
       })}
 
-      <Btn variant="secondary" onClick={addStep} icon={<Plus size={16} />} className="w-full">添加步骤</Btn>
+      <Btn variant="secondary" onClick={addStep} icon={<Plus size={16} />} className="w-full">{t('pages.recipeGuide.addStep')}</Btn>
     </div>
   )
 }

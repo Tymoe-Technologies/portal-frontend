@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Save } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { FormRow, SelectInput, Switch, Btn } from '@/components/ui-kit'
 
 interface Props {
@@ -8,13 +9,15 @@ interface Props {
   saving: boolean
 }
 
-const LANG_OPTIONS = [
-  { label: '简体中文', value: 'zh-CN' },
-  { label: 'English', value: 'en' },
-  { label: '繁體中文', value: 'zh-TW' },
+// 语言选项依赖 t()，改为函数按需生成
+const getLangOptions = (t: (key: string) => string) => [
+  { label: t('pages.printSettings.customerReceiptForm.langOptionZhCN'), value: 'zh-CN' },
+  { label: t('pages.printSettings.customerReceiptForm.langOptionEn'), value: 'en' },
+  { label: t('pages.printSettings.customerReceiptForm.langOptionZhTW'), value: 'zh-TW' },
 ]
 
 const KitchenTicketForm: React.FC<Props> = ({ config, onSave, saving }) => {
+  const { t } = useTranslation()
   const [language, setLanguage] = useState('zh-CN')
   const [header, setHeader] = useState({ showOrderNumber: true, showOrderType: true, showTableNumber: true, showTime: true, showCustomerName: false })
   const [items, setItems] = useState({ showAttributes: true, showModifiers: true, showItemNotes: true, fontSize: 'large' })
@@ -45,38 +48,41 @@ const KitchenTicketForm: React.FC<Props> = ({ config, onSave, saving }) => {
 
   return (
     <div className="max-w-md">
-      <p className="text-sm font-semibold text-slate-700 pb-1">基础设置</p>
-      <FormRow label="语言">
-        <div className="w-40"><SelectInput value={language} onChange={setLanguage} className="w-full" options={LANG_OPTIONS} /></div>
+      <p className="text-sm font-semibold text-slate-700 pb-1">{t('pages.printSettings.kitchenTicketForm.basicSettingsTitle')}</p>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.languageLabel')}>
+        <div className="w-40"><SelectInput value={language} onChange={setLanguage} className="w-full" options={getLangOptions(t)} /></div>
       </FormRow>
 
-      <p className="text-sm font-semibold text-slate-700 pt-4 pb-1">头部信息</p>
-      <FormRow label="订单号（大字体）"><Switch checked={header.showOrderNumber} onCheckedChange={hSet('showOrderNumber')} /></FormRow>
-      <FormRow label="订单类型"><Switch checked={header.showOrderType} onCheckedChange={hSet('showOrderType')} /></FormRow>
-      <FormRow label="桌号"><Switch checked={header.showTableNumber} onCheckedChange={hSet('showTableNumber')} /></FormRow>
-      <FormRow label="时间"><Switch checked={header.showTime} onCheckedChange={hSet('showTime')} /></FormRow>
-      <FormRow label="顾客姓名"><Switch checked={header.showCustomerName} onCheckedChange={hSet('showCustomerName')} /></FormRow>
+      <p className="text-sm font-semibold text-slate-700 pt-4 pb-1">{t('pages.printSettings.kitchenTicketForm.headerInfoTitle')}</p>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.orderNumberLargeFontLabel')}><Switch checked={header.showOrderNumber} onCheckedChange={hSet('showOrderNumber')} /></FormRow>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.orderTypeLabel')}><Switch checked={header.showOrderType} onCheckedChange={hSet('showOrderType')} /></FormRow>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.tableNumberLabel')}><Switch checked={header.showTableNumber} onCheckedChange={hSet('showTableNumber')} /></FormRow>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.timeLabel')}><Switch checked={header.showTime} onCheckedChange={hSet('showTime')} /></FormRow>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.customerNameLabel')}><Switch checked={header.showCustomerName} onCheckedChange={hSet('showCustomerName')} /></FormRow>
 
-      <p className="text-sm font-semibold text-slate-700 pt-4 pb-1">商品信息</p>
-      <FormRow label="商品属性（规格）"><Switch checked={items.showAttributes} onCheckedChange={iSet('showAttributes')} /></FormRow>
-      <FormRow label="加料/自定义选项"><Switch checked={items.showModifiers} onCheckedChange={iSet('showModifiers')} /></FormRow>
-      <FormRow label="单品备注"><Switch checked={items.showItemNotes} onCheckedChange={iSet('showItemNotes')} /></FormRow>
-      <FormRow label="商品字体大小">
+      <p className="text-sm font-semibold text-slate-700 pt-4 pb-1">{t('pages.printSettings.kitchenTicketForm.itemInfoTitle')}</p>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.showAttributesLabel')}><Switch checked={items.showAttributes} onCheckedChange={iSet('showAttributes')} /></FormRow>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.showModifiersLabel')}><Switch checked={items.showModifiers} onCheckedChange={iSet('showModifiers')} /></FormRow>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.showItemNotesLabel')}><Switch checked={items.showItemNotes} onCheckedChange={iSet('showItemNotes')} /></FormRow>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.itemFontSizeLabel')}>
         <div className="w-40">
           <SelectInput
             value={items.fontSize}
             onChange={(v) => setItems(prev => ({ ...prev, fontSize: String(v) }))}
             className="w-full"
-            options={[{ label: '正常', value: 'normal' }, { label: '大号（推荐）', value: 'large' }]}
+            options={[
+              { label: t('pages.printSettings.kitchenTicketForm.fontSizeOptionNormal'), value: 'normal' },
+              { label: t('pages.printSettings.kitchenTicketForm.fontSizeOptionLarge'), value: 'large' },
+            ]}
           />
         </div>
       </FormRow>
 
-      <p className="text-sm font-semibold text-slate-700 pt-4 pb-1">底部信息</p>
-      <FormRow label="订单备注"><Switch checked={footer.showOrderNotes} onCheckedChange={(v) => setFooter({ showOrderNotes: v })} /></FormRow>
+      <p className="text-sm font-semibold text-slate-700 pt-4 pb-1">{t('pages.printSettings.kitchenTicketForm.footerInfoTitle')}</p>
+      <FormRow label={t('pages.printSettings.kitchenTicketForm.orderNotesLabel')}><Switch checked={footer.showOrderNotes} onCheckedChange={(v) => setFooter({ showOrderNotes: v })} /></FormRow>
 
       <div className="pt-5">
-        <Btn variant="primary" icon={<Save className="w-3.5 h-3.5" />} loading={saving} onClick={handleSave}>保存配置</Btn>
+        <Btn variant="primary" icon={<Save className="w-3.5 h-3.5" />} loading={saving} onClick={handleSave}>{t('pages.printSettings.customerReceiptForm.saveConfigBtn')}</Btn>
       </div>
     </div>
   )

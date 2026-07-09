@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import clsx from 'clsx'
 import type { ModifierGroup } from '../../../services/item-management'
 import { Switch, Badge, EmptyState } from '@/components/ui-kit'
@@ -23,6 +24,7 @@ interface ItemModifierConfigInputProps {
 const numCls = 'text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-2 focus:outline-slate-900 disabled:bg-slate-50 disabled:text-slate-400'
 
 const ItemModifierConfigInput: React.FC<ItemModifierConfigInputProps> = ({ value = [], onChange, modifierGroups }) => {
+  const { t } = useTranslation()
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(value.map(c => c.groupId))
   const [configs, setConfigs] = useState<Record<string, ItemModifierConfig>>(
     value.reduce((acc, c) => ({ ...acc, [c.groupId]: c }), {})
@@ -78,10 +80,10 @@ const ItemModifierConfigInput: React.FC<ItemModifierConfigInputProps> = ({ value
 
   return (
     <div>
-      <p className="text-sm font-semibold text-slate-800 mb-3">选择自定义选项组</p>
+      <p className="text-sm font-semibold text-slate-800 mb-3">{t('pages.menuCenter.itemModifierConfigInput.selectGroupsTitle')}</p>
 
       {activeGroups.length === 0 ? (
-        <EmptyState title="暂无可用的自定义选项组" description="请先在「自定义选项组管理」中创建选项组" />
+        <EmptyState title={t('pages.menuCenter.itemModifierConfigInput.emptyGroupsTitle')} description={t('pages.menuCenter.itemModifierConfigInput.emptyGroupsDesc')} />
       ) : (
         <div className="space-y-4">
           {activeGroups.map(group => {
@@ -99,11 +101,11 @@ const ItemModifierConfigInput: React.FC<ItemModifierConfigInputProps> = ({ value
                       <span className="font-medium text-slate-800">{group.displayName}</span>
                       <span className="text-xs text-slate-400 ml-2">({group.name})</span>
                       <span className="ml-2 inline-flex align-middle">
-                        {group.storeId == null ? <Badge variant="blue">品牌</Badge> : <Badge variant="gold">本店</Badge>}
+                        {group.storeId == null ? <Badge variant="blue">{t('pages.menuCenter.modifierGroupManager.scopeBrand')}</Badge> : <Badge variant="gold">{t('pages.menuCenter.modifierGroupManager.scopeStore')}</Badge>}
                       </span>
                     </div>
                   </div>
-                  {isSelected && <span className="text-xs text-slate-400 shrink-0">{options.length} 个选项</span>}
+                  {isSelected && <span className="text-xs text-slate-400 shrink-0">{t('pages.menuCenter.itemModifierConfigInput.optionsCountLabel', { count: options.length })}</span>}
                 </div>
 
                 {/* 选择规则 */}
@@ -112,7 +114,7 @@ const ItemModifierConfigInput: React.FC<ItemModifierConfigInputProps> = ({ value
                     <hr className="my-3 border-slate-100" />
                     <div className="grid grid-cols-12 gap-3">
                       <div className="col-span-4 sm:col-span-3">
-                        <div className="text-xs text-slate-500 mb-1.5">是否必选</div>
+                        <div className="text-xs text-slate-500 mb-1.5">{t('pages.menuCenter.itemModifierConfigInput.isRequiredLabel')}</div>
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={config.isRequired}
@@ -123,11 +125,11 @@ const ItemModifierConfigInput: React.FC<ItemModifierConfigInputProps> = ({ value
                               handleConfigChange(group.id, updates)
                             }}
                           />
-                          <span className="text-xs text-slate-500">{config.isRequired ? '必选' : '可选'}</span>
+                          <span className="text-xs text-slate-500">{config.isRequired ? t('pages.menuCenter.required') : t('pages.menuCenter.optional')}</span>
                         </div>
                       </div>
                       <div className="col-span-4">
-                        <div className="text-xs text-slate-500 mb-1.5">最少选择</div>
+                        <div className="text-xs text-slate-500 mb-1.5">{t('pages.menuCenter.itemModifierConfigInput.minSelectionsLabel')}</div>
                         <input
                           type="number" className={clsx(numCls, 'w-full')}
                           min={config.isRequired ? 1 : 0} max={config.maxSelections}
@@ -136,7 +138,7 @@ const ItemModifierConfigInput: React.FC<ItemModifierConfigInputProps> = ({ value
                         />
                       </div>
                       <div className="col-span-4">
-                        <div className="text-xs text-slate-500 mb-1.5">最多选择</div>
+                        <div className="text-xs text-slate-500 mb-1.5">{t('pages.menuCenter.itemModifierConfigInput.maxSelectionsLabel')}</div>
                         <input
                           type="number" className={clsx(numCls, 'w-full')}
                           min={config.minSelections}
@@ -150,7 +152,7 @@ const ItemModifierConfigInput: React.FC<ItemModifierConfigInputProps> = ({ value
                     {options.length > 0 && (
                       <>
                         <div className="flex items-center gap-2 my-3">
-                          <span className="text-xs font-medium text-slate-400">选项配置</span>
+                          <span className="text-xs font-medium text-slate-400">{t('pages.menuCenter.itemModifierConfigInput.optionConfigLabel')}</span>
                           <span className="flex-1 h-px bg-slate-100" />
                         </div>
                         <div className="max-h-80 overflow-y-auto sidebar-scroll grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -169,12 +171,12 @@ const ItemModifierConfigInput: React.FC<ItemModifierConfigInputProps> = ({ value
                                     <div className="text-xs font-medium text-slate-700 truncate">{option.displayName}</div>
                                     <div className="text-[10px] text-slate-400 truncate">{option.name}</div>
                                   </div>
-                                  {isDefault && <Badge variant="blue">默认</Badge>}
+                                  {isDefault && <Badge variant="blue">{t('pages.menuCenter.default')}</Badge>}
                                 </div>
                                 <div className="flex items-center gap-1.5 mt-1.5">
                                   <span className="text-[11px] text-slate-500 shrink-0">{(defaultPrice ?? 0).toFixed(2)}</span>
                                   <input
-                                    type="number" min={0} step="0.01" placeholder="商品价" disabled={!isEnabled}
+                                    type="number" min={0} step="0.01" placeholder={t('pages.menuCenter.itemModifierConfigInput.itemPricePlaceholder')} disabled={!isEnabled}
                                     value={customPrice ?? ''}
                                     onChange={e => handleOptionPriceChange(group.id, option.id, e.target.value === '' ? null : Number(e.target.value))}
                                     className={clsx(numCls, 'flex-1 min-w-0 text-[11px]')}
@@ -182,7 +184,7 @@ const ItemModifierConfigInput: React.FC<ItemModifierConfigInputProps> = ({ value
                                   {hasCustomPrice ? (
                                     <button
                                       onClick={() => handleOptionPriceChange(group.id, option.id, null)}
-                                      disabled={!isEnabled} title="清除"
+                                      disabled={!isEnabled} title={t('pages.menuCenter.itemModifierConfigInput.clearAction')}
                                       className="px-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer disabled:opacity-40"
                                     >×</button>
                                   ) : (
@@ -190,7 +192,7 @@ const ItemModifierConfigInput: React.FC<ItemModifierConfigInputProps> = ({ value
                                       onClick={() => { if (isEnabled && !isDefault) handleConfigChange(group.id, { defaultOptionId: option.id }) }}
                                       disabled={!isEnabled || isDefault}
                                       className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-40"
-                                    >设默认</button>
+                                    >{t('pages.menuCenter.itemModifierConfigInput.setDefaultAction')}</button>
                                   )}
                                 </div>
                               </div>

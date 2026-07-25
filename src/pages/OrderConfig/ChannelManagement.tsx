@@ -6,6 +6,7 @@ import {
   DollarSign, Store, Car, Lock, Percent, Users,
 } from 'lucide-react'
 import { useAuthContext } from '../../auth/AuthProvider'
+import { canEditModule } from '../../auth/permissions'
 import {
   getSalesChannels,
   createSalesChannel,
@@ -25,9 +26,9 @@ import {
   type UpdateSalesChannelRequest,
 } from '../../services/order-config'
 import {
-  PageHeader, SectionCard, Table, Badge, Btn, Switch, TextInput, Textarea,
+  PageHeader, SectionCard, Table, Badge, Btn, Switch, SwitchOrStatus, TextInput, Textarea,
   NumberInput, SelectInput, Field, AlertBox, Modal, ConfirmDialog, EmptyState,
-  Spinner, type Column,
+  Spinner, Tooltip, type Column,
 } from '../../components/ui-kit'
 
 // 外卖平台销售渠道的 sourceType 集合
@@ -130,7 +131,8 @@ const ChannelManagement: React.FC = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const tk = (key: string) => t(`pages.orderConfig.${key}`)
-  const { isAuthenticated } = useAuthContext()
+  const { isAuthenticated, role, permissions } = useAuthContext()
+  const canEdit = canEditModule('salesChannels', role, permissions)
 
   const [loading, setLoading] = useState(false)
   const [allSources, setAllSources] = useState<SalesChannel[]>([])
@@ -453,18 +455,24 @@ const ChannelManagement: React.FC = () => {
           <Btn variant="ghost" size="sm" icon={<DollarSign className="w-3.5 h-3.5" />} onClick={() => navigate(`/order-config/pricing?channelId=${r.id}`)}>
             {tk('managePricing')}
           </Btn>
-          {!r.isSystemChannel && (
+          {!r.isSystemChannel && canEdit && (
             <>
               <span className="w-px h-4 bg-slate-200 mx-0.5" />
-              <button title={tk('memberManagementBtn')} onClick={() => openMemberModal(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
-                <Users className="w-4 h-4" />
-              </button>
-              <button title={tk('edit')} onClick={() => openModal(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
-                <Pencil className="w-4 h-4" />
-              </button>
-              <button title={tk('delete')} onClick={() => setDeleteTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <Tooltip label={tk('memberManagementBtn')}>
+                <button onClick={() => openMemberModal(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
+                  <Users className="w-4 h-4" />
+                </button>
+              </Tooltip>
+              <Tooltip label={tk('edit')}>
+                <button onClick={() => openModal(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
+                  <Pencil className="w-4 h-4" />
+                </button>
+              </Tooltip>
+              <Tooltip label={tk('delete')}>
+                <button onClick={() => setDeleteTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </Tooltip>
             </>
           )}
         </div>
@@ -482,7 +490,7 @@ const ChannelManagement: React.FC = () => {
         actions={
           <>
             <Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading} onClick={loadSources} />
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openModal()}>{tk('createSource')}</Btn>
+            {canEdit && <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openModal()}>{tk('createSource')}</Btn>}
           </>
         }
       />
@@ -518,9 +526,11 @@ const ChannelManagement: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex border-t border-slate-100 divide-x divide-slate-100">
-                      <button onClick={() => openDeliveryModal(ch)} className="flex-1 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
-                        <Pencil className="w-3 h-3" />{tk('configureBtn')}
-                      </button>
+                      {canEdit && (
+                        <button onClick={() => openDeliveryModal(ch)} className="flex-1 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
+                          <Pencil className="w-3 h-3" />{tk('configureBtn')}
+                        </button>
+                      )}
                       <button onClick={() => navigate(`/order-config/pricing?channelId=${ch.id}`)} className="flex-1 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
                         <DollarSign className="w-3 h-3" />{tk('pricingBtn')}
                       </button>
@@ -554,7 +564,7 @@ const ChannelManagement: React.FC = () => {
             ) : filteredCustom.length === 0 ? (
               <EmptyState
                 title={tk('empty')}
-                action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openModal()}>{tk('createSource')}</Btn>}
+                action={canEdit ? <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openModal()}>{tk('createSource')}</Btn> : undefined}
               />
             ) : (
               <Table columns={customColumns} data={filteredCustom} rowKey={r => r.id} />
@@ -716,18 +726,20 @@ const ChannelManagement: React.FC = () => {
       >
         <div className="space-y-4">
           {/* 添加成员 */}
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <TextInput value={memberPhone} onChange={setMemberPhone} placeholder={tk('memberPhonePlaceholder')} />
+          {canEdit && (
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <TextInput value={memberPhone} onChange={setMemberPhone} placeholder={tk('memberPhonePlaceholder')} />
+              </div>
+              <div className="w-28">
+                <TextInput value={memberName} onChange={setMemberName} placeholder={tk('memberNamePlaceholder')} />
+              </div>
+              <div className="w-28">
+                <TextInput value={memberNote} onChange={setMemberNote} placeholder={tk('memberNotePlaceholder')} />
+              </div>
+              <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} loading={addingMember} onClick={handleAddMember}>{tk('addBtn')}</Btn>
             </div>
-            <div className="w-28">
-              <TextInput value={memberName} onChange={setMemberName} placeholder={tk('memberNamePlaceholder')} />
-            </div>
-            <div className="w-28">
-              <TextInput value={memberNote} onChange={setMemberNote} placeholder={tk('memberNotePlaceholder')} />
-            </div>
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} loading={addingMember} onClick={handleAddMember}>{tk('addBtn')}</Btn>
-          </div>
+          )}
 
           {/* 成员列表 */}
           {membersLoading ? (
@@ -738,10 +750,21 @@ const ChannelManagement: React.FC = () => {
                 { key: 'phone', title: tk('phoneColumn'), render: (m: ChannelMember) => m.phone },
                 { key: 'name', title: tk('nameColumn'), render: (m: ChannelMember) => m.name || '-' },
                 { key: 'note', title: tk('noteColumn'), render: (m: ChannelMember) => m.note || '-' },
-                { key: 'isActive', title: tk('status'), render: (m: ChannelMember) => <Switch checked={m.isActive} onCheckedChange={c => handleToggleMember(m, c)} /> },
+                {
+                  key: 'isActive', title: tk('status'),
+                  render: (m: ChannelMember) => (
+                    <SwitchOrStatus
+                      checked={m.isActive}
+                      editable={canEdit}
+                      onCheckedChange={c => handleToggleMember(m, c)}
+                      onLabel={tk('active')}
+                      offLabel={tk('inactive')}
+                    />
+                  ),
+                },
                 {
                   key: 'actions', title: tk('actions'),
-                  render: (m: ChannelMember) => (
+                  render: (m: ChannelMember) => !canEdit ? null : (
                     <Btn variant="ghost" size="sm" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setRemoveMemberTarget(m)}>{tk('removeBtn')}</Btn>
                   ),
                 },

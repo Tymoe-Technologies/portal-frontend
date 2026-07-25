@@ -26,6 +26,7 @@ import {
   Field,
   TextInput,
   SelectInput,
+  Tooltip,
   toast,
   type Column,
 } from '@/components/ui-kit'
@@ -525,18 +526,19 @@ const DeviceManagement: React.FC = () => {
             >
               {deviceId.substring(0, 8)}...
             </code>
-            <button
-              type="button"
-              title={copiedField === deviceId ? t('pages.devices.copied') : t('pages.devices.copy')}
-              onClick={() => copyToClipboard(deviceId, deviceId)}
-              className="p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
-            >
-              {copiedField === deviceId ? (
-                <Check className="w-3.5 h-3.5 text-green-600" />
-              ) : (
-                <Copy className="w-3.5 h-3.5" />
-              )}
-            </button>
+            <Tooltip label={copiedField === deviceId ? t('pages.devices.copied') : t('pages.devices.copy')}>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(deviceId, deviceId)}
+                className="p-1 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                {copiedField === deviceId ? (
+                  <Check className="w-3.5 h-3.5 text-green-600" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </Tooltip>
           </div>
         )
       },
@@ -565,42 +567,46 @@ const DeviceManagement: React.FC = () => {
       width: 150,
       render: (record) => (
         <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            title={t('pages.devices.edit')}
-            onClick={() => openModal(record)}
-            className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-          >
-            <Pencil className="w-4 h-4" />
-          </button>
+          <Tooltip label={t('pages.devices.edit')}>
+            <button
+              type="button"
+              onClick={() => openModal(record)}
+              className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          </Tooltip>
           {record.status === 'ACTIVE' && (
             <>
-              <button
-                type="button"
-                title={t('pages.devices.viewSession')}
-                onClick={() => handleViewSession(record)}
-                className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-              >
-                <Info className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                title={t('pages.devices.updateCode')}
-                onClick={() => openUpdateCodeModal(record)}
-                className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-              >
-                <RotateCw className="w-4 h-4" />
-              </button>
+              <Tooltip label={t('pages.devices.viewSession')}>
+                <button
+                  type="button"
+                  onClick={() => handleViewSession(record)}
+                  className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+              </Tooltip>
+              <Tooltip label={t('pages.devices.updateCode')}>
+                <button
+                  type="button"
+                  onClick={() => openUpdateCodeModal(record)}
+                  className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </button>
+              </Tooltip>
             </>
           )}
-          <button
-            type="button"
-            title={t('pages.devices.delete')}
-            onClick={() => setDeletingDevice(record)}
-            className="p-1.5 rounded-md text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <Tooltip label={t('pages.devices.delete')}>
+            <button
+              type="button"
+              onClick={() => setDeletingDevice(record)}
+              className="p-1.5 rounded-md text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       ),
     },
@@ -650,13 +656,6 @@ const DeviceManagement: React.FC = () => {
 
           {/* 筛选栏 */}
           <div className="flex flex-wrap items-center gap-3">
-            <SelectInput
-              className="w-[300px]"
-              placeholder={t('pages.devices.selectOrgPlaceholder')}
-              value={selectedOrgId}
-              onChange={(v) => setSelectedOrgId(v)}
-              options={orgOptions}
-            />
             <div className="relative w-[250px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <input
@@ -692,7 +691,7 @@ const DeviceManagement: React.FC = () => {
 
           {/* 表格 */}
           {!selectedOrgId ? (
-            <EmptyState title={t('pages.devices.selectOrgPlaceholder')} />
+            <EmptyState title={t('pages.devices.noOrgSelectedHint')} />
           ) : (
             <Table
               columns={columns}

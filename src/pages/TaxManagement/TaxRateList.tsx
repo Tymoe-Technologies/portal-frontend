@@ -11,6 +11,8 @@ import {
 import {
   Table, type Column, AlertBox, Spinner, Modal, NumberInput, Textarea, Btn, FormRow, toast,
 } from '@/components/ui-kit'
+import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 
 interface TaxRateListProps {
   regionCode: string
@@ -22,6 +24,8 @@ interface TaxRateListProps {
  */
 const TaxRateList: React.FC<TaxRateListProps> = ({ regionCode }) => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('taxSettings', role, permissions)
   const [loading, setLoading] = useState(false)
   const [taxRates, setTaxRates] = useState<TaxRate[]>([])
   const [taxClasses, setTaxClasses] = useState<TaxClass[]>([])
@@ -107,7 +111,7 @@ const TaxRateList: React.FC<TaxRateListProps> = ({ regionCode }) => {
     },
     { key: 'effectiveDate', title: t('pages.taxManagement.taxRateList.colEffectiveDate'), width: 120, render: (r) => (r.effectiveDate ? new Date(r.effectiveDate).toLocaleDateString() : '-') },
     { key: 'expiresDate', title: t('pages.taxManagement.taxRateList.colExpiresDate'), width: 120, render: (r) => (r.expiresDate ? new Date(r.expiresDate).toLocaleDateString() : '-') },
-    { key: 'action', title: t('pages.taxManagement.colActions'), width: 100, render: (r) => <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleOverrideClick(r)}>{t('pages.taxManagement.taxRateList.overrideBtn')}</Btn> },
+    { key: 'action', title: t('pages.taxManagement.colActions'), width: 100, render: (r) => canEdit ? <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleOverrideClick(r)}>{t('pages.taxManagement.taxRateList.overrideBtn')}</Btn> : null },
   ]
 
   // 税类表格列定义

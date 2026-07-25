@@ -15,9 +15,11 @@ import {
 } from '@/services/multi-menu'
 import { itemManagementService } from '@/services/item-management'
 import {
-  PageHeader, SectionCard, Badge, Btn, Switch, TextInput, Textarea, Field,
-  AlertBox, Spinner, EmptyState, Modal, Drawer, ConfirmDialog,
+  PageHeader, SectionCard, Badge, Btn, SwitchOrStatus, TextInput, Textarea, Field,
+  AlertBox, Spinner, EmptyState, Modal, Drawer, ConfirmDialog, Tooltip,
 } from '@/components/ui-kit'
+import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 
 const DAY_LABEL_KEYS = ['dayShortSun', 'dayShortMon', 'dayShortTue', 'dayShortWed', 'dayShortThu', 'dayShortFri', 'dayShortSat'] as const
 
@@ -169,6 +171,8 @@ const ItemPicker: React.FC<{
 // ─── 主页面 ────────────────────────────────────────────────────────
 const MultiMenuManagement: React.FC = () => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('multiMenu', role, permissions)
   const [menus, setMenus] = useState<StoreMenu[]>([])
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<StoreMenu | null>(null)
@@ -332,7 +336,7 @@ const MultiMenuManagement: React.FC = () => {
         actions={
           <>
             <Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading} onClick={load} />
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.multiMenu.newMenu')}</Btn>
+            {canEdit && <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.multiMenu.newMenu')}</Btn>}
           </>
         }
       />
@@ -346,7 +350,7 @@ const MultiMenuManagement: React.FC = () => {
             <Spinner />
           ) : menus.length === 0 ? (
             <SectionCard>
-              <EmptyState title={t('pages.multiMenu.noMenus')} action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.multiMenu.newMenu')}</Btn>} />
+              <EmptyState title={t('pages.multiMenu.noMenus')} action={canEdit ? <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.multiMenu.newMenu')}</Btn> : undefined} />
             </SectionCard>
           ) : (
             <div className="space-y-2">
@@ -369,13 +373,27 @@ const MultiMenuManagement: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                      <Switch checked={menu.isActive} onCheckedChange={v => handleToggle(menu, v)} />
-                      <button title={t('pages.multiMenu.edit')} onClick={() => openEdit(menu)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button title={t('pages.multiMenu.delete')} onClick={() => setDeleteMenuTarget(menu)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <SwitchOrStatus
+                        checked={menu.isActive}
+                        editable={canEdit}
+                        onCheckedChange={v => handleToggle(menu, v)}
+                        onLabel={t('pages.multiMenu.active')}
+                        offLabel={t('pages.multiMenu.inactive')}
+                      />
+                      {canEdit && (
+                        <>
+                          <Tooltip label={t('pages.multiMenu.edit')}>
+                            <button onClick={() => openEdit(menu)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          </Tooltip>
+                          <Tooltip label={t('pages.multiMenu.delete')}>
+                            <button onClick={() => setDeleteMenuTarget(menu)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </Tooltip>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -391,10 +409,10 @@ const MultiMenuManagement: React.FC = () => {
           ) : (
             <SectionCard
               title={selected.name}
-              action={<Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openSectionCreate(selected.id)}>{t('pages.multiMenu.addSection')}</Btn>}
+              action={canEdit ? <Btn variant="secondary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openSectionCreate(selected.id)}>{t('pages.multiMenu.addSection')}</Btn> : undefined}
             >
               {selected.sections.length === 0 ? (
-                <EmptyState title={t('pages.multiMenu.noSections')} action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openSectionCreate(selected.id)}>{t('pages.multiMenu.addFirstSection')}</Btn>} />
+                <EmptyState title={t('pages.multiMenu.noSections')} action={canEdit ? <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openSectionCreate(selected.id)}>{t('pages.multiMenu.addFirstSection')}</Btn> : undefined} />
               ) : (
                 <div className="space-y-3">
                   {selected.sections.map(section => (
@@ -404,14 +422,20 @@ const MultiMenuManagement: React.FC = () => {
                           <span className="font-medium text-slate-700 text-sm">{section.name}</span>
                           <Badge>{t('pages.multiMenu.itemsCountUnit', { count: section.items.length })}</Badge>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <button title={t('pages.multiMenu.editSection')} onClick={() => openSectionEdit(selected.id, section)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button title={t('pages.multiMenu.deleteSection')} onClick={() => setDeleteSectionTarget({ menuId: selected.id, section })} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {canEdit && (
+                          <div className="flex items-center gap-1">
+                            <Tooltip label={t('pages.multiMenu.editSection')}>
+                              <button onClick={() => openSectionEdit(selected.id, section)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer">
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            </Tooltip>
+                            <Tooltip label={t('pages.multiMenu.deleteSection')}>
+                              <button onClick={() => setDeleteSectionTarget({ menuId: selected.id, section })} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </Tooltip>
+                          </div>
+                        )}
                       </div>
                       <div className="p-3">
                         {section.items.length > 0 && (
@@ -426,16 +450,22 @@ const MultiMenuManagement: React.FC = () => {
                                       : <span className="text-slate-400">{fmtPrice(item.catalogItem?.basePrice)}</span>}
                                   </span>
                                 </div>
-                                <button title={t('pages.multiMenu.removeItem')} onClick={() => setRemoveItemTarget({ sectionId: section.id, itemId: item.id })} className="p-1 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer shrink-0">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                {canEdit && (
+                                  <Tooltip label={t('pages.multiMenu.removeItem')}>
+                                    <button onClick={() => setRemoveItemTarget({ sectionId: section.id, itemId: item.id })} className="p-1 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer shrink-0">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </Tooltip>
+                                )}
                               </div>
                             ))}
                           </div>
                         )}
-                        <button onClick={() => setItemPicker({ section, open: true })} className="w-full rounded-lg border border-dashed border-slate-300 py-1.5 text-sm text-slate-500 hover:border-slate-400 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
-                          <Plus className="w-3.5 h-3.5" />{t('pages.multiMenu.addItems')}
-                        </button>
+                        {canEdit && (
+                          <button onClick={() => setItemPicker({ section, open: true })} className="w-full rounded-lg border border-dashed border-slate-300 py-1.5 text-sm text-slate-500 hover:border-slate-400 hover:text-slate-700 transition-colors cursor-pointer inline-flex items-center justify-center gap-1">
+                            <Plus className="w-3.5 h-3.5" />{t('pages.multiMenu.addItems')}
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

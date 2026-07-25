@@ -14,6 +14,7 @@ import type { TooltipContentProps } from 'recharts'
 import {
   Loader2, Info, AlertTriangle, CheckCircle2, X, ChevronRight, ChevronLeft,
   Image as ImageIcon, Trash2, Check, ChevronsUpDown, Calendar as CalendarIcon, ArrowRight, Clock,
+  Search,
 } from 'lucide-react'
 
 // ─── 徽章 ───────────────────────────────────────────────────────────────────────
@@ -37,11 +38,40 @@ export function Badge({ children, variant = 'default', icon }: {
   )
 }
 
+// ─── Tooltip ────────────────────────────────────────────────────────────────────
+// 悬浮提示：跟原生 title 属性效果一样，但没有浏览器那 0.5~1.5 秒的固定延迟，
+// 鼠标一放上去就出现。纯 CSS hover 控制显隐，不依赖任何定位库。
+
+export function Tooltip({ label, children, side = 'top' }: {
+  label?: string
+  children: React.ReactNode
+  side?: 'top' | 'bottom'
+}) {
+  if (!label) return <>{children}</>
+  return (
+    <span className="relative inline-flex group/tooltip">
+      {children}
+      <span
+        role="tooltip"
+        className={clsx(
+          'pointer-events-none absolute left-1/2 -translate-x-1/2 z-50',
+          'px-2 py-1 rounded-md bg-slate-800 text-white text-xs whitespace-nowrap',
+          'opacity-0 scale-95 transition-all duration-100',
+          'group-hover/tooltip:opacity-100 group-hover/tooltip:scale-100',
+          side === 'top' ? 'bottom-full mb-1.5' : 'top-full mt-1.5',
+        )}
+      >
+        {label}
+      </span>
+    </span>
+  )
+}
+
 // ─── 按钮 ───────────────────────────────────────────────────────────────────────
 
 export function Btn({
   children, variant = 'primary', size = 'md', loading = false,
-  disabled = false, onClick, type = 'button', icon, className,
+  disabled = false, onClick, type = 'button', icon, className, title,
 }: {
   children?: React.ReactNode
   variant?: 'primary' | 'secondary' | 'ghost' | 'link' | 'danger'
@@ -52,8 +82,9 @@ export function Btn({
   type?: 'button' | 'submit'
   icon?: React.ReactNode
   className?: string
+  title?: string
 }) {
-  return (
+  const button = (
     <button
       type={type}
       disabled={disabled || loading}
@@ -78,6 +109,39 @@ export function Btn({
       {children}
     </button>
   )
+  // title 走自定义 Tooltip（瞬时显示），不再用原生 title 属性（浏览器固定延迟 0.5~1.5 秒）
+  return title ? <Tooltip label={title}>{button}</Tooltip> : button
+}
+
+// 表格行内操作列的统一规范：单个操作用纯图标 + Tooltip（IconButton），不带文字——
+// 一行里挤 3-5 个操作时文字按钮（Btn variant=link/ghost）会让列很宽、视觉噪音大。
+// 需要露文字的场景（如带跳转语义的"管理定价""配置项目"）才用 Btn，不要用 IconButton 硬凑。
+export function IconButton({ icon, label, onClick, variant = 'default', disabled = false, className }: {
+  icon: React.ReactNode
+  label: string // 必填：图标本身不表意，Tooltip 是唯一的操作说明来源
+  onClick?: () => void
+  variant?: 'default' | 'danger'
+  disabled?: boolean
+  className?: string
+}) {
+  return (
+    <Tooltip label={label}>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={clsx(
+          'p-1.5 rounded-md transition-colors cursor-pointer',
+          'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent',
+          variant === 'default' && 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
+          variant === 'danger' && 'text-red-500 hover:bg-red-50',
+          className,
+        )}
+      >
+        {icon}
+      </button>
+    </Tooltip>
+  )
 }
 
 // ─── 开关 ───────────────────────────────────────────────────────────────────────
@@ -95,13 +159,33 @@ export function Switch({ checked, onCheckedChange, disabled }: {
       className={clsx(
         'relative w-10 h-5 rounded-full transition-colors duration-200 cursor-pointer shrink-0',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900',
-        checked ? 'bg-slate-900' : 'bg-slate-200',
-        disabled && 'opacity-50 cursor-not-allowed',
+        // disabled 时开/关两种状态要保持明显区分，不能用一刀切的 opacity-50——
+        // 深色轨道半透明后会变成中灰，跟"关闭"的浅灰视觉上很难分辨
+        checked
+          ? (disabled ? 'bg-slate-400' : 'bg-slate-900')
+          : (disabled ? 'bg-slate-100' : 'bg-slate-200'),
+        disabled && 'cursor-not-allowed',
       )}
     >
       <RadixSwitch.Thumb className="block w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
     </RadixSwitch.Root>
   )
+}
+
+// 没有编辑权限时，开关不能给一个"看起来能点但点不动"的东西，直接换成只读的
+// 状态徽标——onLabel/offLabel 传对应语言的"已开启/已关闭"文案
+export function SwitchOrStatus({ checked, onCheckedChange, editable, onLabel, offLabel, disabled }: {
+  checked: boolean
+  onCheckedChange: (v: boolean) => void
+  editable: boolean
+  onLabel: string
+  offLabel: string
+  disabled?: boolean // 临时禁用（比如保存中），跟 editable 的权限判断是两回事
+}) {
+  if (!editable) {
+    return <Badge variant={checked ? 'green' : 'default'}>{checked ? onLabel : offLabel}</Badge>
+  }
+  return <Switch checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
 }
 
 // ─── 复选框（原生 + slate 强调色） ───────────────────────────────────────────────
@@ -400,31 +484,41 @@ export function Textarea({ value, onChange, placeholder, disabled, rows = 3, cla
   )
 }
 
-export function NumberInput({ value, onChange, min, max, suffix, disabled, className }: {
+export function NumberInput({ value, onChange, min, max, prefix, suffix, disabled, className }: {
   value: number
   onChange: (v: number) => void
   min?: number
   max?: number
+  /** 输入框内左侧前缀（如货币符号）。不传时组件行为/样式与之前完全一致，不影响现有调用方 */
+  prefix?: string
   suffix?: string
   disabled?: boolean
   className?: string
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <input
-        type="number"
-        value={Number.isNaN(value) ? '' : value}
-        min={min}
-        max={max}
-        disabled={disabled}
-        onChange={e => onChange(Number(e.target.value))}
-        className={clsx(
-          'text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 w-24',
-          'disabled:bg-slate-50 disabled:text-slate-400',
-          'focus:outline-2 focus:outline-slate-900 focus:outline-offset-0',
-          className,
+      <div className={clsx('relative', prefix && 'inline-block')}>
+        {prefix && (
+          <span className="pointer-events-none select-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 tabular-nums">
+            {prefix}
+          </span>
         )}
-      />
+        <input
+          type="number"
+          value={Number.isNaN(value) ? '' : value}
+          min={min}
+          max={max}
+          disabled={disabled}
+          onChange={e => onChange(Number(e.target.value))}
+          className={clsx(
+            'text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 w-24 tabular-nums',
+            'disabled:bg-slate-50 disabled:text-slate-400',
+            'focus:outline-2 focus:outline-slate-900 focus:outline-offset-0',
+            prefix && 'pl-6',
+            className,
+          )}
+        />
+      </div>
       {suffix && <span className="text-xs text-slate-400">{suffix}</span>}
     </div>
   )
@@ -897,6 +991,135 @@ export function SelectInput({ value, onChange, options, disabled, className, pla
         </RadixSelect.Content>
       </RadixSelect.Portal>
     </RadixSelect.Root>
+  )
+}
+
+// 可搜索下拉选择（选项多——如货币列表——需要过滤时用这个而不是 SelectInput）
+// 选中项展示不截断，方便看清完整名称（如 "Canadian Dollar (CAD)"）
+export function SearchSelect({ value, onChange, options, disabled, className, placeholder, searchPlaceholder }: {
+  value: string | number
+  onChange: (v: any) => void
+  options: { label: string; value: string | number }[]
+  disabled?: boolean
+  className?: string
+  placeholder?: string
+  searchPlaceholder?: string
+}) {
+  const [open, setOpen] = React.useState(false)
+  const [query, setQuery] = React.useState('')
+  // 浮层用 Portal 渲染以摆脱父级 overflow 裁剪。若处于 Radix Dialog 内，则挂到 Dialog 容器上
+  // （而非 body），这样输入框仍在 Dialog 的焦点陷阱与关闭层内——否则焦点会被抢回、无法输入
+  const [menu, setMenu] = React.useState<{ container: HTMLElement; style: React.CSSProperties } | null>(null)
+  const rootRef = React.useRef<HTMLDivElement>(null)
+  const menuRef = React.useRef<HTMLDivElement>(null)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  const updatePos = React.useCallback(() => {
+    const trigger = rootRef.current
+    const tr = trigger?.getBoundingClientRect()
+    if (!trigger || !tr) return
+    const dialog = trigger.closest('[role="dialog"]') as HTMLElement | null
+    if (dialog) {
+      // Dialog.Content 是 position:fixed（定位元素），故用 absolute 相对它定位，不受内层滚动区裁剪
+      const dr = dialog.getBoundingClientRect()
+      setMenu({ container: dialog, style: { position: 'absolute', top: tr.bottom - dr.top + 6, left: tr.left - dr.left, width: tr.width } })
+    } else {
+      setMenu({ container: document.body, style: { position: 'fixed', top: tr.bottom + 6, left: tr.left, width: tr.width } })
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (!open) return
+    updatePos()
+    const onDocClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node) && menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onEsc)
+    window.addEventListener('scroll', updatePos, true)
+    window.addEventListener('resize', updatePos)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+      window.removeEventListener('scroll', updatePos, true)
+      window.removeEventListener('resize', updatePos)
+    }
+  }, [open, updatePos])
+
+  React.useEffect(() => {
+    if (open) {
+      setQuery('')
+      setTimeout(() => inputRef.current?.focus(), 0)
+    }
+  }, [open])
+
+  const selected = options.find(o => String(o.value) === String(value))
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? options.filter(o => o.label.toLowerCase().includes(q) || String(o.value).toLowerCase().includes(q))
+    : options
+
+  return (
+    <div ref={rootRef} className={clsx('relative inline-block w-full', className)}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        className={clsx(
+          'w-full inline-flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700',
+          'hover:border-slate-300 transition-colors cursor-pointer',
+          'focus:outline-2 focus:outline-slate-900 focus:outline-offset-0',
+          'disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed',
+        )}
+      >
+        <span className={clsx('text-left', !selected && 'text-slate-400')}>{selected?.label || placeholder || '请选择'}</span>
+        <ChevronsUpDown className="w-4 h-4 text-slate-400 shrink-0" />
+      </button>
+
+      {open && menu && createPortal(
+        <div
+          ref={menuRef}
+          style={{ ...menu.style, pointerEvents: 'auto' }}
+          className="z-[100] min-w-[16rem] rounded-xl border border-slate-200 bg-white shadow-lg p-1.5"
+        >
+          <div className="flex items-center gap-2 px-2 py-1.5 mb-1 border-b border-slate-100">
+            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={searchPlaceholder || '搜索...'}
+              className="w-full text-sm outline-none placeholder:text-slate-400"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-slate-400 text-center">无匹配结果</div>
+            ) : (
+              filtered.map(o => (
+                <button
+                  key={String(o.value)}
+                  type="button"
+                  onClick={() => { onChange(o.value); setOpen(false) }}
+                  className={clsx(
+                    'w-full flex items-center gap-2 rounded-lg pl-8 pr-3 py-2 text-sm text-left text-slate-700 cursor-pointer relative',
+                    'hover:bg-slate-100',
+                    String(o.value) === String(value) && 'font-medium text-slate-900 bg-slate-50',
+                  )}
+                >
+                  {String(o.value) === String(value) && (
+                    <Check className="w-4 h-4 text-slate-900 absolute left-2" />
+                  )}
+                  {o.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>,
+        menu.container
+      )}
+    </div>
   )
 }
 

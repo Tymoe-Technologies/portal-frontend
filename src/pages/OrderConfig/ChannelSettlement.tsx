@@ -13,6 +13,8 @@ import {
   PageHeader, SectionCard, StatCard, Table, Badge, Btn, Modal, Spinner,
   EmptyState, ProgressBar, TextInput, FormRow, AlertBox, type Column,
 } from '@/components/ui-kit'
+import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 
 function centsToDisplay(cents: number) {
   return `$${(cents / 100).toFixed(2)}`
@@ -189,6 +191,8 @@ function mergeChannels(channels: CreditChannel[], groups: ChannelReceivableGroup
 
 export default function ChannelSettlement() {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('salesChannels', role, permissions)
   const [loading, setLoading] = useState(false)
   const [groups, setGroups] = useState<ChannelReceivableGroup[]>([])
   const [settling, setSettling] = useState<string | null>(null)
@@ -246,15 +250,17 @@ export default function ChannelSettlement() {
       title: t('pages.orderConfig.actions'),
       render: r => (
         <div className="flex items-center gap-2">
-          <Btn
-            variant="primary"
-            size="sm"
-            icon={<CheckCircle2 className="w-3.5 h-3.5" />}
-            disabled={r.totalAmount === 0}
-            onClick={() => { setConfirmTarget(r); setNoteInput('') }}
-          >
-            {t('pages.orderConfig.settlement.manualSettleBtn')}
-          </Btn>
+          {canEdit && (
+            <Btn
+              variant="primary"
+              size="sm"
+              icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+              disabled={r.totalAmount === 0}
+              onClick={() => { setConfirmTarget(r); setNoteInput('') }}
+            >
+              {t('pages.orderConfig.settlement.manualSettleBtn')}
+            </Btn>
+          )}
           <Btn
             variant="secondary"
             size="sm"

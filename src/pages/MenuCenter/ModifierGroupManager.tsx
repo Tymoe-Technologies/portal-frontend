@@ -11,7 +11,7 @@ import {
 } from '../../services/item-management'
 import {
   SectionCard, Table, Badge, Btn, Modal, Spinner, EmptyState, ConfirmDialog,
-  Switch, Field, TextInput, Textarea, toast, type Column,
+  Switch, Field, TextInput, Textarea, toast, Tooltip, type Column,
 } from '@/components/ui-kit'
 
 interface ModifierGroupManagerProps {
@@ -312,9 +312,11 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
       render: r => readOnly ? null : (
         <div className="flex items-center gap-1">
           <Btn variant="ghost" size="sm" onClick={() => handleEditGroup(r)}>{t('pages.menuCenter.modifierGroupManager.editAction')}</Btn>
-          <button title={t('pages.menuCenter.modifierGroupManager.deleteAction')} onClick={() => setDeleteGroupTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <Tooltip label={t('pages.menuCenter.modifierGroupManager.deleteAction')}>
+            <button onClick={() => setDeleteGroupTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       ),
     },
@@ -441,9 +443,11 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
                   render: (o: ModifierOption) => readOnly ? null : (
                     <div className="flex items-center gap-1">
                       <Btn variant="ghost" size="sm" onClick={() => managingGroup && handleEditOption(managingGroup.id, o)}>{t('pages.menuCenter.modifierGroupManager.editAction')}</Btn>
-                      <button title={t('pages.menuCenter.modifierGroupManager.deleteAction')} onClick={() => setDeleteOptionTarget(o)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <Tooltip label={t('pages.menuCenter.modifierGroupManager.deleteAction')}>
+                        <button onClick={() => setDeleteOptionTarget(o)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </Tooltip>
                     </div>
                   ),
                 },

@@ -18,7 +18,6 @@ export interface TenantPaymentConfig {
 export interface TenantPaymentConfigDTO {
   currency: string
   roundingUnit?: number
-  roundingMethod?: 'ROUND' | 'ROUND_UP' | 'ROUND_DOWN'
 }
 
 const FINANCE_API_BASE = '/api/finance/v1'

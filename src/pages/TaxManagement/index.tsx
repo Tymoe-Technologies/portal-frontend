@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, RotateCcw, Pencil, Trash2, Store as StoreIcon, LayoutGrid } from 'lucide-react'
 import { useAuthContext } from '../../auth/AuthProvider'
+import { canEditModule } from '../../auth/permissions'
 import { getOrganization } from '../../services/auth'
 import {
   getStoreAvailableItems, getStoreTaxRates, createStoreTaxRate, updateStoreTaxRate,
@@ -10,7 +11,7 @@ import {
 } from '../../services/item-management'
 import {
   PageHeader, SectionCard, Table, Badge, Btn, AlertBox, Spinner, EmptyState,
-  Modal, ConfirmDialog, Field, TextInput, NumberInput, Transfer, type Column,
+  Modal, ConfirmDialog, Field, TextInput, NumberInput, Transfer, Tooltip, type Column,
 } from '../../components/ui-kit'
 
 type StoreItem = { id: string; name: string; basePrice: number; isActive: boolean; isLocal?: boolean }
@@ -56,7 +57,8 @@ const TaxManagement: React.FC = () => {
   const { t } = useTranslation()
   const getRegionDisplayName = useRegionDisplayName()
   const renderStoreItem = useRenderStoreItem()
-  const { organizations } = useAuthContext()
+  const { organizations, role, permissions } = useAuthContext()
+  const canEdit = canEditModule('taxSettings', role, permissions)
   const tenantId = localStorage.getItem('organization_id') || ''
 
   const [loading, setLoading] = useState(true)
@@ -314,16 +316,18 @@ const TaxManagement: React.FC = () => {
     { key: 'rate', title: t('pages.taxManagement.colRate'), width: 110, render: r => <Badge variant="blue">{(r.rate * 100).toFixed(2)}%</Badge> },
     {
       key: 'actions', title: t('pages.taxManagement.colActions'),
-      render: r => (
+      render: r => canEdit ? (
         <div className="flex items-center gap-1 flex-wrap">
           <Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openEdit(r)}>{t('pages.taxManagement.editBtn')}</Btn>
           <Btn variant="ghost" size="sm" icon={<LayoutGrid className="w-3.5 h-3.5" />} onClick={() => handleManageItems(r)}>{t('pages.taxManagement.manageItemsBtn')}</Btn>
           <Btn variant="ghost" size="sm" icon={<StoreIcon className="w-3.5 h-3.5" />} onClick={() => setApplyAllTarget(r)}>{t('pages.taxManagement.applyToAllBtn')}</Btn>
-          <button title={t('pages.taxManagement.deleteTooltip')} onClick={() => setDeleteTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <Tooltip label={t('pages.taxManagement.deleteTooltip')}>
+            <button onClick={() => setDeleteTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
-      ),
+      ) : null,
     },
   ]
 
@@ -337,7 +341,7 @@ const TaxManagement: React.FC = () => {
         actions={
           <>
             <Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loadingTaxRates} onClick={() => loadTaxRates(regionCode)}>{t('common.refresh')}</Btn>
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => { setCreateName(''); setCreateRate(NaN); setCreateErr({}); setCreateOpen(true) }}>{t('pages.taxManagement.addTaxRateBtn')}</Btn>
+            {canEdit && <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => { setCreateName(''); setCreateRate(NaN); setCreateErr({}); setCreateOpen(true) }}>{t('pages.taxManagement.addTaxRateBtn')}</Btn>}
           </>
         }
       />
@@ -356,7 +360,7 @@ const TaxManagement: React.FC = () => {
                 ) : taxRates.length === 0 ? (
                   <EmptyState
                     title={t('pages.taxManagement.noTaxRatesConfigured')}
-                    action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setCreateOpen(true)}>{t('pages.taxManagement.createFirstTaxRateBtn')}</Btn>}
+                    action={canEdit ? <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setCreateOpen(true)}>{t('pages.taxManagement.createFirstTaxRateBtn')}</Btn> : undefined}
                   />
                 ) : (
                   <Table columns={columns} data={taxRates} rowKey={r => r.id} />

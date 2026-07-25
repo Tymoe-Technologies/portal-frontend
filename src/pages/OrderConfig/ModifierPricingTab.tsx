@@ -13,6 +13,7 @@ import {
   Spinner,
   ConfirmDialog,
   toast,
+  Tooltip,
   type Column
 } from '@/components/ui-kit'
 import { getCurrencySymbol } from '../../config/currencyConfig'
@@ -193,7 +194,7 @@ const ModifierPricingTab: React.FC<ModifierPricingTabProps> = ({
       title: (
         <span className="inline-flex items-center gap-1">
           {tk('pricePriorityLabel')}
-          <span title={tk('pricePriorityTooltip')}><Info size={13} className="text-slate-400" /></span>
+          <Tooltip label={tk('pricePriorityTooltip')}><Info size={13} className="text-slate-400" /></Tooltip>
         </span>
       ),
       width: 300,

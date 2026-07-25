@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, Pencil, Trash2, Info, Save, RefreshCw, CheckCircle2, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Table, Btn, Badge, AlertBox, Spinner, toast, type Column } from '@/components/ui-kit'
+import { Table, Btn, Badge, AlertBox, Spinner, toast, Tooltip, type Column } from '@/components/ui-kit'
 import { getCurrencySymbol } from '../../config/currencyConfig'
 import {
   batchSaveCustomOptionSourcePrices,
@@ -242,10 +242,12 @@ const CustomOptionPricingRowV2: React.FC<CustomOptionPricingRowProps> = ({
     {
       key: 'defaultPrice',
       title: (
-        <span className="inline-flex items-center gap-1" title={tk('customOptionPricingTip')}>
-          {tk('defaultPrice')}
-          <Info size={13} className="text-slate-400" />
-        </span>
+        <Tooltip label={tk('customOptionPricingTip')}>
+          <span className="inline-flex items-center gap-1">
+            {tk('defaultPrice')}
+            <Info size={13} className="text-slate-400" />
+          </span>
+        </Tooltip>
       ),
       width: 100,
       align: 'right',
@@ -400,7 +402,7 @@ const CustomOptionPricingRowV2: React.FC<CustomOptionPricingRowProps> = ({
               <div className="mb-4 flex items-center justify-between">
                 <span className="inline-flex items-center gap-2">
                   <span className="text-sm font-medium text-slate-700">{tk('customOptionPricing')}</span>
-                  <span title={tk('customOptionPricingTip')}><Info size={14} className="text-slate-400" /></span>
+                  <Tooltip label={tk('customOptionPricingTip')}><Info size={14} className="text-slate-400" /></Tooltip>
                 </span>
                 <div className="flex items-center gap-2">
                   <Btn variant="secondary" icon={<RefreshCw size={16} />} onClick={loadCustomOptionPrices} disabled={loading}>{t('common.refresh')}</Btn>

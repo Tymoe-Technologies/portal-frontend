@@ -64,6 +64,23 @@ export default defineConfig(({ mode }) => {
           });
         }
       },
+      // OIDC userinfo 端点 - 通过网关（USER/ACCOUNT 统一的"我是谁"接口）
+      '/userinfo': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.log('🚨 [GATEWAY] Userinfo Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('🔄 [GATEWAY] Userinfo Request:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log('✅ [GATEWAY] Userinfo Response:', proxyRes.statusCode, req.url);
+          });
+        }
+      },
       // Order Service 代理 - 通过网关
       '/api/order': {
         target: 'http://localhost:8000',

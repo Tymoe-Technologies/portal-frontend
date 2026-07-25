@@ -4,12 +4,14 @@ import BaseLayout from '@/layouts/BaseLayout'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
 import Register from '@/pages/Register'
+import FranchiseInvitationAccept from '@/pages/FranchiseInvitationAccept'
 import ApiTest from '@/pages/ApiTest'
 import Profile from '@/pages/Profile'
 import ItemManagement from '@/pages/ItemManagement'
 import ItemApiTest from '@/pages/ItemApiTest'
 import OrganizationManagement from '@/pages/OrganizationManagement'
 import AccountManagement from '@/pages/AccountManagement'
+import PermissionSets from '@/pages/PermissionSets'
 import DeviceManagement from '@/pages/DeviceManagement'
 import PrintSettings from '@/pages/PrintSettings'
 import RecipeGuide from '@/pages/RecipeGuide'
@@ -90,6 +92,15 @@ const routes: RouteObject[] = [
         element: withErrorBoundary(
           <RequireAuth>
             <AccountManagement />
+          </RequireAuth>
+        ),
+        errorElement: <ErrorPage />
+      },
+      {
+        path: 'permission-sets',
+        element: withErrorBoundary(
+          <RequireAuth>
+            <PermissionSets />
           </RequireAuth>
         ),
         errorElement: <ErrorPage />
@@ -419,6 +430,11 @@ const routes: RouteObject[] = [
   {
     path: '/register',
     element: <Register />,
+    errorElement: <ErrorPage />
+  },
+  {
+    path: '/franchise-invitations/:token',
+    element: <FranchiseInvitationAccept />,
     errorElement: <ErrorPage />
   },
   {

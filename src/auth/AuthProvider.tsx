@@ -1,21 +1,32 @@
-import React, { createContext, useContext, useMemo, useState, useEffect } from 'react'
-import { getProfile, getOrganizations, logout as authLogout, type AuthUser, type Organization } from '../services/auth'
-import { isTokenExpired } from '../services/http'
+import React, { createContext, useContext, useMemo, useRef, useState, useEffect } from 'react'
+import { getOrganizations, getUserInfo, logout as authLogout, refreshOAuthToken, type Organization } from '../services/auth'
+import { isTokenExpired, parseJWTPayload } from '../services/http'
+import type { PortalRole } from './permissions'
+import { Modal, Btn } from '@/components/ui-kit'
+import { useTranslation } from 'react-i18next'
 
 export interface UserInfo {
   id: string
   email: string
   name: string
+  phone?: string
+  createdAt?: string
   emailVerified?: boolean
   roles?: string[]
+  userType: 'USER' | 'ACCOUNT'
+  // 仅 ACCOUNT 有意义：有 username 才是开通了 Portal 后台登录（有密码可改）；
+  // PIN-only 的员工账号没有 username，也没有密码
+  username?: string
 }
 
 interface AuthContextValue {
   user: UserInfo | null
   organizations: Organization[]
+  role: PortalRole
+  permissions: string[]
   isAuthenticated: boolean
   loading: boolean
-  login: (token?: string, userInfo?: AuthUser) => Promise<void>
+  login: (token?: string) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
   updateOrganizations: (orgs: Organization[]) => void
@@ -26,20 +37,172 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 // 临时硬编码为 false 以确保认证流程启用
 const authDisabled = false // (import.meta.env.VITE_AUTH_DISABLED ?? 'false') === 'true'
 
+// 统一的空组织形状占位符：/userinfo 的 ACCOUNT 分支不返回 createdAt/updatedAt，
+// 但 Organization 类型要求这两个字段，这里补空字符串，不影响 RequireOrganization
+// 等"是否至少有一个组织"的判断，也不会被 ACCOUNT 专属页面用到这两个字段。
+function toOrganization(o: {
+  id: string; orgName: string; orgType: string
+  parentOrgId: string | null; status: string
+}): Organization {
+  return {
+    id: o.id,
+    orgName: o.orgName,
+    orgType: o.orgType as Organization['orgType'],
+    parentOrgId: o.parentOrgId ?? undefined,
+    status: o.status as Organization['status'],
+    createdAt: '',
+    updatedAt: '',
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { t } = useTranslation()
   const [user, setUser] = useState<UserInfo | null>(null)
   const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [permissions, setPermissions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  // 上一次确认过的组织快照（orgType/parentOrgId）——用来跟"当前登录 token 里的认知"做对比，
+  // 检测主店有没有把当前登录的加盟店解除关联。access token 里的 orgType/parentOrgId 是签发时的
+  // 快照，不会随着 auth-service 数据库变化而更新，所以不能直接用 token，要单独轮询 getOrganizations()
+  const orgSnapshotRef = useRef<Map<string, { orgType: string; parentOrgId: string | null }>>(new Map())
+  const [dissociatedOrg, setDissociatedOrg] = useState<{ id: string; orgName: string } | null>(null)
+  const [confirmingDissociation, setConfirmingDissociation] = useState(false)
+
+  const updateOrgSnapshot = (orgs: Organization[]) => {
+    orgSnapshotRef.current = new Map(orgs.map(o => [o.id, { orgType: o.orgType, parentOrgId: o.parentOrgId ?? null }]))
+  }
+
+  // 统一的"我是谁"流程：同时支持 USER（老板，邮箱登录）和 ACCOUNT（员工，用户名登录）
+  const fetchWhoAmI = async (): Promise<boolean> => {
+    const info = await getUserInfo()
+    const token = localStorage.getItem('access_token')
+    const jwtSub = token ? parseJWTPayload(token)?.sub : undefined
+
+    if (info.userType === 'USER') {
+      setUser({
+        id: jwtSub ?? '',
+        email: info.data.email ?? '',
+        name: info.data.name ?? info.data.email?.split('@')[0] ?? '',
+        phone: info.data.phone,
+        createdAt: info.data.createdAt,
+        emailVerified: info.data.emailVerified,
+        userType: 'USER',
+      })
+      setPermissions([]) // USER 不受权限集限制
+
+      try {
+        const userOrganizations = await getOrganizations()
+        setOrganizations(userOrganizations)
+        updateOrgSnapshot(userOrganizations)
+        const currentOrgId = localStorage.getItem('organization_id')
+        if (!currentOrgId && userOrganizations.length > 0) {
+          localStorage.setItem('organization_id', userOrganizations[0].id)
+        }
+      } catch (orgError) {
+        console.warn('Failed to get organizations:', orgError)
+        setOrganizations([])
+      }
+    } else {
+      // ACCOUNT：加盟店 OWNER / 店长 MANAGER，用户名登录
+      setUser({
+        id: jwtSub ?? '',
+        email: info.data.email ?? '',
+        name: info.data.name ?? info.data.username ?? '',
+        phone: info.data.phone,
+        createdAt: info.data.createdAt,
+        userType: 'ACCOUNT',
+        username: info.data.username,
+      })
+      setPermissions(info.data.permissions ?? [])
+
+      const org = info.data.organization
+      if (org) {
+        const orgs = [toOrganization(org)]
+        setOrganizations(orgs)
+        updateOrgSnapshot(orgs)
+        localStorage.setItem('organization_id', org.id)
+      } else {
+        setOrganizations([])
+      }
+    }
+    return true
+  }
+
+  // 定期用实时数据核对当前登录 token 里"认为"的组织关系是否还成立——
+  // 主要是为了发现"主店把我这个加盟店解除关联了"这种别人操作导致的、
+  // 自己 token 里没有及时反映的变化（access token 是登录/刷新那一刻的快照）
+  const checkForDissociation = async () => {
+    if (dissociatedOrg) return // 已经在等用户确认了，不用重复检测
+    try {
+      const liveOrgs = await getOrganizations()
+      for (const live of liveOrgs) {
+        const prev = orgSnapshotRef.current.get(live.id)
+        if (prev && prev.orgType === 'FRANCHISE' && prev.parentOrgId && live.orgType !== 'FRANCHISE') {
+          setDissociatedOrg({ id: live.id, orgName: live.orgName })
+          return
+        }
+      }
+    } catch {
+      // 静默失败即可，下一轮轮询再试
+    }
+  }
+
+  // 只有名下确实拥有 FRANCHISE 组织的 USER 才可能被"解除关联"——
+  // 主店老板（只有 MAIN/BRANCH）和 ACCOUNT 员工都不可能触发这个场景，没必要陪着轮询
+  const hasFranchiseOrg = user?.userType === 'USER' && organizations.some(o => o.orgType === 'FRANCHISE')
+
+  useEffect(() => {
+    if (authDisabled || !user || !hasFranchiseOrg) return
+
+    // 标签页切到后台时暂停轮询，切回来立即补一次检查，不用干等下一个整点
+    let interval: ReturnType<typeof setInterval> | null = null
+    const start = () => {
+      if (interval) return
+      checkForDissociation()
+      interval = setInterval(checkForDissociation, 120000)
+    }
+    const stop = () => {
+      if (interval) { clearInterval(interval); interval = null }
+    }
+    const handleVisibility = () => { document.visibilityState === 'visible' ? start() : stop() }
+
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [user, hasFranchiseOrg, dissociatedOrg])
+
+  // 用户在弹窗里确认后：拿 refresh_token 换一个新 access token（里面的 orgType/parentOrgId
+  // 才是解除关联之后的最新值），然后整页刷新，确保所有页面的内部状态都跟着重置
+  const handleConfirmDissociation = async () => {
+    setConfirmingDissociation(true)
+    try {
+      const refreshToken = localStorage.getItem('refresh_token')
+      if (refreshToken) {
+        const tokenResponse = await refreshOAuthToken({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: 'tymoe-web',
+        })
+        localStorage.setItem('access_token', tokenResponse.access_token)
+        if (tokenResponse.refresh_token) {
+          localStorage.setItem('refresh_token', tokenResponse.refresh_token)
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to refresh token after dissociation:', error)
+    } finally {
+      window.location.reload()
+    }
+  }
 
   // 初始化时检查是否已登录
   useEffect(() => {
     const initAuth = async () => {
-      console.log('AuthProvider initAuth - authDisabled:', authDisabled)
-      console.log('VITE_AUTH_DISABLED env value:', import.meta.env.VITE_AUTH_DISABLED)
-      
       if (authDisabled) {
-        // 如果认证被禁用，设置默认用户
-        setUser({ id: 'placeholder', email: 'guest@example.com', name: 'Guest' })
+        setUser({ id: 'placeholder', email: 'guest@example.com', name: 'Guest', userType: 'USER' })
         setLoading(false)
         return
       }
@@ -56,54 +219,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         try {
-          // 分别获取用户资料和组织信息
-          const profile = await getProfile()
-          if (profile) {
-            console.log('🔧 [AUTH PROVIDER DEBUG] Setting user from profile:', JSON.stringify(profile, null, 2))
-            setUser(profile)
-
-            // 获取组织信息
-            try {
-              const userOrganizations = await getOrganizations(undefined, 'beverage')
-              console.log('🔧 [AUTH PROVIDER DEBUG] Setting organizations:', JSON.stringify(userOrganizations, null, 2))
-              setOrganizations(userOrganizations)
-
-              // 只有在没有选中组织时，才自动选择第一个
-              const currentOrgId = localStorage.getItem('organization_id')
-              if (!currentOrgId && userOrganizations.length > 0) {
-                console.log('🔧 [AUTH PROVIDER DEBUG] No organization selected, setting first one:', userOrganizations[0].id)
-                localStorage.setItem('organization_id', userOrganizations[0].id)
-              } else if (currentOrgId) {
-                console.log('🔧 [AUTH PROVIDER DEBUG] Organization already selected:', currentOrgId)
-              }
-            } catch (orgError) {
-              console.warn('Failed to get organizations:', orgError)
-              setOrganizations([])
-            }
-          } else {
-            // profile 获取失败（网络问题或服务暂时不可用），但 token 有效
-            // 用 JWT payload 中的基本信息构造临时用户，避免误登出
-            console.warn('[AUTH] getProfile returned null, using token payload as fallback')
-            try {
-              const parts = token.split('.')
-              // Base64URL → 标准 Base64，补全 padding
-              const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-              const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=')
-              const payload = JSON.parse(atob(padded))
-              if (payload.sub && payload.email) {
-                setUser({
-                  id: payload.sub,
-                  email: payload.email,
-                  name: payload.email.split('@')[0]
-                })
-                console.log('[AUTH] Fallback user set from token payload')
-              }
-            } catch (parseError) {
-              console.warn('[AUTH] Failed to parse token payload for fallback')
-            }
-          }
+          await fetchWhoAmI()
         } catch (error) {
-          console.warn('Failed to get user profile:', error)
+          console.warn('Failed to get user info:', error)
           // Token 可能已过期，清除本地存储
           localStorage.removeItem('access_token')
           localStorage.removeItem('refresh_token')
@@ -115,93 +233,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth()
   }, [])
 
-  // 额外的保护机制：如果组织状态为空但localStorage中有组织ID，尝试恢复
-  useEffect(() => {
-    const restoreOrganizations = async () => {
-      if (authDisabled || organizations.length > 0) return
-      
-      const orgId = localStorage.getItem('organization_id')
-      const token = localStorage.getItem('access_token')
-      
-      if (orgId && token) {
-        console.log('🔧 [AUTH PROVIDER DEBUG] Organizations state is empty but localStorage has org ID, attempting to restore...')
-        try {
-          const userOrganizations = await getOrganizations(undefined, 'beverage')
-          if (userOrganizations.length > 0) {
-            console.log('🔧 [AUTH PROVIDER DEBUG] Successfully restored organizations:', userOrganizations.length)
-            setOrganizations(userOrganizations)
-          }
-        } catch (error) {
-          console.warn('Failed to restore organizations:', error)
-        }
-      }
-    }
-
-    restoreOrganizations()
-  }, [authDisabled, organizations.length])
-
-  // 强制刷新机制：页面加载时检查组织状态
-  useEffect(() => {
-    const forceRefreshOrganizations = async () => {
-      if (authDisabled) return
-      
-      const token = localStorage.getItem('access_token')
-      if (!token) return
-      
-      // 如果组织状态为空，强制刷新
-      if (organizations.length === 0) {
-        console.log('🔧 [AUTH PROVIDER DEBUG] Force refreshing organizations...')
-        try {
-          const userOrganizations = await getOrganizations(undefined, 'beverage')
-          console.log('🔧 [AUTH PROVIDER DEBUG] Force refresh result:', userOrganizations.length)
-          if (userOrganizations.length > 0) {
-            setOrganizations(userOrganizations)
-            console.log('🔧 [AUTH PROVIDER DEBUG] Force refresh successful')
-          }
-        } catch (error) {
-          console.warn('Force refresh failed:', error)
-        }
-      }
-    }
-
-    // 延迟执行，确保其他初始化完成
-    const timer = setTimeout(forceRefreshOrganizations, 1000)
-    return () => clearTimeout(timer)
-  }, [authDisabled])
-
   const refreshUser = async () => {
     if (authDisabled) return
-
     try {
-      // 分别获取用户资料和组织信息
-      const profile = await getProfile()
-      if (profile) {
-        console.log('🔧 [AUTH PROVIDER DEBUG] Refreshing user profile:', JSON.stringify(profile, null, 2))
-        setUser(profile)
-        
-        // 获取组织信息
-        try {
-          const userOrganizations = await getOrganizations(undefined, 'beverage')
-          console.log('🔧 [AUTH PROVIDER DEBUG] Updating organizations:', JSON.stringify(userOrganizations, null, 2))
-          setOrganizations(userOrganizations)
-          if (userOrganizations.length > 0) {
-            localStorage.setItem('organization_id', userOrganizations[0].id)
-          }
-        } catch (orgError) {
-          console.warn('Failed to refresh organizations:', orgError)
-          setOrganizations([])
-        }
-      }
+      await fetchWhoAmI()
     } catch (error) {
-      console.warn('Failed to refresh user profile:', error)
+      console.warn('Failed to refresh user info:', error)
       setUser(null)
       setOrganizations([])
     }
   }
 
-  const login = async (token?: string, userInfo?: AuthUser) => {
+  const login = async (token?: string) => {
     if (authDisabled) {
-      setUser({ id: 'placeholder', email: 'guest@example.com', name: 'Guest' })
+      setUser({ id: 'placeholder', email: 'guest@example.com', name: 'Guest', userType: 'USER' })
       return
     }
 
@@ -209,53 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (token) {
         localStorage.setItem('access_token', token)
       }
-
-      // 如果提供了用户信息（如登录响应），直接使用
-      if (userInfo) {
-        console.log('🔧 [AUTH PROVIDER DEBUG] Using provided user info from login response:', JSON.stringify(userInfo, null, 2))
-        setUser(userInfo)
-        // 设置组织信息
-        if (userInfo.organizations) {
-          console.log('🔧 [AUTH PROVIDER DEBUG] Setting organizations from login response:', JSON.stringify(userInfo.organizations, null, 2))
-          setOrganizations(userInfo.organizations)
-          try {
-            const firstOrgId = userInfo.organizations?.[0]?.id
-            if (firstOrgId) localStorage.setItem('organization_id', firstOrgId)
-          } catch {}
-        } else {
-          setOrganizations([])
-        }
-        return
-      }
-
-      // 否则从API获取用户信息
-      const profile = await getProfile()
-      if (profile) {
-        console.log('🔧 [AUTH PROVIDER DEBUG] Login successful, setting user from API:', JSON.stringify(profile, null, 2))
-        setUser(profile)
-        
-        // 获取组织信息
-        try {
-          console.log('🔧 [AUTH PROVIDER DEBUG] Fetching organizations...')
-          // 使用 'beverage' 获取组织
-          const userOrganizations = await getOrganizations(undefined, 'beverage')
-          console.log('🔧 [AUTH PROVIDER DEBUG] Organizations response:', JSON.stringify(userOrganizations, null, 2))
-          console.log('🔧 [AUTH PROVIDER DEBUG] Organizations count:', userOrganizations?.length || 0)
-          
-          setOrganizations(userOrganizations)
-          if (userOrganizations.length > 0) {
-            localStorage.setItem('organization_id', userOrganizations[0].id)
-            console.log('✅ [AUTH PROVIDER DEBUG] Set organization ID:', userOrganizations[0].id)
-          } else {
-            console.log('⚠️ [AUTH PROVIDER DEBUG] No organizations found')
-          }
-        } catch (orgError) {
-          console.error('❌ [AUTH PROVIDER DEBUG] Failed to get organizations:', orgError)
-          setOrganizations([])
-        }
-      } else {
-        throw new Error('Failed to get user profile')
-      }
+      await fetchWhoAmI()
     } catch (error) {
       // 如果获取用户信息失败，清除 token
       localStorage.removeItem('access_token')
@@ -277,6 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setUser(null)
       setOrganizations([])
+      setPermissions([])
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
       localStorage.removeItem('organization_id')
@@ -284,22 +284,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const updateOrganizations = (orgs: Organization[]) => {
-    console.log('🔧 [AUTH PROVIDER DEBUG] Updating organizations from external call:', orgs.length)
     setOrganizations(orgs)
   }
+
+  const role: PortalRole = user?.userType === 'ACCOUNT' ? 'ACCOUNT' : 'USER'
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
     organizations,
+    role,
+    permissions,
     isAuthenticated: authDisabled ? true : !!user,
     loading,
     login,
     logout,
     refreshUser,
     updateOrganizations
-  }), [user, organizations, loading])
+  }), [user, organizations, loading, role, permissions])
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      {/* 加盟关联被主店解除后的强制确认弹窗——不能通过点击遮罩/ESC 关闭，
+          必须点确认才能继续，确认时会强制刷新 token 并整页重载 */}
+      <Modal
+        open={!!dissociatedOrg}
+        onOpenChange={() => {}}
+      >
+        <h3 className="text-base font-semibold text-slate-900">{t('auth.dissociationTitle')}</h3>
+        <p className="mt-2 text-sm text-slate-600">
+          {t('auth.dissociationMessage', { orgName: dissociatedOrg?.orgName })}
+        </p>
+        <div className="mt-5 flex justify-end">
+          <Btn variant="primary" loading={confirmingDissociation} onClick={handleConfirmDissociation}>
+            {t('auth.dissociationConfirm')}
+          </Btn>
+        </div>
+      </Modal>
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuthContext(): AuthContextValue {

@@ -169,7 +169,7 @@ const ApiTest: React.FC = () => {
         phone: "+8613812345678"
       }
 
-      const response = await register(payload, 'beauty')
+      const response = await register(payload)
       setResult(response)
     } catch (err: any) {
       setError(err?.response?.data?.detail || err.message || 'Unknown error')
@@ -276,7 +276,7 @@ const ApiTest: React.FC = () => {
         client_id: 'tymoe-web'
       }
 
-      const response = await getOAuthToken(tokenRequest, 'beauty')
+      const response = await getOAuthToken(tokenRequest)
       setResult(response)
     } catch (err: any) {
       setError(err?.response?.data?.detail || err.message || 'Unknown error')
@@ -296,7 +296,7 @@ const ApiTest: React.FC = () => {
     setResult(null)
 
     try {
-      const response = await getOrganizations({}, 'beauty')
+      const response = await getOrganizations({})
       setResult(response)
     } catch (err: any) {
       setError(err?.response?.data?.detail || err.message || 'Unknown error')

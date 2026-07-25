@@ -9,11 +9,15 @@ import {
 import { getBrandLocale, LOCALE_LABELS } from '@/services/brand-locale'
 import {
   PageHeader, SectionCard, Table, Badge, Btn, Switch, TextInput, Textarea,
-  NumberInput, SelectInput, Field, Modal, ConfirmDialog, toast, type Column,
+  NumberInput, SelectInput, Field, Modal, ConfirmDialog, toast, Tooltip, type Column,
 } from '@/components/ui-kit'
+import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 
 const SupplyManagement: React.FC = () => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('recipesSupplies', role, permissions)
   const [supplies, setSupplies] = useState<Supply[]>([])
   const [loading, setLoading] = useState(false)
   const [total, setTotal] = useState(0)
@@ -132,12 +136,12 @@ const SupplyManagement: React.FC = () => {
     { key: 'is_active', title: t('pages.supplyManagement.columns.status'), width: 80, render: r => <Badge variant={r.is_active ? 'green' : 'default'}>{r.is_active ? t('pages.supplyManagement.active') : t('pages.supplyManagement.inactive')}</Badge> },
     {
       key: 'actions', title: t('pages.supplyManagement.columns.actions'), width: 100,
-      render: r => (
+      render: r => canEdit ? (
         <div className="flex items-center gap-1">
-          <button title={t('pages.supplyManagement.edit')} onClick={() => openEdit(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"><Pencil className="w-4 h-4" /></button>
-          <button title={t('pages.supplyManagement.delete')} onClick={() => setDeleteTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+          <Tooltip label={t('pages.supplyManagement.edit')}><button onClick={() => openEdit(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"><Pencil className="w-4 h-4" /></button></Tooltip>
+          <Tooltip label={t('pages.supplyManagement.delete')}><button onClick={() => setDeleteTarget(r)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button></Tooltip>
         </div>
-      ),
+      ) : null,
     },
   ]
 
@@ -149,7 +153,7 @@ const SupplyManagement: React.FC = () => {
         actions={
           <>
             <Btn variant="secondary" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading} onClick={load}>{t('pages.supplyManagement.refresh')}</Btn>
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.supplyManagement.addSupply')}</Btn>
+            {canEdit && <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.supplyManagement.addSupply')}</Btn>}
           </>
         }
       />

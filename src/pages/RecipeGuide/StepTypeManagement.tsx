@@ -5,9 +5,13 @@ import { getStepTypes, deleteStepType } from '@/services/recipe'
 import type { StepType } from '@/services/recipe'
 import StepTypeFormModalEnhanced from './StepTypeFormModalEnhanced'
 import { Table, type Column, Btn, EmptyState, ConfirmDialog, toast } from '@/components/ui-kit'
+import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 
 const StepTypeManagement: React.FC = () => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('recipesSupplies', role, permissions)
   const [stepTypes, setStepTypes] = useState<StepType[]>([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
@@ -57,7 +61,7 @@ const StepTypeManagement: React.FC = () => {
     { key: 'name', title: t('pages.recipeGuide.stepTypeName'), render: (r) => r.name },
     {
       key: 'actions', title: t('pages.recipeGuide.actions'), width: 150,
-      render: (r) => (
+      render: (r) => !canEdit ? null : (
         <div className="flex items-center gap-1">
           <Btn variant="link" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEdit(r)}>{t('pages.recipeGuide.edit')}</Btn>
           <Btn variant="link" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setDeleteId(r.id)}>{t('pages.recipeGuide.delete')}</Btn>
@@ -68,9 +72,11 @@ const StepTypeManagement: React.FC = () => {
 
   return (
     <div>
-      <div className="mb-4">
-        <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreate}>{t('pages.recipeGuide.createStepType')}</Btn>
-      </div>
+      {canEdit && (
+        <div className="mb-4">
+          <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreate}>{t('pages.recipeGuide.createStepType')}</Btn>
+        </div>
+      )}
 
       <StepTypeFormModalEnhanced
         visible={modalVisible}
@@ -83,7 +89,7 @@ const StepTypeManagement: React.FC = () => {
       {!loading && stepTypes.length === 0 ? (
         <EmptyState
           title={t('pages.recipeGuide.noStepTypes')}
-          action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreate}>{t('pages.recipeGuide.createFirstStepType')}</Btn>}
+          action={canEdit ? <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreate}>{t('pages.recipeGuide.createFirstStepType')}</Btn> : undefined}
         />
       ) : (
         <Table columns={columns} data={stepTypes} rowKey={(r) => r.id} loading={loading} />

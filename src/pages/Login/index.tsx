@@ -4,7 +4,7 @@ import { Turnstile } from '@marsidev/react-turnstile'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '../../auth/AuthProvider'
-import { login, getCaptchaStatus, forgotPassword, resetPassword, getOAuthToken, type LoginPayload, type CaptchaStatus, type UserTokenRequest } from '../../services/auth'
+import { login, getCaptchaStatus, forgotPassword, resetPassword, getOAuthToken, type LoginPayload, type CaptchaStatus, type UserTokenRequest, type AccountTokenRequest } from '../../services/auth'
 import { Btn, AlertBox } from '@/components/ui-kit'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -252,9 +252,13 @@ const Login: React.FC = () => {
   }
 
   const handleLogin = async () => {
+    const loginId = email.trim()
+    // 输入含 @ 按邮箱（老板/USER）走，否则按用户名（经理/加盟店 OWNER，ACCOUNT）走
+    const isEmailLogin = loginId.includes('@')
+
     // 校验
-    if (!email) { setFieldError(t('auth.login.emailRequired')); return }
-    if (!EMAIL_RE.test(email)) { setFieldError(t('auth.login.emailInvalid')); return }
+    if (!loginId) { setFieldError(t('auth.login.emailRequired')); return }
+    if (isEmailLogin && !EMAIL_RE.test(loginId)) { setFieldError(t('auth.login.emailInvalid')); return }
     if (!password) { setFieldError(t('auth.login.passwordRequired')); return }
     setFieldError('')
     setLoading(true)
@@ -262,29 +266,43 @@ const Login: React.FC = () => {
     setSuccess('')
 
     try {
-      const payload: LoginPayload = { email, password }
-      const loginResponse = await login(payload, 'beverage')
+      let access_token: string | undefined
+      let refresh_token: string | undefined
 
-      if (!loginResponse.success) {
-        setError(t('auth.login.loginFailedCheckCredentials'))
-        return
-      }
+      if (isEmailLogin) {
+        const payload: LoginPayload = { email: loginId, password }
+        const loginResponse = await login(payload, 'beverage')
 
-      const tokenRequest: UserTokenRequest = {
-        grant_type: 'password',
-        username: email,
-        password,
-        client_id: 'tymoe-web',
+        if (!loginResponse.success) {
+          setError(t('auth.login.loginFailedCheckCredentials'))
+          return
+        }
+
+        const tokenRequest: UserTokenRequest = {
+          grant_type: 'password',
+          username: loginId,
+          password,
+          client_id: 'tymoe-web',
+        }
+        const tokenResponse = await getOAuthToken(tokenRequest)
+        access_token = tokenResponse.access_token
+        refresh_token = tokenResponse.refresh_token
+      } else {
+        // ACCOUNT 登录（经理/加盟店 OWNER）：跳过 USER 专属的 /identity/login，直接换 token
+        const tokenRequest: AccountTokenRequest = {
+          grant_type: 'password',
+          username: loginId,
+          password,
+          client_id: 'tymoe-web',
+        }
+        const tokenResponse = await getOAuthToken(tokenRequest)
+        access_token = tokenResponse.access_token
+        refresh_token = tokenResponse.refresh_token
       }
-      const tokenResponse = await getOAuthToken(tokenRequest, 'beverage')
-      const { access_token, refresh_token } = tokenResponse
 
       if (access_token) {
-        localStorage.setItem('access_token', access_token)
         if (refresh_token) localStorage.setItem('refresh_token', refresh_token)
-
-        const userWithOrgs = { ...loginResponse.user, organizations: loginResponse.organizations }
-        await authLogin(access_token, userWithOrgs)
+        await authLogin(access_token)
 
         const from = (location.state as any)?.from || '/'
         navigate(from, { replace: true })
@@ -420,8 +438,8 @@ const Login: React.FC = () => {
     >
       <div className="space-y-4">
         <div>
-          <FieldLabel>{t('auth.login.email')}</FieldLabel>
-          <IconInput icon={<Mail className="h-4 w-4" />} value={email} onChange={setEmail} onRawChange={handleEmailChange} placeholder={t('auth.login.emailPlaceholder')} />
+          <FieldLabel>{t('auth.login.emailOrUsername')}</FieldLabel>
+          <IconInput icon={<Mail className="h-4 w-4" />} value={email} onChange={setEmail} onRawChange={handleEmailChange} placeholder={t('auth.login.emailOrUsernamePlaceholder')} />
         </div>
 
         <div>

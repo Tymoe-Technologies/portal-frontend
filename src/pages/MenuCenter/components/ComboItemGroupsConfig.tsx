@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Search, GripVertical } from 'lucide-react'
 import type { ComboItemGroup, Item, CreateComboItemPayload } from '@/services/item-management'
 import { fromMinorUnit, toMinorUnit } from '@/utils/priceConverter'
-import { Modal, Btn, Checkbox, SelectInput, EmptyState, ConfirmDialog, toast } from '@/components/ui-kit'
+import { Modal, Btn, Checkbox, SelectInput, EmptyState, ConfirmDialog, toast, Tooltip } from '@/components/ui-kit'
 
 interface ComboItemGroupsConfigProps {
   groups: ComboItemGroup[]
@@ -179,9 +179,11 @@ export const ComboItemGroupsConfig: React.FC<ComboItemGroupsConfigProps> = ({
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <Btn variant="primary" size="sm" onClick={() => handleOpenModal(group.id)}>{t('pages.menuCenter.comboItemGroupsConfig.addItem')}</Btn>
-                <button title={t('pages.menuCenter.comboItemGroupsConfig.deleteGroup')} onClick={() => setDeleteGroupIndex(index)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <Tooltip label={t('pages.menuCenter.comboItemGroupsConfig.deleteGroup')}>
+                  <button onClick={() => setDeleteGroupIndex(index)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </Tooltip>
               </div>
             </div>
 

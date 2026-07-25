@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import './index.css' // 添加样式文件
 import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '../../auth/AuthProvider'
+import { canEditModule } from '../../auth/permissions'
 import { debugOrganizationIsolation } from '../../utils/debug-org'
 import { getJWTInfo, checkJWTOrganizationInfo } from '../../utils/jwt-utils'
 import { formatPrice, fromMinorUnit, toMinorUnit } from '../../utils/priceConverter'
+import { getCurrencySymbol } from '../../config/currencyConfig'
 import ModifierGroupManager from './ModifierGroupManager'
 import ItemChannelConfig from './components/ItemChannelConfig'
 import { storeMenuService, type StoreMenuConfig } from '../../services/store-menu'
@@ -34,7 +36,8 @@ import {
   type CreateComboPayload,
   type CreateComboItemPayload,
   type ComboItemGroup,
-  type ComboAvailabilityRules
+  type ComboAvailabilityRules,
+  type ItemModifierGroup
 } from '../../services/item-management'
 import { ComboItemGroupsConfig } from './components/ComboItemGroupsConfig'
 import { ComboAvailabilityConfig } from './components/ComboAvailabilityConfig'
@@ -271,7 +274,7 @@ const ComboItemsInput: React.FC<{
                     </div>
                   </div>
                   <div className="col-span-1 flex justify-end">
-                    <button onClick={() => handleRemoveItem(comboItem.itemId)} title={t('pages.menuCenter.remove')} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                    <UI.Tooltip label={t('pages.menuCenter.remove')}><button onClick={() => handleRemoveItem(comboItem.itemId)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button></UI.Tooltip>
                   </div>
                 </div>
               </div>
@@ -352,7 +355,13 @@ const flattenCategoryTree = (tree: HierarchicalCategory[]): HierarchicalCategory
 
 const MenuCenter: React.FC = () => {
   const { t } = useTranslation()
-  const { isAuthenticated, organizations } = useAuthContext()
+  const { isAuthenticated, organizations, role, permissions } = useAuthContext()
+  const canEdit = canEditModule('menuCatalog', role, permissions)
+  const canEditAvailability = canEditModule('menuAvailability', role, permissions)
+  const canEditPricing = canEditModule('menuPricingCosts', role, permissions)
+  // 当前系统货币符号（config/currencyConfig.ts 目前是硬编码 $ 的占位实现，
+  // 后端接入按商户货币配置后这里会自动跟着变，不需要改这个文件）
+  const currencySymbol = getCurrencySymbol()
 
   // 从 localStorage 找当前选中的 org，判断 orgType
   const currentOrgId = localStorage.getItem('organization_id')
@@ -373,6 +382,9 @@ const MenuCenter: React.FC = () => {
   const [items, setItems] = useState<Item[]>([])
   const [allItems, setAllItems] = useState<Item[]>([]) // 所有商品,用于Combo选择
   const [selectedCategoryId, setSelectedCategoryId] = useState<ID | null>(null)
+  // 记录最近一次发起的商品请求对应的分类——快速切换分类时，旧请求可能比新请求晚返回，
+  // 用它在 setItems 前校验请求是否已过期，避免把上一个分类的商品渲染成当前分类的
+  const loadItemsRequestIdRef = useRef<ID | null>(null)
   const [attributeTypes, setAttributeTypes] = useState<ItemAttributeType[]>([])
   const [attributeOptions, setAttributeOptions] = useState<Record<string, ItemAttributeOption[]>>({})
   // Modifier v2.0: 使用 ModifierGroup 替代 Addon
@@ -417,6 +429,11 @@ const MenuCenter: React.FC = () => {
   // 门店改价（替代原 Modal.confirm + getElementById DOM hack）
   const [priceOverrideTarget, setPriceOverrideTarget] = useState<Item | null>(null)
   const [priceOverrideValue, setPriceOverrideValue] = useState<number>(NaN)
+  // 门店改价弹窗内的选项加价（分店/加盟店可改本店选项加价，产品规则）
+  const [priceOverrideModifierGroups, setPriceOverrideModifierGroups] = useState<ItemModifierGroup[]>([])
+  const [priceOverrideModifierValues, setPriceOverrideModifierValues] = useState<Record<string, string>>({})
+  const [priceOverrideModifierLoading, setPriceOverrideModifierLoading] = useState(false)
+  const [priceOverrideSaving, setPriceOverrideSaving] = useState(false)
   // 套餐增强功能状态
   const [comboImageUrl, setComboImageUrl] = useState<string | undefined>()
   // 新建套餐时选择的待上传图片文件（保存套餐成功后自动上传）
@@ -526,6 +543,13 @@ const MenuCenter: React.FC = () => {
   useEffect(() => {
     const handleOrganizationChange = (event: CustomEvent) => {
       console.log('🔄 [MENU CENTER] Organization changed, reloading data...', event.detail)
+      // selectedCategoryId 是上一个组织的分类 ID，对新组织无意义——必须先清空，
+      // 否则下面 loadCategories() 里"没有选中分类才默认选第一个"的逻辑不会触发，
+      // 会一直拿着这个跨组织的旧 categoryId 去取商品，显示成上一个组织的数据
+      loadItemsRequestIdRef.current = null
+      setSelectedCategoryId(null)
+      setItems([])
+      setCategoryCombos([])
       // 重新加载所有数据
       loadCategories()
       loadAttributeTypes()
@@ -533,17 +557,14 @@ const MenuCenter: React.FC = () => {
       loadModifierGroups()
       loadCombos()
       loadAllItems()
-      if (selectedCategoryId) {
-        loadItems()
-      }
     }
 
     window.addEventListener('organizationChanged', handleOrganizationChange as EventListener)
-    
+
     return () => {
       window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener)
     }
-  }, [selectedCategoryId])
+  }, [])
 
   // 加载分类列表
   // 加载非主店的门店配置（用于显示品牌商品的本店可用状态）
@@ -893,31 +914,40 @@ const MenuCenter: React.FC = () => {
     if (!selectedCategoryId) {
       return
     }
-    
+
     if (!isAuthenticated) {
       return
     }
-    
+
+    const requestedCategoryId = selectedCategoryId
+    loadItemsRequestIdRef.current = requestedCategoryId
+
     setLoading(prev => ({ ...prev, items: true }))
     try {
       // 同时加载商品和套餐
       const [itemsResponse, combosResponse] = await Promise.all([
         itemManagementService.getItems({
-          categoryId: selectedCategoryId,
+          categoryId: requestedCategoryId,
           limit: 100
         }),
         itemManagementService.getCombos({
-          categoryId: selectedCategoryId,
+          categoryId: requestedCategoryId,
           limit: 100
         })
       ])
-      
+
+      // 快速切换分类时，慢的旧请求可能晚于新请求返回——这时它的结果已经过期，
+      // 不能再写入 items/categoryCombos，否则会把上一个分类的商品显示成当前分类的
+      if (loadItemsRequestIdRef.current !== requestedCategoryId) {
+        return
+      }
+
       const items = itemsResponse.data || []
       const categoryCombos = combosResponse.data || []
-      
+
       setItems(items)
       setCategoryCombos(categoryCombos)
-      
+
       // 收集所有商品中使用的属性类型ID
       const usedAttributeTypeIds = new Set<string>()
       items.forEach(item => {
@@ -930,7 +960,7 @@ const MenuCenter: React.FC = () => {
           })
         }
       })
-      
+
       // 为所有使用的属性类型加载选项数据（如果还没有加载）
       for (const typeId of usedAttributeTypeIds) {
         if (!attributeOptions[typeId]) {
@@ -941,14 +971,19 @@ const MenuCenter: React.FC = () => {
           }
         }
       }
-      
+
       // 静默加载商品，不显示加载消息
     } catch (error) {
+      if (loadItemsRequestIdRef.current !== requestedCategoryId) {
+        return // 已过期的请求，报错也不该影响当前分类的展示
+      }
       console.error('Failed to load items:', error)
       UI.toast.error(t('pages.menuCenter.loadItemsFailed'))
       setItems([]) // 确保出错时也设置为空数组
     } finally {
-      setLoading(prev => ({ ...prev, items: false }))
+      if (loadItemsRequestIdRef.current === requestedCategoryId) {
+        setLoading(prev => ({ ...prev, items: false }))
+      }
     }
   }
 
@@ -1044,6 +1079,31 @@ const MenuCenter: React.FC = () => {
     setItemModalTab('basic')
     setPreviewImageUrl(undefined)
     setItemModalVisible(true)
+  }
+
+  // 门店改价弹窗：打开时并行加载该商品的选项组（品牌默认价）+ 本店已保存的选项加价覆盖
+  const openPriceOverride = async (item: Item) => {
+    setPriceOverrideTarget(item)
+    setPriceOverrideValue(storeConfigs.get(item.id)?.priceOverride ?? NaN)
+    setPriceOverrideModifierGroups([])
+    setPriceOverrideModifierValues({})
+    setPriceOverrideModifierLoading(true)
+    try {
+      const [groups, overrides] = await Promise.all([
+        itemManagementService.getItemModifiers(item.id),
+        storeMenuService.getStoreModifierPrices(item.id),
+      ])
+      setPriceOverrideModifierGroups(groups)
+      const prefill: Record<string, string> = {}
+      for (const [optionId, price] of Object.entries(overrides)) {
+        prefill[optionId] = String(price)
+      }
+      setPriceOverrideModifierValues(prefill)
+    } catch {
+      // 选项加价加载失败不阻断本店价格的修改
+    } finally {
+      setPriceOverrideModifierLoading(false)
+    }
   }
 
   // 编辑商品
@@ -1649,11 +1709,11 @@ const MenuCenter: React.FC = () => {
             <span className="truncate">{category.name}</span>
             {category.isSystem && <UI.Badge>{t('pages.menuCenter.systemBadge')}</UI.Badge>}
           </span>
-          {isMain && (
+          {isMain && canEdit && (
             <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-              <button title={t('pages.menuCenter.edit')} onClick={() => handleEditCategory(category)} className="p-1 rounded text-slate-400 hover:bg-slate-200 hover:text-slate-600 cursor-pointer"><Pencil className="w-3.5 h-3.5" /></button>
+              <UI.Tooltip label={t('pages.menuCenter.edit')}><button onClick={() => handleEditCategory(category)} className="p-1 rounded text-slate-400 hover:bg-slate-200 hover:text-slate-600 cursor-pointer"><Pencil className="w-3.5 h-3.5" /></button></UI.Tooltip>
               {!category.isSystem && (
-                <button title={t('pages.menuCenter.delete')} onClick={() => setCategoryDeleteTarget(category)} className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                <UI.Tooltip label={t('pages.menuCenter.delete')}><button onClick={() => setCategoryDeleteTarget(category)} className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button></UI.Tooltip>
               )}
             </span>
           )}
@@ -1686,13 +1746,6 @@ const MenuCenter: React.FC = () => {
       loadModifierGroups() // 加载自定义选项组
     }
   }, [isAuthenticated])
-
-  // 当选中分类变化时，加载商品和套餐
-  React.useEffect(() => {
-    if (selectedCategoryId) {
-      loadItems()
-    }
-  }, [selectedCategoryId])
 
   // 如果未认证，显示提示
   if (!isAuthenticated) {
@@ -1740,7 +1793,7 @@ const MenuCenter: React.FC = () => {
             title={t('pages.menuCenter.categoriesTitle')}
             action={
               <div className="flex items-center gap-1.5">
-                {isMain && <UI.Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateCategory}>{t('pages.menuCenter.addCategory')}</UI.Btn>}
+                {isMain && canEdit && <UI.Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateCategory}>{t('pages.menuCenter.addCategory')}</UI.Btn>}
                 <UI.Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading.categories} onClick={loadCategories} />
               </div>
             }
@@ -1760,7 +1813,7 @@ const MenuCenter: React.FC = () => {
             title={t('pages.menuCenter.itemsTitle')}
             action={selectedCategory && (
               <div className="flex items-center gap-1.5">
-                {isMain && <UI.Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateItem}>{t('pages.menuCenter.addItem')}</UI.Btn>}
+                {isMain && canEdit && <UI.Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateItem}>{t('pages.menuCenter.addItem')}</UI.Btn>}
                 <UI.Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading.items} onClick={loadItems} />
               </div>
             )}
@@ -1778,7 +1831,7 @@ const MenuCenter: React.FC = () => {
                 </p>
 
                 {categoryItems.length === 0 ? (
-                  <UI.EmptyState title={t('pages.menuCenter.emptyItems')} action={isMain ? <UI.Btn variant="primary" onClick={handleCreateItem}>{t('pages.menuCenter.createFirstItemBtn')}</UI.Btn> : undefined} />
+                  <UI.EmptyState title={t('pages.menuCenter.emptyItems')} action={isMain && canEdit ? <UI.Btn variant="primary" onClick={handleCreateItem}>{t('pages.menuCenter.createFirstItemBtn')}</UI.Btn> : undefined} />
                 ) : (
                   <div className="divide-y divide-slate-100">
                     {categoryItems.map(item => (
@@ -1843,14 +1896,17 @@ const MenuCenter: React.FC = () => {
                         <div className="flex items-center gap-1 shrink-0">
                           {isMain ? (
                             <>
-                              <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditItem(item)}>{t('pages.menuCenter.edit')}</UI.Btn>
-                              <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>{t('pages.menuCenter.saleRange')}</UI.Btn>
-                              <button title={t('pages.menuCenter.delete')} onClick={() => setItemDeleteTarget(item)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                              {canEdit && <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditItem(item)}>{t('pages.menuCenter.edit')}</UI.Btn>}
+                              {canEdit && <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>{t('pages.menuCenter.saleRange')}</UI.Btn>}
+                              {canEdit && <UI.Tooltip label={t('pages.menuCenter.delete')}><button onClick={() => setItemDeleteTarget(item)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button></UI.Tooltip>}
                             </>
                           ) : (
                             <>
-                              <UI.Switch
+                              <UI.SwitchOrStatus
                                 checked={storeConfigs.get(item.id)?.isAvailable ?? true}
+                                editable={canEditAvailability}
+                                onLabel={t('pages.menuCenter.active')}
+                                offLabel={t('pages.menuCenter.inactive')}
                                 onCheckedChange={async (val) => {
                                   await storeMenuService.upsertStoreMenuConfig(item.id, { isAvailable: val })
                                   setStoreConfigs(prev => {
@@ -1861,8 +1917,8 @@ const MenuCenter: React.FC = () => {
                                   })
                                 }}
                               />
-                              <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => { setPriceOverrideTarget(item); setPriceOverrideValue(storeConfigs.get(item.id)?.priceOverride ?? NaN) }}>{t('pages.menuCenter.changePriceBtn')}</UI.Btn>
-                              <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>{t('pages.menuCenter.saleRange')}</UI.Btn>
+                              {canEditPricing && <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openPriceOverride(item)}>{t('pages.menuCenter.changePriceBtn')}</UI.Btn>}
+                              {canEdit && <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>{t('pages.menuCenter.saleRange')}</UI.Btn>}
                             </>
                           )}
                         </div>
@@ -1937,10 +1993,12 @@ const MenuCenter: React.FC = () => {
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditCombo(combo)}>{t('pages.menuCenter.edit')}</UI.Btn>
-                              <button title={t('pages.menuCenter.delete')} onClick={() => setComboDeleteTarget(combo)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
-                            </div>
+                            {canEdit && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditCombo(combo)}>{t('pages.menuCenter.edit')}</UI.Btn>
+                                <UI.Tooltip label={t('pages.menuCenter.delete')}><button onClick={() => setComboDeleteTarget(combo)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button></UI.Tooltip>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -1955,7 +2013,7 @@ const MenuCenter: React.FC = () => {
               </div>
           )}
           {productsTab === 'modifiers' && (
-            <ModifierGroupManager readOnly={!isMain} isMain={isMain} additionalLocales={additionalLocales} />
+            <ModifierGroupManager readOnly={!isMain || !canEdit} isMain={isMain} additionalLocales={additionalLocales} />
           )}
           </div>
         </>
@@ -1965,7 +2023,7 @@ const MenuCenter: React.FC = () => {
                 title={t('pages.menuCenter.comboList')}
                 action={
                   <div className="flex items-center gap-1.5">
-                    <UI.Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateCombo}>{t('pages.menuCenter.createCombo')}</UI.Btn>
+                    {canEdit && <UI.Btn variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateCombo}>{t('pages.menuCenter.createCombo')}</UI.Btn>}
                     <UI.Btn variant="secondary" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} loading={loading.combos} onClick={loadCombos} />
                   </div>
                 }
@@ -2043,12 +2101,12 @@ const MenuCenter: React.FC = () => {
                     { key: 'isActive', title: t('pages.menuCenter.status'), render: (r: Combo) => <UI.Badge variant={r.isActive ? 'green' : 'red'}>{r.isActive ? t('pages.menuCenter.activated') : t('pages.menuCenter.deactivated')}</UI.Badge> },
                     {
                       key: 'actions', title: t('pages.menuCenter.action'),
-                      render: (record: Combo) => (
+                      render: (record: Combo) => canEdit ? (
                         <div className="flex items-center gap-1">
                           <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditCombo(record)}>{t('pages.menuCenter.edit')}</UI.Btn>
-                          <button title={t('pages.menuCenter.delete')} onClick={() => setComboDeleteTarget(record)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                          <UI.Tooltip label={t('pages.menuCenter.delete')}><button onClick={() => setComboDeleteTarget(record)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button></UI.Tooltip>
                         </div>
-                      ),
+                      ) : null,
                     },
                   ]}
                 />
@@ -2522,30 +2580,99 @@ const MenuCenter: React.FC = () => {
         </div>
       </UI.Modal>
 
-      {/* 门店改价弹窗（受控，替代原 Modal.confirm DOM hack） */}
+      {/* 门店改价弹窗（受控，替代原 Modal.confirm DOM hack）——本店价格 + 本店选项加价 */}
       <UI.Modal
         open={!!priceOverrideTarget}
         onOpenChange={(v) => !v && setPriceOverrideTarget(null)}
         title={priceOverrideTarget ? t('pages.menuCenter.changePriceModalTitle', { name: priceOverrideTarget.name }) : t('pages.menuCenter.changePriceModalTitleDefault')}
+        size="xl"
         footer={
           <>
             <UI.Btn variant="secondary" onClick={() => setPriceOverrideTarget(null)}>{t('pages.menuCenter.cancel')}</UI.Btn>
-            <UI.Btn variant="primary" onClick={async () => {
+            <UI.Btn variant="primary" loading={priceOverrideSaving} onClick={async () => {
               if (!priceOverrideTarget) return
-              await storeMenuService.upsertStoreMenuConfig(priceOverrideTarget.id, {
-                priceOverride: Number.isNaN(priceOverrideValue) ? undefined : priceOverrideValue,
-                isAvailable: storeConfigs.get(priceOverrideTarget.id)?.isAvailable ?? true,
-              })
-              await loadStoreConfigs()
-              UI.toast.success(t('pages.menuCenter.priceUpdatedSuccess'))
-              setPriceOverrideTarget(null)
+              setPriceOverrideSaving(true)
+              try {
+                await storeMenuService.upsertStoreMenuConfig(priceOverrideTarget.id, {
+                  priceOverride: Number.isNaN(priceOverrideValue) ? undefined : priceOverrideValue,
+                  isAvailable: storeConfigs.get(priceOverrideTarget.id)?.isAvailable ?? true,
+                })
+                const modifierPrices = Object.entries(priceOverrideModifierValues)
+                  .filter(([, v]) => v !== '' && v != null)
+                  .map(([modifierOptionId, price]) => ({ modifierOptionId, price: parseFloat(price) }))
+                if (modifierPrices.length > 0) {
+                  await storeMenuService.setStoreModifierPrices(priceOverrideTarget.id, modifierPrices)
+                }
+                await loadStoreConfigs()
+                UI.toast.success(t('pages.menuCenter.priceUpdatedSuccess'))
+                setPriceOverrideTarget(null)
+              } finally {
+                setPriceOverrideSaving(false)
+              }
             }}>{t('common.save')}</UI.Btn>
           </>
         }
       >
-        <UI.Field label={t('pages.menuCenter.storePriceInYuanLabel')} hint={priceOverrideTarget ? t('pages.menuCenter.brandPriceHint', { price: formatPrice(priceOverrideTarget.basePrice) }) : undefined}>
-          <UI.NumberInput value={priceOverrideValue} onChange={setPriceOverrideValue} min={0} className="w-full" />
-        </UI.Field>
+        <div className="space-y-3">
+          <UI.Field
+            label={t('pages.menuCenter.storePriceInYuanLabel')}
+            hint={priceOverrideTarget ? (
+              <span>{t('pages.menuCenter.brandPriceLabelPrefix')}<span className="font-semibold text-slate-600">{currencySymbol}{formatPrice(priceOverrideTarget.basePrice)}</span>{t('pages.menuCenter.restoreDefaultHint')}</span>
+            ) : undefined}
+          >
+            <UI.NumberInput value={priceOverrideValue} onChange={setPriceOverrideValue} min={0} prefix={currencySymbol} className="w-full font-semibold" />
+          </UI.Field>
+
+          {priceOverrideModifierLoading ? (
+            <div className="py-6 flex justify-center"><UI.Spinner /></div>
+          ) : priceOverrideModifierGroups.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-medium text-slate-400">{t('pages.menuCenter.modifierOverrideTitle')}</span>
+                <span className="text-xs text-slate-300">·</span>
+                <span className="text-xs text-slate-400">{t('pages.menuCenter.modifierOverrideHint')}</span>
+                <span className="flex-1 h-px bg-slate-100" />
+              </div>
+              {/* 紧凑网格：每组一块浅灰底卡片做强区分，组内两列，输入框紧跟在名称后面 */}
+              <div className="max-h-[55vh] overflow-y-auto pr-1 space-y-2.5">
+                {priceOverrideModifierGroups.map(mg => (
+                  <div key={mg.modifierGroupId} className="bg-slate-50 rounded-lg p-3">
+                    <div className="text-xs font-semibold text-slate-500 mb-1.5">{mg.group?.displayName || mg.modifierGroupId}</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5">
+                      {(mg.group?.options || []).map(opt => {
+                        const rawValue = priceOverrideModifierValues[opt.id] ?? ''
+                        const numericValue = rawValue === '' ? NaN : Number(rawValue)
+                        const hasOverride = rawValue !== '' && !Number.isNaN(numericValue)
+                        // 品牌价优先用 finalPrice（已合并商品级覆盖 catalog_item_modifier_prices，
+                        // 即总部对"这个商品的这个选项"单独设的价），没有才回退选项默认价。
+                        // 注意：getItemModifiers() 已经把这两个字段转换成元了，不能再传给
+                        // formatPrice()（它的入参约定是分，会再除一次 100），这里直接 toFixed
+                        const brandPrice = Number(opt.finalPrice ?? opt.defaultPrice ?? 0).toFixed(2)
+                        return (
+                          // 不用 flex-1/justify-between 撑开：输入框紧跟在文字后面，不被推到行尾
+                          <div key={opt.id} className="flex items-center flex-wrap gap-x-2 gap-y-1 py-1">
+                            <span className="text-sm text-slate-700">{opt.displayName}</span>
+                            <span className="text-xs text-slate-400">
+                              {t('pages.menuCenter.brandPriceLabel')} <span className="font-medium text-slate-500">{currencySymbol}{brandPrice}</span>
+                            </span>
+                            {hasOverride && <UI.Badge variant="gold">{t('pages.menuCenter.overriddenBadge')}</UI.Badge>}
+                            <UI.NumberInput
+                              value={numericValue}
+                              onChange={v => setPriceOverrideModifierValues(prev => ({ ...prev, [opt.id]: Number.isNaN(v) ? '' : String(v) }))}
+                              min={0}
+                              prefix={currencySymbol}
+                              className="font-semibold"
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </UI.Modal>
 
       {channelModal && (

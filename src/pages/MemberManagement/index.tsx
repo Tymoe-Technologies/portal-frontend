@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import {
   Users, Gift, Trophy, Settings, RotateCw, Plus, Pencil, Trash2,
-  History, DollarSign, Crown, Calendar, User,
+  History, DollarSign, Crown, Calendar, User, Eye,
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
@@ -19,10 +19,12 @@ import { isRateLimited } from '@/services/http'
 import RewardManagement from '@/pages/RewardManagement'
 import RewardFields, { buildRewardPayload, type LinkedItemLite, type RewardFormValues } from '@/pages/RewardManagement/RewardFields'
 import {
-  Btn, Badge, TextInput, Textarea, SelectInput, Switch, Checkbox,
+  Btn, IconButton, Badge, TextInput, Textarea, SelectInput, Switch, SwitchOrStatus, Checkbox,
   Modal, Drawer, ConfirmDialog, Table, type Column, Tabs, Field,
   SectionCard, AlertBox, EmptyState, Spinner, toast,
 } from '@/components/ui-kit'
+import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 通用小工具：带前后缀的可空数字输入（空 → undefined）
@@ -84,9 +86,10 @@ const getSourceMap = (t: (k: string) => string): Record<string, { label: string;
 const CouponWallet: React.FC<{
   coupons: GrantedReward[]
   loading: boolean
+  editable: boolean
   onRevokeClick: (c: GrantedReward) => void
   onManualIssueClick: () => void
-}> = ({ coupons, loading, onRevokeClick, onManualIssueClick }) => {
+}> = ({ coupons, loading, editable, onRevokeClick, onManualIssueClick }) => {
   const { t } = useTranslation()
   const describe = (c: GrantedReward) => {
     if (c.rewardType === 'DISCOUNT_AMOUNT' && c.discountAmount) {
@@ -104,9 +107,11 @@ const CouponWallet: React.FC<{
   return (
     <>
       <div className="flex justify-end mb-3">
-        <Btn size="sm" variant="secondary" icon={<Calendar className="w-3.5 h-3.5" />} onClick={onManualIssueClick}>
-          {t('pages.memberManagement.couponWallet.manualIssueBtn')}
-        </Btn>
+        {editable && (
+          <Btn size="sm" variant="secondary" icon={<Calendar className="w-3.5 h-3.5" />} onClick={onManualIssueClick}>
+            {t('pages.memberManagement.couponWallet.manualIssueBtn')}
+          </Btn>
+        )}
       </div>
 
       {loading ? (
@@ -141,7 +146,7 @@ const CouponWallet: React.FC<{
                     </div>
                   )}
                 </div>
-                {canRevoke && (
+                {canRevoke && editable && (
                   <Btn size="sm" variant="danger" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => onRevokeClick(c)}>
                     {t('pages.memberManagement.couponWallet.revokeBtn')}
                   </Btn>
@@ -161,6 +166,9 @@ const CouponWallet: React.FC<{
 
 const MemberListTab: React.FC = () => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEditProgram = canEditModule('loyaltyProgram', role, permissions)
+  const canEditRewards = canEditModule('loyaltyRewards', role, permissions)
   const [loading, setLoading] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
   // 等级开关：关闭时冻结，前端不展示等级
@@ -414,9 +422,7 @@ const MemberListTab: React.FC = () => {
       title: t('pages.memberManagement.memberList.columns.actions'),
       width: 100,
       render: (r) => (
-        <Btn size="sm" variant="secondary" icon={<History className="w-3.5 h-3.5" />} onClick={() => openMemberDrawer(r)}>
-          {t('pages.memberManagement.memberList.columns.viewBtn')}
-        </Btn>
+        <IconButton icon={<Eye className="w-4 h-4" />} label={t('pages.memberManagement.memberList.columns.viewBtn')} onClick={() => openMemberDrawer(r)} />
       ),
     },
   ]
@@ -500,11 +506,11 @@ const MemberListTab: React.FC = () => {
         width={540}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        footer={
+        footer={canEditProgram ? (
           <Btn variant="primary" size="sm" icon={<DollarSign className="w-3.5 h-3.5" />} onClick={() => setAdjustModalOpen(true)}>
             {t('pages.memberManagement.memberList.adjustPointsBtn')}
           </Btn>
-        }
+        ) : undefined}
       >
         {selectedMember && (
           <>
@@ -600,6 +606,7 @@ const MemberListTab: React.FC = () => {
                 <CouponWallet
                   coupons={coupons}
                   loading={couponsLoading}
+                  editable={canEditRewards}
                   onRevokeClick={setRevokeTarget}
                   onManualIssueClick={openManualIssue}
                 />
@@ -719,6 +726,9 @@ const EMPTY_LEVEL_FORM: LevelFormState = {
 
 const LevelManagementTab: React.FC = () => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEditProgram = canEditModule('loyaltyProgram', role, permissions)
+  const canEditMembers = canEditModule('members', role, permissions)
   const [loading, setLoading] = useState(false)
   const [levels, setLevels] = useState<MemberLevel[]>([])
   const [modalOpen, setModalOpen] = useState(false)
@@ -914,10 +924,10 @@ const LevelManagementTab: React.FC = () => {
       key: 'actions',
       title: t('pages.memberManagement.levelManagement.columns.actions'),
       width: 160,
-      render: (r) => (
-        <div className="flex items-center gap-1.5">
-          <Btn size="sm" variant="secondary" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openEdit(r)}>{t('pages.memberManagement.levelManagement.columns.editBtn')}</Btn>
-          <Btn size="sm" variant="danger" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setDeleteTarget(r)}>{t('pages.memberManagement.levelManagement.columns.deactivateBtn')}</Btn>
+      render: (r) => !canEditProgram ? null : (
+        <div className="flex items-center gap-0.5">
+          <IconButton icon={<Pencil className="w-4 h-4" />} label={t('pages.memberManagement.levelManagement.columns.editBtn')} onClick={() => openEdit(r)} />
+          <IconButton icon={<Trash2 className="w-4 h-4" />} label={t('pages.memberManagement.levelManagement.columns.deactivateBtn')} variant="danger" onClick={() => setDeleteTarget(r)} />
         </div>
       ),
     },
@@ -927,10 +937,13 @@ const LevelManagementTab: React.FC = () => {
     <>
       <SectionCard>
         <div className="flex items-center gap-3 flex-wrap">
-          <Switch
+          <SwitchOrStatus
             checked={!!levelsEnabled}
+            editable={canEditMembers}
             disabled={toggling || levelsEnabled === null}
             onCheckedChange={handleToggleEnabled}
+            onLabel={t('pages.memberManagement.levelManagement.enabledToast')}
+            offLabel={t('pages.memberManagement.levelManagement.disabledToast')}
           />
           <span className="text-sm font-medium text-slate-700">{t('pages.memberManagement.levelManagement.enableSwitchLabel')}</span>
           <span className="text-xs text-slate-400">
@@ -945,7 +958,7 @@ const LevelManagementTab: React.FC = () => {
         <div className="mt-4">
           <div className="flex items-center gap-2 mb-4">
             <Btn variant="secondary" icon={<RotateCw className="w-3.5 h-3.5" />} onClick={fetchLevels}>{t('pages.memberManagement.levelManagement.refreshBtn')}</Btn>
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.memberManagement.levelManagement.createBtn')}</Btn>
+            {canEditProgram && <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>{t('pages.memberManagement.levelManagement.createBtn')}</Btn>}
           </div>
 
           <Table
@@ -1096,6 +1109,8 @@ interface BirthdayRuleFormState extends RewardFormValues {
 
 const BirthdayRewardTab: React.FC = () => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('loyaltyRewards', role, permissions)
   const [rules, setRules] = useState<BirthdayRewardRule[]>([])
   const [coupons, setCoupons] = useState<Reward[]>([])
   const [levels, setLevels] = useState<MemberLevel[]>([])
@@ -1314,10 +1329,10 @@ const BirthdayRewardTab: React.FC = () => {
     {
       key: 'action',
       title: t('pages.memberManagement.birthdayReward.columns.actions'),
-      render: (r) => (
-        <div className="flex items-center gap-1.5">
-          <Btn size="sm" variant="secondary" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openEditRule(r)}>{t('pages.memberManagement.birthdayReward.columns.editBtn')}</Btn>
-          <Btn size="sm" variant="danger" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setDeleteTarget(r)}>{t('pages.memberManagement.birthdayReward.columns.deleteBtn')}</Btn>
+      render: (r) => !canEdit ? null : (
+        <div className="flex items-center gap-0.5">
+          <IconButton icon={<Pencil className="w-4 h-4" />} label={t('pages.memberManagement.birthdayReward.columns.editBtn')} onClick={() => openEditRule(r)} />
+          <IconButton icon={<Trash2 className="w-4 h-4" />} label={t('pages.memberManagement.birthdayReward.columns.deleteBtn')} variant="danger" onClick={() => setDeleteTarget(r)} />
         </div>
       ),
     },
@@ -1339,8 +1354,8 @@ const BirthdayRewardTab: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Btn variant="secondary" loading={scanning} icon={<RotateCw className="w-3.5 h-3.5" />} onClick={() => setScanConfirm(true)}>{t('pages.memberManagement.birthdayReward.scanNowBtn')}</Btn>
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreateRule}>{t('pages.memberManagement.birthdayReward.createBtn')}</Btn>
+            {canEdit && <Btn variant="secondary" loading={scanning} icon={<RotateCw className="w-3.5 h-3.5" />} onClick={() => setScanConfirm(true)}>{t('pages.memberManagement.birthdayReward.scanNowBtn')}</Btn>}
+            {canEdit && <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreateRule}>{t('pages.memberManagement.birthdayReward.createBtn')}</Btn>}
           </div>
         </div>
       </SectionCard>
@@ -1475,6 +1490,9 @@ const EMPTY_RULE_FORM: RuleFormState = {
 
 const ConfigTab: React.FC = () => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEditMembers = canEditModule('members', role, permissions)
+  const canEditProgram = canEditModule('loyaltyProgram', role, permissions)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [config, setConfig] = useState<ConfigFormState>({
@@ -1683,7 +1701,7 @@ const ConfigTab: React.FC = () => {
     {
       key: 'action',
       title: t('pages.memberManagement.config.columns.actions'),
-      render: (r) => (
+      render: (r) => !canEditProgram ? null : (
         <div className="flex items-center gap-1.5">
           <Btn size="sm" variant="secondary" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openRuleModal(r)}>{t('pages.memberManagement.config.columns.editBtn')}</Btn>
           <Btn size="sm" variant="danger" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={() => setDeleteTarget(r)}>{t('pages.memberManagement.config.columns.deleteBtn')}</Btn>
@@ -1705,9 +1723,9 @@ const ConfigTab: React.FC = () => {
       <div className="max-w-xl">
         <SectionCard title={t('pages.memberManagement.config.basicSettingsTitle')}>
           {loading ? <Spinner /> : (
-            <div className="space-y-4">
+            <div className={`space-y-4 ${!canEditMembers ? 'opacity-60 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-2">
-                <Switch checked={config.membershipEnabled} onCheckedChange={(v) => setC({ membershipEnabled: v })} />
+                <Switch checked={config.membershipEnabled} onCheckedChange={(v) => setC({ membershipEnabled: v })} disabled={!canEditMembers} />
                 <span className="text-sm text-slate-700">{t('pages.memberManagement.config.enableMembershipLabel')}</span>
               </div>
 
@@ -1756,9 +1774,11 @@ const ConfigTab: React.FC = () => {
                 )}
               </div>
 
-              <div className="border-t border-slate-100 pt-3">
-                <Btn variant="primary" loading={saving} onClick={handleSaveConfig}>{t('pages.memberManagement.config.saveConfigBtn')}</Btn>
-              </div>
+              {canEditMembers && (
+                <div className="border-t border-slate-100 pt-3">
+                  <Btn variant="primary" loading={saving} onClick={handleSaveConfig}>{t('pages.memberManagement.config.saveConfigBtn')}</Btn>
+                </div>
+              )}
             </div>
           )}
         </SectionCard>
@@ -1767,7 +1787,7 @@ const ConfigTab: React.FC = () => {
       {/* 积分规则 */}
       <SectionCard
         title={t('pages.memberManagement.config.earnRulesTitle')}
-        action={<Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openRuleModal()}>{t('pages.memberManagement.config.addRuleBtn')}</Btn>}
+        action={canEditProgram ? <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => openRuleModal()}>{t('pages.memberManagement.config.addRuleBtn')}</Btn> : undefined}
       >
         <Table
           columns={ruleColumns}

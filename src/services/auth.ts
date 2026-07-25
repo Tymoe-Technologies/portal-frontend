@@ -1,5 +1,4 @@
 import { httpService } from './http'
-import { mapProductTypeToEnum } from './productTypeMapper'
 
 export interface LoginPayload {
   email: string
@@ -30,7 +29,6 @@ export interface Organization {
   id: string
   orgName: string
   orgType: 'MAIN' | 'BRANCH' | 'FRANCHISE'
-  productType: 'beauty' | 'fb'
   parentOrgId?: string
   parentOrgName?: string
   description?: string
@@ -54,6 +52,14 @@ export interface Organization {
   status: 'ACTIVE' | 'SUSPENDED' | 'DELETED'
   createdAt: string
   updatedAt: string
+  // 是否是自己名下真正拥有的组织；false 表示只是通过主店旗下关系可见的加盟店（仅可见不可管理）
+  canManage?: boolean
+  // 仅当 canManage===false 时后端才会附带：该加盟店 owner 的账号信息，方便主店联系/核实身份
+  owner?: {
+    name: string | null
+    email: string
+    phone: string | null
+  }
 }
 
 export interface CreateOrganizationPayload {
@@ -74,7 +80,6 @@ export interface CreateOrganizationPayload {
   email?: string
   timezone?: string
   businessHours?: Record<string, any>
-  productType?: 'beauty' | 'fb' | 'beverage'
   // 品牌身份字段（仅 MAIN 适用）
   subdomain?: string
   customDomain?: string
@@ -141,15 +146,11 @@ const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'https
 const AUTH_BASE = (import.meta.env.VITE_AUTH_BASE as string | undefined) ?? 'https://tymoe.com'
 
 // 身份管理 API
-export async function login(payload: LoginPayload, productType: 'beauty' | 'fb' | 'beverage' = 'beauty'): Promise<LoginResponse> {
+export async function login(payload: LoginPayload): Promise<LoginResponse> {
   console.log('🔑 [AUTH DEBUG] Login request payload:', JSON.stringify(payload, null, 2))
-  
-  const response = await httpService.post<LoginResponse>(`${API_BASE}/identity/login`, payload, {
-    headers: {
-      'X-Product-Type': productType
-    }
-  })
-  
+
+  const response = await httpService.post<LoginResponse>(`${API_BASE}/identity/login`, payload)
+
   console.log('🔑 [AUTH DEBUG] Login response - Full response object:', JSON.stringify(response, null, 2))
   console.log('🔑 [AUTH DEBUG] Login response - Response data:', JSON.stringify(response.data, null, 2))
   console.log('🔑 [AUTH DEBUG] Login response - User info:', JSON.stringify(response.data.user, null, 2))
@@ -166,15 +167,11 @@ export interface RegisterResponse {
   }
 }
 
-export async function register(payload: RegisterPayload, productType: 'beauty' | 'fb' = 'beauty'): Promise<RegisterResponse> {
+export async function register(payload: RegisterPayload): Promise<RegisterResponse> {
   console.log('📝 [AUTH DEBUG] Register request payload:', JSON.stringify(payload, null, 2))
-  
-  const response = await httpService.post<RegisterResponse>(`${API_BASE}/identity/register`, payload, {
-    headers: {
-      'X-Product-Type': productType
-    }
-  })
-  
+
+  const response = await httpService.post<RegisterResponse>(`${API_BASE}/identity/register`, payload)
+
   console.log('📝 [AUTH DEBUG] Register response - Full response object:', JSON.stringify(response, null, 2))
   console.log('📝 [AUTH DEBUG] Register response - Response data:', JSON.stringify(response.data, null, 2))
   
@@ -309,6 +306,19 @@ export async function changePassword(currentPassword: string, newPassword: strin
   return response.data
 }
 
+export interface ResetOwnPinResponse {
+  success: boolean
+  message: string
+}
+
+// 重置主账户（USER）自己登录 POS 用的 PIN 码——跟 Account 的 reset-pin 是不同的接口，
+// 因为主账户/加盟店 owner 是 User 记录，不是 Account。PIN 由后端随机生成并邮件通知本人，
+// 接口不再接收/返回明文
+export async function resetOwnPin(): Promise<ResetOwnPinResponse> {
+  const response = await httpService.post<ResetOwnPinResponse>(`${API_BASE}/identity/reset-pin`, {})
+  return response.data
+}
+
 // 修改邮箱相关API
 export interface ChangeEmailResponse {
   success: boolean
@@ -345,16 +355,14 @@ export async function verifyEmailChange(code: string): Promise<VerifyEmailChange
 // OAuth2 Token 获取
 export async function getOAuthToken(
   request: UserTokenRequest | AccountTokenRequest | AccountPOSTokenRequest,
-  productType: 'beauty' | 'fb' | 'beverage' = 'beauty',
   deviceId?: string
 ): Promise<TokenResponse> {
   console.log('🎫 [AUTH DEBUG] OAuth token request:', {
     grant_type: request.grant_type,
     client_id: request.client_id,
-    productType,
     deviceId: deviceId ? '***存在***' : '❌缺失'
   })
-  
+
   const params = new URLSearchParams({
     grant_type: request.grant_type,
     client_id: request.client_id
@@ -369,8 +377,7 @@ export async function getOAuthToken(
   }
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'X-Product-Type': productType
+    'Content-Type': 'application/x-www-form-urlencoded'
   }
 
   if (deviceId) {
@@ -400,13 +407,12 @@ export interface RefreshTokenRequest {
   client_id: string
 }
 
-export async function refreshOAuthToken(request: RefreshTokenRequest, productType: 'beauty' | 'fb' = 'beauty'): Promise<TokenResponse> {
+export async function refreshOAuthToken(request: RefreshTokenRequest): Promise<TokenResponse> {
   console.log('🔄 [AUTH DEBUG] Refresh token request:', {
     grant_type: request.grant_type,
-    client_id: request.client_id,
-    productType
+    client_id: request.client_id
   })
-  
+
   const params = new URLSearchParams({
     grant_type: request.grant_type,
     refresh_token: request.refresh_token,
@@ -416,12 +422,11 @@ export async function refreshOAuthToken(request: RefreshTokenRequest, productTyp
   const tokenUrl = `${AUTH_BASE}/oauth/token`
   console.log('🔄 [AUTH DEBUG] Refresh token URL:', tokenUrl)
   const response = await httpService.post<TokenResponse>(tokenUrl, params.toString(), {
-    headers: { 
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'X-Product-Type': productType
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
     }
   })
-  
+
   console.log('🔄 [AUTH DEBUG] Refresh token response - Full response object:', JSON.stringify(response, null, 2))
   console.log('🔄 [AUTH DEBUG] Refresh token response - Token data:', JSON.stringify(response.data, null, 2))
   
@@ -436,52 +441,68 @@ export async function revokeToken(token: string, tokenTypeHint: 'access_token' |
   })
 }
 
-export async function getUserInfo(): Promise<AuthUser> {
-  console.log('👥 [AUTH DEBUG] Getting user info from OAuth userinfo endpoint...')
+export interface UserInfoOrganization {
+  id: string
+  orgName: string
+  orgType: 'MAIN' | 'BRANCH' | 'FRANCHISE'
+  parentOrgId: string | null
+  role: 'USER' | 'OWNER'
+  status: string
+}
+
+export interface UserInfoResponse {
+  success: boolean
+  userType: 'USER' | 'ACCOUNT'
+  data: {
+    // USER 字段
+    email?: string
+    organizations?: UserInfoOrganization[]
+    emailVerified?: boolean
+    // ACCOUNT 字段
+    username?: string
+    employeeNumber?: string
+    organization?: Omit<UserInfoOrganization, 'role'>
+    // 两者共有
+    name?: string
+    phone?: string
+    createdAt?: string
+    // ACCOUNT 专属：细粒度权限位（如 "devices.view"）
+    permissions?: string[]
+  }
+}
+
+// 统一的"我是谁"接口：同时支持 USER（老板，邮箱登录）和 ACCOUNT（员工，用户名登录）两种身份，
+// 用于替代只支持 USER 的 /identity/profile
+export async function getUserInfo(): Promise<UserInfoResponse> {
   const userinfoUrl = AUTH_BASE ? `${AUTH_BASE}/userinfo` : '/userinfo'
-  const response = await httpService.get<AuthUser>(userinfoUrl)
-  
-  console.log('👥 [AUTH DEBUG] UserInfo response - Full response object:', JSON.stringify(response, null, 2))
-  console.log('👥 [AUTH DEBUG] UserInfo response - User data:', JSON.stringify(response.data, null, 2))
-  
+  const response = await httpService.get<UserInfoResponse>(userinfoUrl)
   return response.data
 }
 
 // 组织管理 API
-export async function getOrganizations(params?: GetOrganizationsParams, productType: 'beauty' | 'fb' | 'beverage' = 'beauty'): Promise<Organization[]> {
+export async function getOrganizations(params?: GetOrganizationsParams): Promise<Organization[]> {
   console.log('🏢 [AUTH DEBUG] Getting organizations...', params)
-  
+
   const queryParams = new URLSearchParams()
   if (params?.orgType) queryParams.append('orgType', params.orgType)
   if (params?.status) queryParams.append('status', params.status)
-  
+
   const url = `${API_BASE}/organizations${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
-  const response = await httpService.get<GetOrganizationsResponse>(url, {
-    headers: {
-      'X-Product-Type': productType
-    }
-  })
-  
+  const response = await httpService.get<GetOrganizationsResponse>(url)
+
   console.log('🏢 [AUTH DEBUG] Organizations response - Full response object:', JSON.stringify(response, null, 2))
   console.log('🏢 [AUTH DEBUG] Organizations response - Organizations data:', JSON.stringify(response.data.data, null, 2))
-  
+
   return response.data.data
 }
 
-export async function createOrganization(payload: CreateOrganizationPayload, productType: 'beauty' | 'fb' | 'beverage' = 'beauty'): Promise<Organization> {
+export async function createOrganization(payload: CreateOrganizationPayload): Promise<Organization> {
   console.log('🏢 [AUTH DEBUG] Creating organization...', payload)
-  console.log('🏢 [AUTH DEBUG] Product type:', productType)
-  
-  // 将产品类型转换为Prisma期望的枚举值
-  const prismaProductType = mapProductTypeToEnum(productType)
-  
-  console.log('🏢 [AUTH DEBUG] Converted product type:', prismaProductType)
-  
+
   // 根据API文档创建请求载荷
   const requestPayload: any = {
     orgName: payload.orgName,
     orgType: payload.orgType,
-    productType: prismaProductType  // 使用转换后的枚举值
   }
   
   // 根据API文档：parentOrgId 的处理规则
@@ -542,12 +563,11 @@ export async function createOrganization(payload: CreateOrganizationPayload, pro
   
   const response = await httpService.post<CreateOrganizationResponse>(`${API_BASE}/organizations`, requestPayload, {
     headers: {
-      'X-Product-Type': productType,
       'Content-Type': 'application/json'
       // Authorization 头部会由 httpService 自动添加
     }
   })
-  
+
   console.log('🏢 [AUTH DEBUG] Create organization response - Full response object:', JSON.stringify(response, null, 2))
   console.log('🏢 [AUTH DEBUG] Create organization response - Organization data:', JSON.stringify(response.data.data, null, 2))
   
@@ -563,30 +583,24 @@ export async function updateProfileWithOrganizations(data: Partial<Pick<AuthUser
   return response.data.data
 }
 
-export async function getOrganization(id: string, productType: 'beauty' | 'fb' | 'beverage' = 'beauty'): Promise<Organization> {
-  const response = await httpService.get<{ success: boolean; data: Organization }>(`${API_BASE}/organizations/${id}`, {
-    headers: {
-      'X-Product-Type': productType
-    }
-  })
+export async function getOrganization(id: string): Promise<Organization> {
+  const response = await httpService.get<{ success: boolean; data: Organization }>(`${API_BASE}/organizations/${id}`)
   return response.data.data
 }
 
-export async function updateOrganization(id: string, data: Partial<Omit<Organization, 'id' | 'orgType' | 'productType' | 'userId' | 'createdAt' | 'updatedAt'>>, productType: 'beauty' | 'fb' | 'beverage' = 'beauty'): Promise<Organization> {
-  const response = await httpService.put<CreateOrganizationResponse>(`${API_BASE}/organizations/${id}`, data, {
-    headers: {
-      'X-Product-Type': productType
-    }
-  })
+export async function updateOrganization(id: string, data: Partial<Omit<Organization, 'id' | 'orgType' | 'userId' | 'createdAt' | 'updatedAt'>>): Promise<Organization> {
+  const response = await httpService.put<CreateOrganizationResponse>(`${API_BASE}/organizations/${id}`, data)
   return response.data.data
 }
 
-export async function deleteOrganization(id: string, productType: 'beauty' | 'fb' | 'beverage' = 'beauty'): Promise<void> {
-  await httpService.delete(`${API_BASE}/organizations/${id}`, {
-    headers: {
-      'X-Product-Type': productType
-    }
-  })
+export async function deleteOrganization(id: string): Promise<void> {
+  await httpService.delete(`${API_BASE}/organizations/${id}`)
+}
+
+// 主店解除与旗下加盟店的关联：加盟店变成独立主店，owner 自己的数据（账号/菜单/设备等）不受影响
+export async function dissociateFranchise(id: string): Promise<Organization> {
+  const response = await httpService.post<CreateOrganizationResponse>(`${API_BASE}/organizations/${id}/dissociate`, {})
+  return response.data.data
 }
 
 export async function uploadOrgLogo(orgId: string, file: File): Promise<{ logoUrl: string }> {
@@ -602,4 +616,142 @@ export async function uploadOrgLogo(orgId: string, file: File): Promise<{ logoUr
 
 export async function deleteOrgLogo(orgId: string): Promise<void> {
   await httpService.delete(`${API_BASE}/organizations/${orgId}/logo`)
+}
+
+// 加盟店邀请 API
+export interface FranchiseInvitation {
+  id: string
+  email: string
+  proposedOrgName?: string | null
+  status: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED'
+  expiresAt: string
+  acceptedAt?: string | null
+  createdOrgId?: string | null
+  createdAt: string
+}
+
+export interface CreateFranchiseInvitationPayload {
+  email: string
+  proposedOrgName?: string
+}
+
+export interface FranchiseInvitationPublicInfo {
+  brand: string | null
+  email: string
+  // 邀请邮箱是否已经是一个 User：决定 accept 页面走"设置新密码"还是"验证已有密码"
+  emailHasAccount: boolean
+  proposedOrgName?: string | null
+  status: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED'
+  expiresAt: string
+}
+
+export interface AcceptFranchiseInvitationPayload {
+  orgName: string
+  description?: string
+  street?: string
+  city?: string
+  province?: string
+  postalCode?: string
+  country?: string
+  latitude?: number
+  longitude?: number
+  phone?: string
+  email?: string
+  password: string
+  pinCode: string
+  name?: string
+}
+
+export interface AcceptFranchiseInvitationResult {
+  organizationId: string
+  orgName: string
+  userId: string
+  email: string
+  // 是否真的用了本次提交的 pinCode——挂靠到已有账号且对方已经设过 PIN 时会是 false（沿用旧 PIN）
+  pinCodeApplied: boolean
+}
+
+export async function createFranchiseInvitation(orgId: string, payload: CreateFranchiseInvitationPayload): Promise<FranchiseInvitation> {
+  const response = await httpService.post<{ success: boolean; data: FranchiseInvitation }>(
+    `${API_BASE}/organizations/${orgId}/franchise-invitations`,
+    payload
+  )
+  return response.data.data
+}
+
+export async function listFranchiseInvitations(orgId: string): Promise<FranchiseInvitation[]> {
+  const response = await httpService.get<{ success: boolean; data: FranchiseInvitation[] }>(
+    `${API_BASE}/organizations/${orgId}/franchise-invitations`
+  )
+  return response.data.data
+}
+
+export async function revokeFranchiseInvitation(id: string): Promise<void> {
+  await httpService.delete(`${API_BASE}/franchise-invitations/${id}`)
+}
+
+export async function getFranchiseInvitationPublic(token: string): Promise<FranchiseInvitationPublicInfo> {
+  const response = await httpService.get<{ success: boolean; data: FranchiseInvitationPublicInfo }>(
+    `${API_BASE}/franchise-invitations/${token}`
+  )
+  return response.data.data
+}
+
+export async function acceptFranchiseInvitation(token: string, payload: AcceptFranchiseInvitationPayload): Promise<AcceptFranchiseInvitationResult> {
+  const response = await httpService.post<{ success: boolean; data: AcceptFranchiseInvitationResult }>(
+    `${API_BASE}/franchise-invitations/${token}/accept`,
+    payload
+  )
+  return response.data.data
+}
+
+// 权限集 API
+export type PermissionAction = 'view' | 'edit'
+
+export interface PermissionCatalogModule {
+  module: string
+  actions: PermissionAction[]
+}
+
+export interface PermissionSet {
+  id: string
+  orgId: string
+  name: string
+  permissions: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export async function getPermissionCatalog(): Promise<{ modules: PermissionCatalogModule[]; allPermissions: string[] }> {
+  const response = await httpService.get<{ success: boolean; data: { modules: PermissionCatalogModule[]; allPermissions: string[] } }>(
+    `${API_BASE}/permission-sets/catalog`
+  )
+  return response.data.data
+}
+
+export async function listPermissionSets(orgId: string): Promise<PermissionSet[]> {
+  const response = await httpService.get<{ success: boolean; data: PermissionSet[] }>(
+    `${API_BASE}/organizations/${orgId}/permission-sets`
+  )
+  return response.data.data
+}
+
+export async function createPermissionSet(orgId: string, payload: { name: string; permissions: string[] }): Promise<PermissionSet> {
+  const response = await httpService.post<{ success: boolean; data: PermissionSet }>(
+    `${API_BASE}/organizations/${orgId}/permission-sets`,
+    payload
+  )
+  return response.data.data
+}
+
+export async function updatePermissionSet(id: string, payload: { name?: string; permissions?: string[] }): Promise<PermissionSet> {
+  const response = await httpService.put<{ success: boolean; data: PermissionSet }>(
+    `${API_BASE}/permission-sets/${id}`,
+    payload
+  )
+  return response.data.data
+}
+
+export async function deletePermissionSet(id: string): Promise<void> {
+  await httpService.delete(`${API_BASE}/permission-sets/${id}`)
 }

@@ -3,9 +3,10 @@ import {
   Gift, Plus, Trash2, Upload as UploadIcon, Copy, Info, Eye, EyeOff, X,
 } from 'lucide-react'
 import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 import { useTranslation } from 'react-i18next'
 import {
-  SectionCard, Switch, Btn, AlertBox, Spinner, Modal, TextInput, Textarea,
+  SectionCard, SwitchOrStatus, Btn, AlertBox, Spinner, Modal, TextInput, Textarea,
   SelectInput, FormRow, toast,
 } from '@/components/ui-kit'
 import {
@@ -27,7 +28,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function GiftCardSettings() {
   const { t } = useTranslation()
-  const { organizations } = useAuthContext()
+  const { organizations, role, permissions } = useAuthContext()
+  const canEdit = canEditModule('giftCards', role, permissions)
   const organizationId = localStorage.getItem('organization_id') || ''
 
   const currentOrg = organizations.find(o => o.id === organizationId)
@@ -207,7 +209,14 @@ export default function GiftCardSettings() {
               <div className="text-sm text-slate-500">{t('giftCard.subtitle')}</div>
             </div>
           </div>
-          <Switch checked={config?.enabled ?? false} onCheckedChange={handleToggleEnabled} disabled={saving} />
+          <SwitchOrStatus
+            checked={config?.enabled ?? false}
+            editable={canEdit}
+            disabled={saving}
+            onCheckedChange={handleToggleEnabled}
+            onLabel={t('giftCard.enabled')}
+            offLabel={t('giftCard.disabled')}
+          />
         </div>
       </SectionCard>
 
@@ -216,7 +225,7 @@ export default function GiftCardSettings() {
           {/* ── 预设面额 ── */}
           <SectionCard
             title={t('giftCard.denominations')}
-            action={<Btn variant="primary" size="sm" onClick={handleSaveDenominations} loading={saving}>{t('common.save')}</Btn>}
+            action={canEdit ? <Btn variant="primary" size="sm" onClick={handleSaveDenominations} loading={saving}>{t('common.save')}</Btn> : undefined}
           >
             <div className="space-y-4">
               <p className="text-sm text-slate-500">{t('giftCard.denominationsHint')}</p>
@@ -230,9 +239,11 @@ export default function GiftCardSettings() {
                     {denominations.map(d => (
                       <span key={d} className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 text-amber-700 ring-1 ring-amber-200 px-2.5 py-1 text-sm">
                         {centsToDisplay(d)}
-                        <button onClick={() => removeDenomination(d)} className="text-amber-500 hover:text-amber-700 cursor-pointer">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                        {canEdit && (
+                          <button onClick={() => removeDenomination(d)} className="text-amber-500 hover:text-amber-700 cursor-pointer">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </span>
                     ))}
                   </div>
@@ -251,7 +262,7 @@ export default function GiftCardSettings() {
                       <button
                         key={d}
                         onClick={() => addDenomination(d)}
-                        disabled={active}
+                        disabled={active || !canEdit}
                         className={active
                           ? 'inline-flex items-center rounded-md bg-slate-100 text-slate-400 px-2.5 py-1 text-sm cursor-default'
                           : 'inline-flex items-center gap-1 rounded-md bg-blue-50 text-blue-600 ring-1 ring-blue-200 px-2.5 py-1 text-sm hover:bg-blue-100 cursor-pointer'}
@@ -265,32 +276,34 @@ export default function GiftCardSettings() {
               </div>
 
               {/* 自定义面额输入 */}
-              <div className="flex items-center gap-2">
-                <div className="relative w-40">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10000}
-                    step={0.01}
-                    placeholder={t('giftCard.customDenomination')}
-                    value={customDenomInput}
-                    onChange={e => setCustomDenomInput(e.target.value)}
-                    className="w-full text-sm bg-white border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
-                  />
+              {canEdit && (
+                <div className="flex items-center gap-2">
+                  <div className="relative w-40">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10000}
+                      step={0.01}
+                      placeholder={t('giftCard.customDenomination')}
+                      value={customDenomInput}
+                      onChange={e => setCustomDenomInput(e.target.value)}
+                      className="w-full text-sm bg-white border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-slate-700 focus:outline-2 focus:outline-slate-900 focus:outline-offset-0"
+                    />
+                  </div>
+                  <Btn
+                    variant="secondary"
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    disabled={!customDenomInput || parseFloat(customDenomInput) <= 0}
+                    onClick={() => {
+                      const cents = Math.round(parseFloat(customDenomInput) * 100)
+                      if (cents > 0) addDenomination(cents)
+                    }}
+                  >
+                    {t('giftCard.addDenomination')}
+                  </Btn>
                 </div>
-                <Btn
-                  variant="secondary"
-                  icon={<Plus className="w-3.5 h-3.5" />}
-                  disabled={!customDenomInput || parseFloat(customDenomInput) <= 0}
-                  onClick={() => {
-                    const cents = Math.round(parseFloat(customDenomInput) * 100)
-                    if (cents > 0) addDenomination(cents)
-                  }}
-                >
-                  {t('giftCard.addDenomination')}
-                </Btn>
-              </div>
+              )}
             </div>
           </SectionCard>
 
@@ -305,32 +318,36 @@ export default function GiftCardSettings() {
                   {config!.cardImageUrls.map((url, idx) => (
                     <div key={url} className="relative rounded-xl overflow-hidden border border-slate-100">
                       <img src={url} alt={`Design ${idx + 1}`} className="w-full aspect-video object-cover block" />
-                      <button
-                        onClick={() => handleDeleteImage(url)}
-                        disabled={uploadingImage}
-                        className="absolute top-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-red-500 hover:bg-white transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleDeleteImage(url)}
+                          disabled={uploadingImage}
+                          className="absolute top-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-red-500 hover:bg-white transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
 
               {/* 上传新卡面 */}
-              <div>
-                <Btn variant="secondary" icon={<UploadIcon className="w-3.5 h-3.5" />} loading={uploadingImage}
-                  onClick={() => imageInputRef.current?.click()}>
-                  {t('giftCard.uploadImage')}
-                </Btn>
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadImage(f); e.target.value = '' }}
-                />
-              </div>
+              {canEdit && (
+                <div>
+                  <Btn variant="secondary" icon={<UploadIcon className="w-3.5 h-3.5" />} loading={uploadingImage}
+                    onClick={() => imageInputRef.current?.click()}>
+                    {t('giftCard.uploadImage')}
+                  </Btn>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleUploadImage(f); e.target.value = '' }}
+                  />
+                </div>
+              )}
 
               <AlertBox type="info" description="单张卡面：消费者购买时自动使用该设计。多张卡面：消费者可在购买时选择喜欢的设计。" />
             </div>
@@ -339,7 +356,7 @@ export default function GiftCardSettings() {
           {/* ── 发行礼品卡 ── */}
           <SectionCard
             title={t('giftCard.issue')}
-            action={<Btn variant="primary" icon={<Gift className="w-3.5 h-3.5" />} onClick={() => setIssueModalOpen(true)}>{t('giftCard.issueNew')}</Btn>}
+            action={canEdit ? <Btn variant="primary" icon={<Gift className="w-3.5 h-3.5" />} onClick={() => setIssueModalOpen(true)}>{t('giftCard.issueNew')}</Btn> : undefined}
           >
             <p className="text-sm text-slate-500">{t('giftCard.issueHint')}</p>
           </SectionCard>

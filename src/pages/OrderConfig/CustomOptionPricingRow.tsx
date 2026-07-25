@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, Pencil, Trash2, Info, Save } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Btn, Badge, Modal, Field, Spinner, ConfirmDialog, toast } from '@/components/ui-kit'
+import { Btn, Badge, Modal, Field, Spinner, ConfirmDialog, toast, Tooltip } from '@/components/ui-kit'
 import { getCurrencySymbol } from '../../config/currencyConfig'
 import {
   batchSaveCustomOptionSourcePrices,
@@ -256,7 +256,7 @@ const CustomOptionPricingRow: React.FC<CustomOptionPricingRowProps> = ({
           <div className="mb-3 flex items-center justify-between">
             <span className="inline-flex items-center gap-2">
               <span className="font-medium text-slate-700">{tk('customOptionPricing')}</span>
-              <span title={tk('customOptionPricingTip')}><Info size={14} className="text-slate-400" /></span>
+              <Tooltip label={tk('customOptionPricingTip')}><Info size={14} className="text-slate-400" /></Tooltip>
             </span>
             {modifiedCount > 0 && (
               <Btn variant="primary" size="sm" icon={<Save size={14} />} loading={saving} onClick={handleSaveAll}>

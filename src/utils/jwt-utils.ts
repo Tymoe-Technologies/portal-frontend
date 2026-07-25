@@ -32,7 +32,6 @@ export const getJWTInfo = () => {
   console.log('📋 [JWT DEBUG] User ID:', payload.sub)
   console.log('📧 [JWT DEBUG] Email:', payload.email)
   console.log('👤 [JWT DEBUG] User Type:', payload.userType)
-  console.log('🏷️ [JWT DEBUG] Product Type:', payload.productType)
   console.log('🏢 [JWT DEBUG] Organization IDs:', payload.organizationIds)
   console.log('🏢 [JWT DEBUG] Current Organization ID:', payload.organizationId)
   console.log('🔑 [JWT DEBUG] Permissions:', payload.permissions)

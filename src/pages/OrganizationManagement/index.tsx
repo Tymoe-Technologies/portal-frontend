@@ -6,11 +6,11 @@ import 'react-phone-number-input/style.css'
 import '../../styles/phone-input.css'
 import {
   Plus, Pencil, Trash2, Search, RefreshCw, Store, GitBranch, Crown,
-  Upload as UploadIcon, Loader2, Globe, Copy, Building2,
+  Upload as UploadIcon, Loader2, Globe, Copy, Building2, Mail, Ban, User, Phone,
 } from 'lucide-react'
 import {
-  Btn, SectionCard, Table, type Column, Tabs, SelectInput, TextInput, Textarea,
-  Field, AlertBox, Badge, EmptyState, Checkbox, ConfirmDialog, Modal, toast,
+  Btn, SectionCard, Table, type Column, Tabs, SelectInput, SearchSelect, TextInput, Textarea,
+  Field, AlertBox, Badge, EmptyState, Checkbox, ConfirmDialog, Modal, toast, Tooltip,
 } from '@/components/ui-kit'
 import { useAuthContext } from '../../auth/AuthProvider'
 import {
@@ -19,9 +19,15 @@ import {
   updateOrganization,
   uploadOrgLogo,
   deleteOrgLogo,
+  createFranchiseInvitation,
+  listFranchiseInvitations,
+  revokeFranchiseInvitation,
+  dissociateFranchise,
+  deleteOrganization,
   type Organization,
   type CreateOrganizationPayload,
-  type GetOrganizationsParams
+  type GetOrganizationsParams,
+  type FranchiseInvitation,
 } from '../../services/auth'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import tzlookup from 'tz-lookup'
@@ -233,6 +239,9 @@ const OrganizationManagement: React.FC = () => {
   // 模态框状态
   const [modalVisible, setModalVisible] = useState(false)
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
+  const [viewingOwnerOrg, setViewingOwnerOrg] = useState<Organization | null>(null)
+  const [dissociatingOrg, setDissociatingOrg] = useState<Organization | null>(null)
+  const [dissociating, setDissociating] = useState(false)
   const [activeTab, setActiveTab] = useState('basic')
 
   // 搜索和筛选状态
@@ -251,6 +260,17 @@ const OrganizationManagement: React.FC = () => {
   // 删除确认状态（替代 Modal.confirm）
   const [deletingOrg, setDeletingOrg] = useState<Organization | null>(null)
   const [logoDeleteConfirm, setLogoDeleteConfirm] = useState(false)
+
+  // 加盟邀请状态
+  const [inviteModalVisible, setInviteModalVisible] = useState(false)
+  const [inviteParentOrgId, setInviteParentOrgId] = useState<string>('')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteOrgName, setInviteOrgName] = useState('')
+  const [inviteErrors, setInviteErrors] = useState<{ parentOrgId?: string; email?: string }>({})
+  const [inviteSubmitting, setInviteSubmitting] = useState(false)
+  const [invitations, setInvitations] = useState<(FranchiseInvitation & { parentOrgId: string; parentOrgName: string })[]>([])
+  const [invitationsLoading, setInvitationsLoading] = useState(false)
+  const [revokingInvitation, setRevokingInvitation] = useState<FranchiseInvitation | null>(null)
 
   // 营业时间本地状态（脱离表单管理，方便动态增删时间段）
   const initDayStates = (): Record<string, DayState> =>
@@ -299,9 +319,10 @@ const OrganizationManagement: React.FC = () => {
       }
 
       console.log('🔍 [ORG MANAGEMENT] Loading organizations with params:', params)
-      const orgList = await getOrganizations(params, 'beverage')
+      const orgList = await getOrganizations(params)
       console.log('🔍 [ORG MANAGEMENT] Loaded organizations:', orgList)
       setOrganizations(orgList)
+      loadInvitations(orgList)
 
       // 同步到 AuthProvider
       updateAuthOrganizations(orgList)
@@ -322,6 +343,81 @@ const OrganizationManagement: React.FC = () => {
     }
   }
 
+  // 加载所有 MAIN 组织名下的加盟邀请
+  const loadInvitations = async (orgList: Organization[]) => {
+    const mainOrgs = orgList.filter(org => org.orgType === 'MAIN')
+    if (mainOrgs.length === 0) {
+      setInvitations([])
+      return
+    }
+    setInvitationsLoading(true)
+    try {
+      const results = await Promise.all(
+        mainOrgs.map(async main => {
+          const list = await listFranchiseInvitations(main.id)
+          return list.map(inv => ({ ...inv, parentOrgId: main.id, parentOrgName: main.orgName }))
+        })
+      )
+      setInvitations(results.flat())
+    } catch (error) {
+      console.error('Failed to load franchise invitations:', error)
+    } finally {
+      setInvitationsLoading(false)
+    }
+  }
+
+  // 打开邀请加盟商弹窗
+  const handleOpenInviteModal = () => {
+    const mainOrgs = organizations.filter(org => org.orgType === 'MAIN')
+    setInviteParentOrgId(mainOrgs[0]?.id || '')
+    setInviteEmail('')
+    setInviteOrgName('')
+    setInviteErrors({})
+    setInviteModalVisible(true)
+  }
+
+  // 提交加盟邀请
+  const handleInviteSubmit = async () => {
+    const next: { parentOrgId?: string; email?: string } = {}
+    if (!inviteParentOrgId) next.parentOrgId = t('organization.inviteFranchise.parentOrgRequired')
+    if (!inviteEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim())) {
+      next.email = t('organization.inviteFranchise.emailInvalid')
+    }
+    setInviteErrors(next)
+    if (Object.keys(next).length > 0) return
+
+    setInviteSubmitting(true)
+    try {
+      await createFranchiseInvitation(inviteParentOrgId, {
+        email: inviteEmail.trim(),
+        proposedOrgName: inviteOrgName.trim() || undefined,
+      })
+      toast.success(t('organization.inviteFranchise.sendSuccess'))
+      setInviteModalVisible(false)
+      loadInvitations(organizations)
+    } catch (error) {
+      console.error('Failed to create franchise invitation:', error)
+      toast.error(t('organization.inviteFranchise.sendFailed'))
+    } finally {
+      setInviteSubmitting(false)
+    }
+  }
+
+  // 撤销/删除加盟邀请（确认后执行）：PENDING 走撤销，其余状态走删除
+  const handleRevokeConfirm = async () => {
+    if (!revokingInvitation) return
+    const isPending = revokingInvitation.status === 'PENDING'
+    try {
+      await revokeFranchiseInvitation(revokingInvitation.id)
+      toast.success(t(isPending ? 'organization.inviteFranchise.revokeSuccess' : 'organization.inviteFranchise.deleteSuccess'))
+      setRevokingInvitation(null)
+      loadInvitations(organizations)
+    } catch (error) {
+      console.error('Failed to revoke/delete franchise invitation:', error)
+      toast.error(t(isPending ? 'organization.inviteFranchise.revokeFailed' : 'organization.inviteFranchise.deleteFailed'))
+    }
+  }
+
   // 创建组织
   const handleCreate = () => {
     setEditingOrg(null)
@@ -335,6 +431,22 @@ const OrganizationManagement: React.FC = () => {
   }
 
   // 编辑组织
+  const handleDissociate = async () => {
+    if (!dissociatingOrg) return
+    setDissociating(true)
+    try {
+      await dissociateFranchise(dissociatingOrg.id)
+      toast.success(t('organization.dissociateSuccess'))
+      setDissociatingOrg(null)
+      setViewingOwnerOrg(null)
+      await loadOrganizations()
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || error.message || t('organization.dissociateFailed'))
+    } finally {
+      setDissociating(false)
+    }
+  }
+
   const handleEdit = (org: Organization) => {
     setEditingOrg(org)
     setErrors({})
@@ -377,13 +489,13 @@ const OrganizationManagement: React.FC = () => {
   const handleDeleteConfirm = async () => {
     if (!deletingOrg) return
     try {
-      // TODO: 实现删除组织API
+      await deleteOrganization(deletingOrg.id)
       toast.success(t('organization.deleteSuccess'))
       setDeletingOrg(null)
       loadOrganizations()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete organization:', error)
-      toast.error(t('organization.deleteFailed'))
+      toast.error(error?.response?.data?.detail || t('organization.deleteFailed'))
     }
   }
 
@@ -538,8 +650,14 @@ const OrganizationManagement: React.FC = () => {
   }
 
   // 获取可选的父组织列表（用于BRANCH和FRANCHISE类型）
+  // 加盟店 owner 自己的组织列表里没有主店（主店不属于他），所以编辑自己的 FRANCHISE 时，
+  // 要把当前记录本来就带着的 parentOrgId/parentOrgName 补进选项里，否则下拉框显示不出已选中的主店
   const getAvailableParentOrgs = () => {
-    return organizations.filter(org => org.orgType === 'MAIN')
+    const mainOrgs = organizations.filter(org => org.orgType === 'MAIN')
+    if (editingOrg?.parentOrgId && !mainOrgs.some(org => org.id === editingOrg.parentOrgId)) {
+      return [...mainOrgs, { id: editingOrg.parentOrgId, orgName: (editingOrg as any).parentOrgName || editingOrg.parentOrgId } as Organization]
+    }
+    return mainOrgs
   }
 
   // 从 Mapbox context 中提取字段值
@@ -687,13 +805,21 @@ const OrganizationManagement: React.FC = () => {
       key: 'description',
       title: t('organization.description'),
       width: 200,
-      render: (record) => <span className="truncate block max-w-[200px]" title={record.description}>{record.description || '-'}</span>
+      render: (record) => (
+        <Tooltip label={record.description}>
+          <span className="truncate block max-w-[200px]">{record.description || '-'}</span>
+        </Tooltip>
+      )
     },
     {
       key: 'location',
       title: t('organization.location'),
       width: 200,
-      render: (record) => <span className="truncate block max-w-[200px]" title={record.location}>{record.location || '-'}</span>
+      render: (record) => (
+        <Tooltip label={record.location}>
+          <span className="truncate block max-w-[200px]">{record.location || '-'}</span>
+        </Tooltip>
+      )
     },
     {
       key: 'phone',
@@ -705,7 +831,11 @@ const OrganizationManagement: React.FC = () => {
       key: 'email',
       title: t('organization.email'),
       width: 180,
-      render: (record) => <span className="truncate block max-w-[180px]" title={record.email}>{record.email || '-'}</span>
+      render: (record) => (
+        <Tooltip label={record.email}>
+          <span className="truncate block max-w-[180px]">{record.email || '-'}</span>
+        </Tooltip>
+      )
     },
     {
       key: 'status',
@@ -737,28 +867,103 @@ const OrganizationManagement: React.FC = () => {
       title: t('organization.actions'),
       width: 160,
       render: (record) => (
-        <div className="flex items-center gap-1">
-          <Btn
-            variant="link"
-            size="sm"
-            icon={<Pencil className="w-3.5 h-3.5" />}
-            onClick={() => handleEdit(record)}
-          >
-            {t('organization.edit')}
-          </Btn>
-          <Btn
-            variant="link"
-            size="sm"
-            icon={<Trash2 className="w-3.5 h-3.5" />}
-            onClick={() => setDeletingOrg(record)}
-            disabled={record.orgType === 'MAIN'} // 主店不能删除
-            className="text-red-500! hover:text-red-600!"
-          >
-            {t('organization.delete')}
-          </Btn>
+        <div className="flex items-center gap-0.5">
+          {record.owner && (
+            <Tooltip label={t('organization.viewOwnerInfo')}>
+              <button
+                type="button"
+                onClick={() => setViewingOwnerOrg(record)}
+                className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <User className="w-4 h-4" />
+              </button>
+            </Tooltip>
+          )}
+          <Tooltip label={t('organization.edit')}>
+            <button
+              type="button"
+              onClick={() => handleEdit(record)}
+              // canManage===false 表示这只是主店看到的旗下加盟店（由其 owner 自主管理，本账户不可编辑）；
+              // 加盟店 owner 本人查看自己的组织时 canManage 为 true，正常可编辑
+              disabled={record.canManage === false}
+              className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip label={t('organization.delete')}>
+            <button
+              type="button"
+              onClick={() => setDeletingOrg(record)}
+              disabled={record.canManage === false} // 旗下加盟店由其 owner 自主管理，本账户不能代为删除
+              className="p-1.5 rounded-md text-red-500 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       )
     }
+  ]
+
+  const invitationStatusVariant: Record<string, 'green' | 'gold' | 'red' | 'default'> = {
+    PENDING: 'gold',
+    ACCEPTED: 'green',
+    REVOKED: 'default',
+    EXPIRED: 'red',
+  }
+
+  const invitationColumns: Column<FranchiseInvitation & { parentOrgId: string; parentOrgName: string }>[] = [
+    {
+      key: 'parentOrgName',
+      title: t('organization.inviteFranchise.colBrand'),
+      width: 160,
+      render: (record) => record.parentOrgName,
+    },
+    {
+      key: 'email',
+      title: t('organization.inviteFranchise.colEmail'),
+      width: 220,
+      render: (record) => record.email,
+    },
+    {
+      key: 'proposedOrgName',
+      title: t('organization.inviteFranchise.colProposedName'),
+      width: 180,
+      render: (record) => record.proposedOrgName || '-',
+    },
+    {
+      key: 'status',
+      title: t('organization.inviteFranchise.colStatus'),
+      width: 120,
+      render: (record) => (
+        <Badge variant={invitationStatusVariant[record.status] || 'default'}>
+          {t(`organization.inviteFranchise.status${record.status}`)}
+        </Badge>
+      ),
+    },
+    {
+      key: 'expiresAt',
+      title: t('organization.inviteFranchise.colExpiresAt'),
+      width: 180,
+      render: (record) => new Date(record.expiresAt).toLocaleString(),
+    },
+    {
+      key: 'actions',
+      title: t('organization.actions'),
+      width: 120,
+      render: (record) => (
+        <Tooltip label={record.status === 'PENDING' ? t('organization.inviteFranchise.revoke') : t('organization.inviteFranchise.delete')}>
+          <button
+            type="button"
+            onClick={() => setRevokingInvitation(record)}
+            className="p-1.5 rounded-md text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+          >
+            {record.status === 'PENDING' ? <Ban className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+          </button>
+        </Tooltip>
+      ),
+    },
   ]
 
   if (!isAuthenticated) {
@@ -848,6 +1053,14 @@ const OrganizationManagement: React.FC = () => {
               {t('organization.refresh')}
             </Btn>
             <Btn
+              variant="secondary"
+              icon={<Mail className="w-4 h-4" />}
+              onClick={handleOpenInviteModal}
+              disabled={organizations.filter(o => o.orgType === 'MAIN').length === 0}
+            >
+              {t('organization.inviteFranchise.button')}
+            </Btn>
+            <Btn
               variant="primary"
               icon={<Plus className="w-4 h-4" />}
               onClick={handleCreate}
@@ -922,6 +1135,21 @@ const OrganizationManagement: React.FC = () => {
         )}
       </SectionCard>
 
+      {/* 待处理的加盟邀请（已接受的邀请不再展示，去主组织列表里看真实的加盟店即可） */}
+      {invitations.filter(inv => inv.status !== 'ACCEPTED').length > 0 && (
+        <div className="mt-6">
+          <SectionCard>
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">{t('organization.inviteFranchise.pendingTitle')}</h2>
+            <Table
+              columns={invitationColumns}
+              data={invitations.filter(inv => inv.status !== 'ACCEPTED')}
+              rowKey={(row) => row.id}
+              loading={invitationsLoading}
+            />
+          </SectionCard>
+        </div>
+      )}
+
       {/* 创建/编辑组织模态框 */}
       <Modal
         title={editingOrg ? t('organization.edit') : t('organization.create')}
@@ -945,7 +1173,12 @@ const OrganizationManagement: React.FC = () => {
           {/* 基本信息 */}
           {activeTab === 'basic' && (
             <div className="space-y-4">
-              <Field label={t('organization.orgName')} required error={errors.orgName}>
+              <Field
+                label={t('organization.orgName')}
+                required
+                error={errors.orgName}
+                hint={isMainOrg ? t('organization.orgNameMainHint') : undefined}
+              >
                 <TextInput
                   value={form.orgName}
                   onChange={v => setField('orgName', v)}
@@ -964,10 +1197,12 @@ const OrganizationManagement: React.FC = () => {
                     disabled={!!editingOrg}
                     placeholder={t('organization.orgTypeRequired')}
                     className="w-full"
+                    // FRANCHISE 不支持在这个表单里直接创建，需通过「邀请加盟商」由受邀人自主 onboarding；
+                    // 但编辑加盟店 owner 自己的组织时（disabled=true，仅展示）要能显示出 FRANCHISE 这个值
                     options={[
                       { label: t('organization.typeMain'), value: 'MAIN' },
                       { label: t('organization.typeBranch'), value: 'BRANCH' },
-                      { label: t('organization.typeFranchise'), value: 'FRANCHISE' },
+                      ...(form.orgType === 'FRANCHISE' ? [{ label: t('organization.typeFranchise'), value: 'FRANCHISE' }] : []),
                     ]}
                   />
                 </Field>
@@ -1143,10 +1378,11 @@ const OrganizationManagement: React.FC = () => {
                 }
                 hint={t('organization.timezoneTooltip')}
               >
-                <SelectInput
+                <SearchSelect
                   value={form.timezone || ''}
                   onChange={(v) => setField('timezone', v || undefined)}
                   placeholder={t('organization.timezonePlaceholder')}
+                  searchPlaceholder={t('organization.timezoneSearchPlaceholder')}
                   className="w-full"
                   options={[
                     { label: t('organization.timezonePlaceholder'), value: '' },
@@ -1184,6 +1420,52 @@ const OrganizationManagement: React.FC = () => {
         </div>
       </Modal>
 
+      {/* 加盟店 owner 账号信息（只读，主店无法编辑，仅供联系/核实身份） */}
+      <Modal
+        open={!!viewingOwnerOrg}
+        onOpenChange={(v) => !v && setViewingOwnerOrg(null)}
+        title={t('organization.ownerInfoTitle', { orgName: viewingOwnerOrg?.orgName })}
+        footer={
+          <>
+            <Btn
+              variant="danger"
+              onClick={() => setDissociatingOrg(viewingOwnerOrg)}
+            >
+              {t('organization.dissociateBtn')}
+            </Btn>
+            <Btn variant="secondary" onClick={() => setViewingOwnerOrg(null)}>{t('organization.cancel')}</Btn>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-sm text-slate-700">
+            <User className="w-4 h-4 text-slate-400" />
+            <span>{viewingOwnerOrg?.owner?.name || '-'}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-700">
+            <Mail className="w-4 h-4 text-slate-400" />
+            <span>{viewingOwnerOrg?.owner?.email || '-'}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-700">
+            <Phone className="w-4 h-4 text-slate-400" />
+            <span>{viewingOwnerOrg?.owner?.phone || '-'}</span>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 解除加盟关联二次确认 */}
+      <ConfirmDialog
+        open={!!dissociatingOrg}
+        onOpenChange={(v) => { if (!v) setDissociatingOrg(null) }}
+        title={t('organization.dissociateBtn')}
+        description={t('organization.dissociateConfirm', { orgName: dissociatingOrg?.orgName })}
+        confirmText={t('organization.dissociateBtn')}
+        cancelText={t('organization.cancel')}
+        danger
+        loading={dissociating}
+        onConfirm={handleDissociate}
+      />
+
       {/* 删除组织确认 */}
       <ConfirmDialog
         open={!!deletingOrg}
@@ -1204,6 +1486,66 @@ const OrganizationManagement: React.FC = () => {
         description="Are you sure you want to remove the logo?"
         danger
         onConfirm={handleLogoDeleteConfirm}
+      />
+
+      {/* 邀请加盟商弹窗 */}
+      <Modal
+        title={t('organization.inviteFranchise.modalTitle')}
+        open={inviteModalVisible}
+        onOpenChange={setInviteModalVisible}
+        footer={
+          <>
+            <Btn variant="secondary" onClick={() => setInviteModalVisible(false)}>
+              {t('organization.cancel')}
+            </Btn>
+            <Btn variant="primary" loading={inviteSubmitting} onClick={handleInviteSubmit}>
+              {t('organization.inviteFranchise.send')}
+            </Btn>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <AlertBox type="info" title={t('organization.inviteFranchise.modalTitle')} description={t('organization.inviteFranchise.modalHint')} />
+          <Field label={t('organization.inviteFranchise.parentOrg')} required error={inviteErrors.parentOrgId}>
+            <SelectInput
+              value={inviteParentOrgId}
+              onChange={setInviteParentOrgId}
+              className="w-full"
+              options={organizations
+                .filter(o => o.orgType === 'MAIN')
+                .map(o => ({ label: o.orgName, value: o.id }))}
+            />
+          </Field>
+          <Field label={t('organization.inviteFranchise.email')} required error={inviteErrors.email}>
+            <TextInput
+              value={inviteEmail}
+              onChange={setInviteEmail}
+              placeholder={t('organization.inviteFranchise.emailPlaceholder')}
+            />
+          </Field>
+          <Field label={t('organization.inviteFranchise.proposedOrgName')} hint={t('organization.inviteFranchise.proposedOrgNameHint')}>
+            <TextInput
+              value={inviteOrgName}
+              onChange={setInviteOrgName}
+              placeholder={t('organization.inviteFranchise.proposedOrgNamePlaceholder')}
+            />
+          </Field>
+        </div>
+      </Modal>
+
+      {/* 撤销/删除加盟邀请确认 */}
+      <ConfirmDialog
+        open={!!revokingInvitation}
+        onOpenChange={(v) => { if (!v) setRevokingInvitation(null) }}
+        title={t(revokingInvitation?.status === 'PENDING' ? 'organization.inviteFranchise.revoke' : 'organization.inviteFranchise.delete')}
+        description={t(
+          revokingInvitation?.status === 'PENDING' ? 'organization.inviteFranchise.revokeConfirm' : 'organization.inviteFranchise.deleteConfirm',
+          { email: revokingInvitation?.email }
+        )}
+        confirmText={t(revokingInvitation?.status === 'PENDING' ? 'organization.inviteFranchise.revoke' : 'organization.inviteFranchise.delete')}
+        cancelText={t('organization.cancel')}
+        danger
+        onConfirm={handleRevokeConfirm}
       />
     </div>
   )

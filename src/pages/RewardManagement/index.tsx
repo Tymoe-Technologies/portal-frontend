@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, RotateCw, Gift, ArrowUp } from 'lucide-react'
+import { Plus, Pencil, Trash2, RotateCw, Gift, ArrowUp, Ban } from 'lucide-react'
 import {
   memberRewardService,
   type RedeemItem,
@@ -7,8 +7,10 @@ import {
   type StackingMode,
 } from '@/services/memberReward'
 import { isRateLimited } from '@/services/http'
-import { SectionCard, Btn, Table, type Column, Tabs, ConfirmDialog, toast } from '@/components/ui-kit'
+import { SectionCard, Btn, IconButton, Table, type Column, Tabs, ConfirmDialog, toast } from '@/components/ui-kit'
 import RewardEditorModal from './RewardEditorModal'
+import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 
 // 徽章配色（严禁紫色：DISCOUNT_PERCENTAGE / 可发放 原为紫/洋红，改 slate）
 const REWARD_TYPE_LABELS: Record<RewardType, string> = {
@@ -34,6 +36,8 @@ const STATUS_BADGE: Record<string, string> = {
 const badge = (text: string, cls: string) => <span className={`inline-flex items-center text-xs px-1.5 py-0.5 rounded ring-1 ${cls}`}>{text}</span>
 
 const RewardManagement: React.FC = () => {
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('loyaltyRewards', role, permissions)
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<RedeemItem[]>([])
   const [modalOpen, setModalOpen] = useState(false)
@@ -149,17 +153,17 @@ const RewardManagement: React.FC = () => {
     { key: 'status', title: '状态', render: (r) => badge(STATUS_LABELS[r.status], STATUS_BADGE[r.status] || 'bg-slate-100 text-slate-600 ring-slate-200') },
     {
       key: 'actions', title: '操作',
-      render: (r) => (
-        <div className="flex items-center gap-1.5">
-          <Btn size="sm" variant="secondary" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openEdit(r)}>编辑</Btn>
+      render: (r) => !canEdit ? null : (
+        <div className="flex items-center gap-0.5">
+          <IconButton icon={<Pencil className="w-4 h-4" />} label="编辑" onClick={() => openEdit(r)} />
           {r.status !== 'INACTIVE' ? (
-            <Btn size="sm" variant="danger" icon={<Trash2 className="w-3.5 h-3.5" />}
-              onClick={() => setConfirm({ title: '确认停用此奖励？', confirmText: '停用', onConfirm: () => { setConfirm(null); handleDelete(r.id) } })}>停用</Btn>
+            <IconButton icon={<Ban className="w-4 h-4" />} label="停用" variant="danger"
+              onClick={() => setConfirm({ title: '确认停用此奖励？', confirmText: '停用', onConfirm: () => { setConfirm(null); handleDelete(r.id) } })} />
           ) : (
             <>
-              <Btn size="sm" variant="secondary" icon={<ArrowUp className="w-3.5 h-3.5" />} onClick={() => handleReactivate(r.id)}>上架</Btn>
-              <Btn size="sm" variant="danger" icon={<Trash2 className="w-3.5 h-3.5" />}
-                onClick={() => setConfirm({ title: '确认彻底删除此奖励？删除后不可恢复', description: '仅从未发放过的奖励可删除', confirmText: '删除', onConfirm: () => { setConfirm(null); handleHardDelete(r.id) } })}>删除</Btn>
+              <IconButton icon={<ArrowUp className="w-4 h-4" />} label="上架" onClick={() => handleReactivate(r.id)} />
+              <IconButton icon={<Trash2 className="w-4 h-4" />} label="删除" variant="danger"
+                onClick={() => setConfirm({ title: '确认彻底删除此奖励？删除后不可恢复', description: '仅从未发放过的奖励可删除', confirmText: '删除', onConfirm: () => { setConfirm(null); handleHardDelete(r.id) } })} />
             </>
           )}
         </div>
@@ -178,7 +182,7 @@ const RewardManagement: React.FC = () => {
         action={
           <div className="flex gap-2">
             <Btn variant="secondary" icon={<RotateCw className="w-3.5 h-3.5" />} onClick={() => fetchItems()}>刷新</Btn>
-            <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>新建奖励</Btn>
+            {canEdit && <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreate}>新建奖励</Btn>}
           </div>
         }
       >

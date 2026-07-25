@@ -17,9 +17,13 @@ import {
   type ModifierGroup,
   type ModifierOption
 } from '../../services/item-management'
+import { useAuthContext } from '../../auth/AuthProvider'
+import { canEditModule } from '../../auth/permissions'
 
 const ModifierPrintCodeManagement: React.FC = () => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('menuCatalog', role, permissions)
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -177,6 +181,7 @@ const ModifierPrintCodeManagement: React.FC = () => {
               value={editValue}
               placeholder={t('pages.recipeGuide.modifierPrintCode.printCodePlaceholder') as string}
               maxLength={20}
+              disabled={!canEdit}
               onChange={(v) => setEditingValues(prev => ({ ...prev, [record.id]: v }))}
               className={isDirty ? 'border-amber-400' : ''}
             />
@@ -196,6 +201,7 @@ const ModifierPrintCodeManagement: React.FC = () => {
               value={editValue}
               placeholder={t('pages.recipeGuide.modifierPrintCode.usagePlaceholder') as string}
               maxLength={50}
+              disabled={!canEdit}
               onChange={(v) => setEditingUsageValues(prev => ({ ...prev, [record.id]: v }))}
               className={isDirty ? 'border-amber-400' : ''}
             />
@@ -255,11 +261,13 @@ const ModifierPrintCodeManagement: React.FC = () => {
       action={
         <div className="flex items-center gap-2">
           <Btn variant="secondary" icon={<RefreshCw size={16} />} onClick={loadModifierGroups} loading={loading}>{t('pages.recipeGuide.modifierPrintCode.refresh') as string}</Btn>
-          <Btn variant="primary" icon={<Save size={16} />} loading={saving} disabled={changedCount === 0} onClick={handleSaveAll}>
-            {changedCount > 0
-              ? (t('pages.recipeGuide.modifierPrintCode.saveWithCount', { count: changedCount }) as string)
-              : (t('pages.recipeGuide.modifierPrintCode.save') as string)}
-          </Btn>
+          {canEdit && (
+            <Btn variant="primary" icon={<Save size={16} />} loading={saving} disabled={changedCount === 0} onClick={handleSaveAll}>
+              {changedCount > 0
+                ? (t('pages.recipeGuide.modifierPrintCode.saveWithCount', { count: changedCount }) as string)
+                : (t('pages.recipeGuide.modifierPrintCode.save') as string)}
+            </Btn>
+          )}
         </div>
       }
     >

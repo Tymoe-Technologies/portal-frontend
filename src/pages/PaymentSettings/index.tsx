@@ -36,7 +36,7 @@ import {
   upsertTenantPaymentConfig,
 } from '@/services/tenant-payment-config'
 import {
-  SectionCard, Tabs, Switch, Btn, SelectInput, TextInput, AlertBox, Spinner,
+  SectionCard, Tabs, Switch, Btn, SearchSelect, TextInput, AlertBox, Spinner,
   EmptyState, StatCard, Modal, ConfirmDialog, FormRow, toast,
 } from '@/components/ui-kit'
 
@@ -53,9 +53,6 @@ const isQRMethod = (paymentMethod: string) => ['wechat', 'alipay'].includes(paym
 const isSystemMethod = (paymentMethod: string) => paymentMethod === 'cash' || isQRMethod(paymentMethod)
 // 判断是否为自定义方式
 const isCustomMethod = (paymentMethod: string) => !isCardMethod(paymentMethod) && !isSystemMethod(paymentMethod)
-
-// 找零方式可选值（文案走 i18n，见组件内 useRoundingMethodOptions）
-const ROUNDING_METHOD_VALUES = ['ROUND', 'ROUND_UP', 'ROUND_DOWN'] as const
 
 // 设备类型标签配色（严禁紫色，MOBILE 归入 slate）
 const DEVICE_TYPE_CLASS: Record<string, string> = {
@@ -87,6 +84,10 @@ const PaymentSettings: React.FC = () => {
   // 组织类型：直营分店（BRANCH）绑定主店收款账户，主店/加盟店走 Stripe onboarding
   const currentOrg = organizations.find(o => o.id === tenantId)
   const isBranch = currentOrg?.orgType === 'BRANCH'
+  // 货币配置统一跟随主店：分店/加盟店不能单独设置，只能在主店修改
+  // 优先用 orgType 判断（更可靠，与 isBranch 同一数据源）；orgType 缺失时才退回 parentOrgId 判断，
+  // 避免 currentOrg 未匹配到（如 organizations 列表尚未加载完成）时误判成主店而不显示提示
+  const isMainStore = currentOrg?.orgType ? currentOrg.orgType === 'MAIN' : !currentOrg?.parentOrgId
 
   const [activeTab, setActiveTab] = useState('devices')
   const [loading, setLoading] = useState(false)
@@ -108,8 +109,8 @@ const PaymentSettings: React.FC = () => {
 
   // 租户级全局货币配置状态
   const [tenantConfigLoading, setTenantConfigLoading] = useState(false)
-  const [tenantCfg, setTenantCfg] = useState<{ currency: string; roundingUnit: string; roundingMethod: string }>({
-    currency: '', roundingUnit: '', roundingMethod: 'ROUND',
+  const [tenantCfg, setTenantCfg] = useState<{ currency: string; roundingUnit: string }>({
+    currency: '', roundingUnit: '',
   })
   const [tenantCfgError, setTenantCfgError] = useState('')
 
@@ -163,10 +164,9 @@ const PaymentSettings: React.FC = () => {
         setTenantCfg({
           currency: config.currency || '',
           roundingUnit: config.roundingUnit || '',
-          roundingMethod: config.roundingMethod || 'ROUND',
         })
       } else {
-        setTenantCfg({ currency: '', roundingUnit: '', roundingMethod: 'ROUND' })
+        setTenantCfg({ currency: '', roundingUnit: '' })
       }
     } catch (error: any) {
       console.error('加载租户货币配置失败:', error.message)
@@ -193,8 +193,7 @@ const PaymentSettings: React.FC = () => {
       setTenantConfigLoading(true)
       await upsertTenantPaymentConfig(tenantId, {
         currency: tenantCfg.currency,
-        roundingUnit: tenantCfg.roundingUnit,
-        roundingMethod: tenantCfg.roundingMethod || 'ROUND',
+        roundingUnit: tenantCfg.roundingUnit ? Number(tenantCfg.roundingUnit) : undefined,
       })
       toast.success(t('pages.paymentSettings.toastTenantConfigSaved'))
     } catch (error: any) {
@@ -585,30 +584,25 @@ const PaymentSettings: React.FC = () => {
                   ) : (
                     <div className="flex flex-wrap items-end gap-4">
                       <div>
-                        <div className="text-sm text-slate-600 mb-1.5">{t('pages.paymentSettings.currencyLabel')} <span className="text-red-500">*</span></div>
-                        <div className="w-52">
-                          <SelectInput className="w-full" placeholder={t('pages.paymentSettings.currencyPlaceholder')}
-                            value={tenantCfg.currency} onChange={(v) => handleCurrencyChange(String(v))} options={currencyOptions}
-                            disabled={currenciesLoading} />
+                        <div className="text-sm text-slate-600 mb-1.5">
+                          {t('pages.paymentSettings.currencyLabel')} {isMainStore && <span className="text-red-500">*</span>}
                         </div>
+                        {isMainStore ? (
+                          <div className="w-80">
+                            <SearchSelect className="w-full" placeholder={t('pages.paymentSettings.currencyPlaceholder')}
+                              searchPlaceholder={t('pages.paymentSettings.currencySearchPlaceholder')}
+                              value={tenantCfg.currency} onChange={(v) => handleCurrencyChange(String(v))} options={currencyOptions}
+                              disabled={currenciesLoading} />
+                          </div>
+                        ) : (
+                          <div className="w-80 text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-600">
+                            {currencyOptions.find(o => o.value === tenantCfg.currency)?.label || tenantCfg.currency || '-'}
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <div className="text-sm text-slate-600 mb-1.5">{t('pages.paymentSettings.minCoinDenomination')}</div>
-                        <input type="number" step={0.01} disabled placeholder={t('pages.paymentSettings.autoFillPlaceholder')} value={tenantCfg.roundingUnit}
-                          className="w-36 text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-400" />
-                      </div>
-                      <div>
-                        <div className="text-sm text-slate-600 mb-1.5">{t('pages.paymentSettings.roundingMethodLabel')}</div>
-                        <div className="w-52">
-                          <SelectInput className="w-full" value={tenantCfg.roundingMethod}
-                            onChange={(v) => setTenantCfg(prev => ({ ...prev, roundingMethod: String(v) }))}
-                            options={ROUNDING_METHOD_VALUES.map(m => ({
-                              label: t(`pages.paymentSettings.rounding${m === 'ROUND' ? 'Round' : m === 'ROUND_UP' ? 'Up' : 'Down'}`),
-                              value: m,
-                            }))} />
-                        </div>
-                      </div>
-                      <Btn variant="primary" onClick={handleSaveTenantConfig} loading={tenantConfigLoading}>{t('common.save')}</Btn>
+                      {isMainStore && (
+                        <Btn variant="primary" onClick={handleSaveTenantConfig} loading={tenantConfigLoading}>{t('common.save')}</Btn>
+                      )}
                     </div>
                   )}
                   {tenantCfgError && <p className="text-sm text-red-500 mt-2">{tenantCfgError}</p>}

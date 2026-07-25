@@ -7,13 +7,14 @@ import * as Tooltip from '@radix-ui/react-tooltip'
 import * as Select from '@radix-ui/react-select'
 import { useTranslation } from 'react-i18next'
 import { useAuthContext } from '../auth/AuthProvider'
+import { isPathAllowed } from '../auth/permissions'
 import clsx from 'clsx'
 import {
   LayoutDashboard, Package, ListOrdered, ShoppingCart, Store, Users,
   Wallet, ChevronDown, ChevronRight, LogOut, User, Settings,
   Globe, CreditCard, Car, Printer, Calendar, Gift, FileText,
   Smartphone, Trash2, Sparkles, PanelLeftClose, PanelLeftOpen,
-  Check, ChevronsUpDown, BarChart2,
+  Check, ChevronsUpDown, BarChart2, ShieldCheck,
 } from 'lucide-react'
 import { ToastHost, toast } from '../components/ui-kit'
 
@@ -199,7 +200,7 @@ const BaseLayout: React.FC = () => {
   const { t, i18n } = useTranslation()
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { user, logout, organizations } = useAuthContext()
+  const { user, logout, organizations, role, permissions } = useAuthContext()
   const currentOrgId = localStorage.getItem('organization_id') || ''
   const currentOrg = organizations.find(o => o.id === currentOrgId)
   const isMainStore = currentOrg?.orgType === 'MAIN'
@@ -264,7 +265,7 @@ const BaseLayout: React.FC = () => {
     '/settings/integrations/uber': 'group-order',
     '/payment-settings': 'group-store', '/gift-card-settings': 'group-store',
     '/print-settings': 'group-store', '/booking': 'group-store',
-    '/organizations': 'group-org', '/accounts': 'group-org',
+    '/organizations': 'group-org', '/accounts': 'group-org', '/permission-sets': 'group-org',
     '/devices': 'group-org', '/member-management': 'group-org',
     '/subscription': 'group-system',
   }
@@ -280,6 +281,9 @@ const BaseLayout: React.FC = () => {
     i18n.changeLanguage(value)
     localStorage.setItem('app.lng', value)
   }
+
+  // 门店上下文条：除门店管理页、个人资料页外，其余页面都常驻提示当前设置作用于哪个门店
+  const showOrgContext = !!currentOrg && !['/organizations', '/profile'].includes(activeKey)
 
   // 导航结构
   const navItems: NavItem[] = [
@@ -335,6 +339,7 @@ const BaseLayout: React.FC = () => {
       children: [
         { key: '/organizations', to: '/organizations', label: t('nav.organizations'), icon: <Store className="w-[18px] h-[18px]" /> },
         { key: '/accounts', to: '/accounts', label: t('nav.accounts'), icon: <User className="w-[18px] h-[18px]" /> },
+        { key: '/permission-sets', to: '/permission-sets', label: t('nav.permissionSets'), icon: <ShieldCheck className="w-[18px] h-[18px]" /> },
         { key: '/devices', to: '/devices', label: t('nav.devices'), icon: <Smartphone className="w-[18px] h-[18px]" /> },
         { key: '/member-management', to: '/member-management', label: t('nav.memberManagement'), icon: <Gift className="w-[18px] h-[18px]" /> },
       ],
@@ -348,6 +353,12 @@ const BaseLayout: React.FC = () => {
       ],
     },
   ]
+
+  // 按角色过滤导航（OWNER/MANAGER 看不到 USER 专属页面；见 auth/permissions.ts）
+  const visibleNavItems: NavItem[] = navItems
+    .filter(item => !item.to || isPathAllowed(item.to, role, permissions))
+    .map(item => item.children ? { ...item, children: item.children.filter(c => !c.to || isPathAllowed(c.to, role, permissions)) } : item)
+    .filter(item => !item.children || item.children.length > 0)
 
   const sidebarW = collapsed ? 76 : 256
 
@@ -377,7 +388,7 @@ const BaseLayout: React.FC = () => {
 
           {/* 导航 */}
           <nav className="sidebar-scroll flex-1 overflow-y-auto px-3 py-4 space-y-1">
-            {navItems.map(item => {
+            {visibleNavItems.map(item => {
               if (item.to) {
                 // 顶级叶子（仪表盘）
                 return (
@@ -444,13 +455,15 @@ const BaseLayout: React.FC = () => {
           <header className="sticky top-0 z-20 flex items-center justify-between h-16 bg-white border-b border-slate-200 px-6">
             <div />
             <div className="flex items-center gap-3">
-              {/* 组织选择 */}
-              {organizations.length > 0 && (
+              {/* 组织选择：只列出自己能实际操作的组织——旗下加盟店只是「看得到」，不代表能切进去当自己的
+                  经营上下文使用（加盟店自主管理，其他微服务的权限校验也不会认主账户是这家店的所有者），
+                  混进切换器里选了也会因为不是真正的操作者而处处报错，所以这里过滤掉 canManage===false 的 */}
+              {organizations.filter(org => org.canManage !== false).length > 0 && (
                 <HeaderSelect
                   ariaLabel="选择店铺"
                   value={selectedOrgId}
                   onChange={handleOrganizationChange}
-                  options={organizations.map(org => ({ value: org.id, label: org.orgName }))}
+                  options={organizations.filter(org => org.canManage !== false).map(org => ({ value: org.id, label: org.orgName }))}
                   className="max-w-[200px]"
                 />
               )}
@@ -511,6 +524,20 @@ const BaseLayout: React.FC = () => {
               </DropdownMenu.Root>
             </div>
           </header>
+
+          {/* 门店上下文条：常驻在 header 下方，滚动时也可见，提醒当前设置作用于哪个门店（切换请用顶栏切换器） */}
+          {showOrgContext && currentOrg && (
+            <div className="sticky top-16 z-10 flex items-center gap-1.5 px-6 py-2 bg-slate-50 border-b border-slate-200 text-sm text-slate-600">
+              <Store className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="shrink-0">{t('layout.orgContextPrefix')}</span>
+              <span className="font-semibold text-slate-900 truncate">{currentOrg.orgName}</span>
+              {isMainStore && (
+                <span className="shrink-0 ml-1 px-1.5 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-600">
+                  {t('layout.mainStoreTag')}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* 内容区 */}
           <main className="flex-1 p-6">

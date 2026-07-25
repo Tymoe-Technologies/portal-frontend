@@ -130,7 +130,6 @@ const OnlineOrderConfigPage: React.FC = () => {
           await updateOrganization(
             currentOrganization.id,
             { subdomain } as any,
-            (currentOrganization.productType ?? 'beauty') as any,
           )
           flash(t('onlineOrder.subdomainSaved'), 'success')
         } catch (err: any) {

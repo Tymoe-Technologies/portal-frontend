@@ -5,15 +5,12 @@ const API_BASE = (import.meta.env.VITE_ITEM_MANAGE_BASE as string | undefined) ?
 
 // ==================== 类型定义 ====================
 
-/** 品牌目录商品在该门店的配置（overlay） */
+/** 品牌目录商品在该门店的配置（overlay）——门店只能改本店价格 + 是否售卖，名称/描述/图片一律取品牌目录 */
 export interface StoreMenuConfig {
   id: string
   storeId: string
   catalogItemId: string | null
   priceOverride?: number         // 门店价格覆盖（分）
-  nameOverride?: string
-  descriptionOverride?: string
-  imageUrlOverride?: string
   isAvailable: boolean
   channels?: StoreItemChannel[]
   catalogItem?: {
@@ -24,12 +21,11 @@ export interface StoreMenuConfig {
   }
 }
 
-/** 渠道可见性及价格配置 */
+/** 端可见性配置（pos/online/self_delivery/kiosk 等，只管可见性，不带价格） */
 export interface StoreItemChannel {
   id: string
   channelCode: string
   isVisible: boolean
-  priceOverride?: number
 }
 
 /** 门店完整菜单（品牌目录 + 门店覆盖 + 店铺专属商品，统一在 items 中） */
@@ -65,9 +61,6 @@ function normalizeConfig(raw: any): StoreMenuConfig {
     priceOverride: raw.price_override != null ? fromMinorUnit(raw.price_override) : undefined,
     storeId: raw.store_id,
     catalogItemId: raw.catalog_item_id,
-    nameOverride: raw.name_override,
-    descriptionOverride: raw.description_override,
-    imageUrlOverride: raw.image_url_override,
     isAvailable: raw.is_available,
     catalogItem: raw.catalog_item ? {
       id: raw.catalog_item.id,
@@ -79,7 +72,6 @@ function normalizeConfig(raw: any): StoreMenuConfig {
       id: ch.id,
       channelCode: ch.channel_code,
       isVisible: ch.is_visible,
-      priceOverride: ch.price_override != null ? fromMinorUnit(ch.price_override) : undefined,
     }))
   }
 }
@@ -117,20 +109,14 @@ class StoreMenuService {
     return (res.data.configs ?? []).map(normalizeConfig)
   }
 
-  /** 设置品牌目录商品的门店覆盖（可用性、价格、名称等） */
+  /** 设置品牌目录商品的门店覆盖（仅本店价格 + 是否售卖，产品规则：门店无权改名称/描述/图片） */
   async upsertStoreMenuConfig(catalogItemId: string, payload: {
     priceOverride?: number
-    nameOverride?: string
-    descriptionOverride?: string
-    imageUrlOverride?: string
     isAvailable?: boolean
   }): Promise<StoreMenuConfig> {
     const res = await httpService.put<any>(`${API_BASE}/store-menu/items/${catalogItemId}`, {
       catalogItemId,
       priceOverride: payload.priceOverride != null ? toMinorUnit(payload.priceOverride) : undefined,
-      nameOverride: payload.nameOverride,
-      descriptionOverride: payload.descriptionOverride,
-      imageUrlOverride: payload.imageUrlOverride,
       isAvailable: payload.isAvailable,
     })
     return normalizeConfig(res.data)
@@ -139,6 +125,19 @@ class StoreMenuService {
   /** 批量设置商品可用性（开关） */
   async batchSetAvailability(items: Array<{ catalogItemId: string; isAvailable: boolean }>): Promise<void> {
     await httpService.put(`${API_BASE}/store-menu/items/batch-availability`, { items })
+  }
+
+  /** 获取门店级自定义选项价格覆盖（返回 { modifierOptionId: 元 }，供改价弹窗回显） */
+  async getStoreModifierPrices(catalogItemId: string): Promise<Record<string, number>> {
+    const res = await httpService.get<{ success: boolean; data: Record<string, number> }>(
+      `${API_BASE}/store-menu/items/${catalogItemId}/modifier-prices`
+    )
+    const raw = res.data.data ?? {}
+    const result: Record<string, number> = {}
+    for (const [optionId, cents] of Object.entries(raw)) {
+      result[optionId] = fromMinorUnit(cents)
+    }
+    return result
   }
 
   /** 设置门店级自定义选项价格覆盖（price 传元，内部转分） */

@@ -6,6 +6,8 @@ import type { Recipe, ModifierCombination } from '@/services/recipe/types'
 import type { ItemModifierGroup } from '@/services/item-management'
 import { SectionCard, Table, Btn, Badge, Checkbox, AlertBox, ConfirmDialog, toast, type Column } from '@/components/ui-kit'
 import RecipeFormWithSteps from './RecipeFormWithSteps'
+import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 
 interface ModifierCombinationWithRecipe extends ModifierCombination {
   recipe?: Recipe
@@ -31,6 +33,8 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
   modifierGroups
 }) => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('recipesSupplies', role, permissions)
   const [loading, setLoading] = useState(false)
   const [, setRecipes] = useState<Recipe[]>([])
   const [combinations, setCombinations] = useState<ModifierCombinationWithRecipe[]>([])
@@ -416,7 +420,7 @@ const RecipeByModifierManager: React.FC<RecipeByModifierManagerProps> = ({
       {
         key: 'actions',
         title: t('pages.recipeGuide.actions'),
-        render: (record) => (
+        render: (record) => !canEdit ? null : (
           <div className="flex items-center gap-1">
             {record.hasRecipe ? (
               <>

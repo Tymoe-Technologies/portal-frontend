@@ -139,8 +139,15 @@ class HttpService {
       (error: AxiosError) => {
         if (error.response?.status === 401) {
           const url = error.config?.url || ''
-          // 登录/oauth 端点本身无 token，401 是「凭据错误」，不触发 clearAuth
-          if (url.includes('/identity/login') || url.includes('/oauth/token')) {
+          // 登录/oauth 端点、加盟邀请公开接受页、以及"修改密码"（需要验证当前密码）本身就带着
+          // 有效 token 在请求，401 是「凭据/当前密码错误」这种业务错误，不是 token 失效，不该
+          // 触发 clearAuth 强制登出——填错一次当前密码不该把人直接踢回登录页
+          if (
+            url.includes('/identity/login') ||
+            url.includes('/oauth/token') ||
+            url.includes('/franchise-invitations/') ||
+            url.includes('/change-password')
+          ) {
             return Promise.reject(error)
           }
 
@@ -528,7 +535,7 @@ export const httpDelete = httpService.delete.bind(httpService)
  * 解析 JWT payload
  * JWT 使用 Base64URL 编码（- 和 _），而 atob() 只支持标准 Base64（+ 和 /），需要先转换
  */
-function parseJWTPayload(token: string): Record<string, any> | null {
+export function parseJWTPayload(token: string): Record<string, any> | null {
   try {
     const parts = token.split('.')
     if (parts.length !== 3) return null

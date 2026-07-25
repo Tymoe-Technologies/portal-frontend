@@ -13,6 +13,8 @@ import {
 } from '../../services/item-management'
 import { formatPrice } from '../../utils/priceConverter'
 import { Table, Btn, Modal, Badge, Checkbox, AlertBox, TextInput, toast, type Column } from '@/components/ui-kit'
+import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 
 interface ItemTaxClassConfigProps {
   regionCode: string
@@ -31,6 +33,8 @@ interface ItemWithTaxInfo extends Item {
  */
 const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('taxSettings', role, permissions)
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<ItemWithTaxInfo[]>([])
   const [taxClasses, setTaxClasses] = useState<TaxClass[]>([])
@@ -179,9 +183,9 @@ const ItemTaxClassConfig: React.FC<ItemTaxClassConfigProps> = ({ regionCode }) =
       key: 'action',
       title: t('pages.taxManagement.itemTaxClass.colAction'),
       width: 120,
-      render: (record) => (
+      render: (record) => canEdit ? (
         <Btn variant="link" size="sm" icon={<Settings size={14} />} onClick={() => handleConfigClick(record)}>{t('pages.taxManagement.itemTaxClass.configureTaxClassBtn')}</Btn>
-      )
+      ) : null
     }
   ]
 

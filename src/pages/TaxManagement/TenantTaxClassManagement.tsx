@@ -12,6 +12,8 @@ import {
 import {
   Table, type Column, Btn, Modal, TextInput, Textarea, NumberInput, SelectInput, AlertBox, FormRow, toast,
 } from '@/components/ui-kit'
+import { useAuthContext } from '@/auth/AuthProvider'
+import { canEditModule } from '@/auth/permissions'
 
 interface TenantTaxClassManagementProps {
   regionCode: string
@@ -29,6 +31,8 @@ interface RateRow {
  */
 const TenantTaxClassManagement: React.FC<TenantTaxClassManagementProps> = ({ regionCode }) => {
   const { t } = useTranslation()
+  const { role, permissions } = useAuthContext()
+  const canEdit = canEditModule('taxSettings', role, permissions)
   const [loading, setLoading] = useState(false)
   const [taxClasses, setTaxClasses] = useState<TaxClass[]>([])
   const [availableTaxRates, setAvailableTaxRates] = useState<TaxRate[]>([])
@@ -121,9 +125,11 @@ const TenantTaxClassManagement: React.FC<TenantTaxClassManagementProps> = ({ reg
 
   return (
     <div>
-      <div className="mb-4">
-        <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateClick}>{t('pages.taxManagement.tenantTaxClass.createCustomTaxClassBtn')}</Btn>
-      </div>
+      {canEdit && (
+        <div className="mb-4">
+          <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreateClick}>{t('pages.taxManagement.tenantTaxClass.createCustomTaxClassBtn')}</Btn>
+        </div>
+      )}
 
       <div className="mb-4">
         <AlertBox type="info" title={t('pages.taxManagement.tenantTaxClass.explanationTitle')} description={t('pages.taxManagement.tenantTaxClass.explanationDesc')} />

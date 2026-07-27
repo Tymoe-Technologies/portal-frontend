@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { AvailabilityToggle } from '@/components/AvailabilityToggle'
 import { LOCALE_LABELS } from '../../services/brand-locale'
 import {
   itemManagementService,
@@ -9,6 +10,7 @@ import {
   type CreateModifierGroupPayload,
   type CreateModifierOptionPayload,
 } from '../../services/item-management'
+import type { StoreModifierAvailability } from '../../services/store-menu'
 import {
   SectionCard, Table, Badge, Btn, Modal, Spinner, EmptyState, ConfirmDialog,
   Switch, Field, TextInput, Textarea, toast, Tooltip, type Column,
@@ -19,6 +21,12 @@ interface ModifierGroupManagerProps {
   readOnly?: boolean
   isMain?: boolean
   additionalLocales?: string[]
+  /** 非主店：是否有 menuAvailability 权限，控制“临时下架”按钮是否可点（与 readOnly 的品牌编辑权限独立） */
+  canEditAvailability?: boolean
+  /** 非主店：各 modifier 选项的门店可用性覆盖，用于显示临时下架中的状态 */
+  modifierAvailability?: Map<string, StoreModifierAvailability>
+  /** 点击“临时下架”时回调（弹窗由父组件 MenuCenter 统一管理） */
+  onSnoozeOption?: (option: ModifierOption) => void
 }
 
 const inputCls = 'w-full text-sm border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-2 focus:outline-slate-900 disabled:bg-slate-50 disabled:text-slate-400'
@@ -33,7 +41,10 @@ const normalizeOptions = (options: any[] = []): ModifierOption[] =>
       : undefined,
   }))
 
-export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ readOnly = false, isMain = false, additionalLocales = [] }) => {
+export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({
+  readOnly = false, isMain = false, additionalLocales = [],
+  canEditAvailability = false, modifierAvailability, onSnoozeOption,
+}) => {
   const { t } = useTranslation()
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([])
   const [modifierGroupOptions, setModifierGroupOptions] = useState<Record<string, ModifierOption[]>>({})
@@ -439,17 +450,29 @@ export const ModifierGroupManager: React.FC<ModifierGroupManagerProps> = ({ read
                   },
                 },
                 {
-                  key: 'actions', title: t('pages.menuCenter.modifierGroupManager.columnActions'), width: 110,
-                  render: (o: ModifierOption) => readOnly ? null : (
-                    <div className="flex items-center gap-1">
-                      <Btn variant="ghost" size="sm" onClick={() => managingGroup && handleEditOption(managingGroup.id, o)}>{t('pages.menuCenter.modifierGroupManager.editAction')}</Btn>
-                      <Tooltip label={t('pages.menuCenter.modifierGroupManager.deleteAction')}>
-                        <button onClick={() => setDeleteOptionTarget(o)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </Tooltip>
-                    </div>
-                  ),
+                  key: 'actions', title: t('pages.menuCenter.modifierGroupManager.columnActions'), width: 150,
+                  render: (o: ModifierOption) => {
+                    const availCfg = modifierAvailability?.get(o.id)
+                    const snoozeBtn = canEditAvailability && onSnoozeOption ? (
+                      <AvailabilityToggle
+                        isAvailable={availCfg?.isAvailable ?? true}
+                        unavailableUntil={availCfg?.unavailableUntil}
+                        onClick={() => onSnoozeOption(o)}
+                      />
+                    ) : null
+                    if (readOnly) return snoozeBtn
+                    return (
+                      <div className="flex items-center gap-1">
+                        {snoozeBtn}
+                        <Btn variant="ghost" size="sm" onClick={() => managingGroup && handleEditOption(managingGroup.id, o)}>{t('pages.menuCenter.modifierGroupManager.editAction')}</Btn>
+                        <Tooltip label={t('pages.menuCenter.modifierGroupManager.deleteAction')}>
+                          <button onClick={() => setDeleteOptionTarget(o)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    )
+                  },
                 },
               ]}
             />

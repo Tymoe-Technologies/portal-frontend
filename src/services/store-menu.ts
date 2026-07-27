@@ -12,6 +12,8 @@ export interface StoreMenuConfig {
   catalogItemId: string | null
   priceOverride?: number         // 门店价格覆盖（分）
   isAvailable: boolean
+  /** 临时下架（86'd/snooze）到期时间；为空或已过期 = 视为可售，到期自动恢复 */
+  unavailableUntil?: string | null
   channels?: StoreItemChannel[]
   catalogItem?: {
     id: string
@@ -19,6 +21,15 @@ export interface StoreMenuConfig {
     basePrice: number
     imageUrl?: string
   }
+}
+
+/** 门店 modifier 选项的临时下架/可用性覆盖（无记录 = 默认可售） */
+export interface StoreModifierAvailability {
+  modifierOptionId: string
+  isAvailable: boolean
+  unavailableUntil?: string | null
+  /** 当前时刻的有效可用性（临时下架过期即为 true），后端计算好直接返回 */
+  effectivelyAvailable: boolean
 }
 
 /** 端可见性配置（pos/online/self_delivery/kiosk 等，只管可见性，不带价格） */
@@ -62,6 +73,7 @@ function normalizeConfig(raw: any): StoreMenuConfig {
     storeId: raw.store_id,
     catalogItemId: raw.catalog_item_id,
     isAvailable: raw.is_available,
+    unavailableUntil: raw.unavailable_until ?? null,
     catalogItem: raw.catalog_item ? {
       id: raw.catalog_item.id,
       name: raw.catalog_item.name,
@@ -109,22 +121,67 @@ class StoreMenuService {
     return (res.data.configs ?? []).map(normalizeConfig)
   }
 
-  /** 设置品牌目录商品的门店覆盖（仅本店价格 + 是否售卖，产品规则：门店无权改名称/描述/图片） */
+  /** 设置品牌目录商品的门店覆盖（本店价格 + 是否售卖 + 临时下架到期时间） */
   async upsertStoreMenuConfig(catalogItemId: string, payload: {
     priceOverride?: number
     isAvailable?: boolean
+    /** ISO 时间 = 临时下架至该时刻（过期自动恢复），null = 清除临时下架，缺省 = 不修改 */
+    unavailableUntil?: string | null
   }): Promise<StoreMenuConfig> {
     const res = await httpService.put<any>(`${API_BASE}/store-menu/items/${catalogItemId}`, {
       catalogItemId,
       priceOverride: payload.priceOverride != null ? toMinorUnit(payload.priceOverride) : undefined,
       isAvailable: payload.isAvailable,
+      unavailableUntil: payload.unavailableUntil,
     })
     return normalizeConfig(res.data)
   }
 
-  /** 批量设置商品可用性（开关） */
-  async batchSetAvailability(items: Array<{ catalogItemId: string; isAvailable: boolean }>): Promise<void> {
+  /** 批量设置商品可用性（开关 + 可选临时下架到期时间） */
+  async batchSetAvailability(items: Array<{
+    catalogItemId: string
+    isAvailable: boolean
+    unavailableUntil?: string | null
+  }>): Promise<void> {
     await httpService.put(`${API_BASE}/store-menu/items/batch-availability`, { items })
+  }
+
+  /** 获取本店所有 modifier 可用性覆盖（无记录 = 默认可售） */
+  async getStoreModifierAvailability(): Promise<StoreModifierAvailability[]> {
+    const res = await httpService.get<{ availability: any[] }>(`${API_BASE}/store-menu/modifier-availability`)
+    return (res.data.availability ?? []).map((a) => ({
+      modifierOptionId: a.modifierOptionId,
+      isAvailable: a.isAvailable,
+      unavailableUntil: a.unavailableUntil ?? null,
+      effectivelyAvailable: a.effectivelyAvailable,
+    }))
+  }
+
+  /** 设置单个 modifier 选项的本店可用性/临时下架 */
+  async upsertStoreModifierAvailability(modifierOptionId: string, payload: {
+    isAvailable?: boolean
+    unavailableUntil?: string | null
+  }): Promise<StoreModifierAvailability> {
+    const res = await httpService.put<any>(`${API_BASE}/store-menu/modifier-availability`, {
+      modifierOptionId,
+      isAvailable: payload.isAvailable,
+      unavailableUntil: payload.unavailableUntil,
+    })
+    return {
+      modifierOptionId: res.data.modifierOptionId,
+      isAvailable: res.data.isAvailable,
+      unavailableUntil: res.data.unavailableUntil ?? null,
+      effectivelyAvailable: res.data.effectivelyAvailable,
+    }
+  }
+
+  /** 批量设置 modifier 可用性 */
+  async batchSetModifierAvailability(options: Array<{
+    modifierOptionId: string
+    isAvailable: boolean
+    unavailableUntil?: string | null
+  }>): Promise<void> {
+    await httpService.post(`${API_BASE}/store-menu/modifier-availability/batch`, { options })
   }
 
   /** 获取门店级自定义选项价格覆盖（返回 { modifierOptionId: 元 }，供改价弹窗回显） */

@@ -559,12 +559,18 @@ export function TimeInput({ value, onChange, className }: {
 }) {
   const [open, setOpen] = React.useState(false)
   const rootRef = React.useRef<HTMLDivElement>(null)
+  const triggerRef = React.useRef<HTMLButtonElement>(null)
+  const popRef = React.useRef<HTMLDivElement>(null)
+  const menu = useFloatingMenu(open, triggerRef)
   const [hh, mm] = (value || '00:00').split(':')
 
   React.useEffect(() => {
     if (!open) return
     const onDocClick = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (rootRef.current?.contains(target)) return
+      if (popRef.current?.contains(target)) return
+      setOpen(false)
     }
     const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onDocClick)
@@ -578,6 +584,7 @@ export function TimeInput({ value, onChange, className }: {
   return (
     <div ref={rootRef} className={clsx('relative inline-block', className)}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         className={clsx(
@@ -590,8 +597,12 @@ export function TimeInput({ value, onChange, className }: {
         {hh}:{mm}
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1.5 flex rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+      {open && menu && createPortal(
+        <div
+          ref={popRef}
+          style={{ ...menu.style, pointerEvents: 'auto' }}
+          className="z-50 flex rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden"
+        >
           {[{ list: HOURS, active: hh, pick: (v: string) => onChange(`${v}:${mm}`) },
             { list: MINUTES, active: mm, pick: (v: string) => onChange(`${hh}:${v}`) }].map((col, ci) => (
             <div key={ci} className={clsx('w-14 h-40 overflow-y-auto py-1', ci === 0 && 'border-r border-slate-100')}>
@@ -610,11 +621,49 @@ export function TimeInput({ value, onChange, className }: {
               ))}
             </div>
           ))}
-        </div>
+        </div>,
+        menu.container,
       )}
     </div>
   )
 }
+// 弹层定位：DatePicker/TimeInput 的下拉面板过去是相对自身 absolute 定位的，
+// 放进 Modal（body 是 overflow-y-auto）里就会被父容器裁掉——一旦面板底部超出
+// Modal 可视区域，超出部分直接被剪掉，而不是把 Modal 撑高或露出滚动条。
+// 跟 SearchSelect（上面那个）用同一套办法：若处于 Radix Dialog 内，Portal 挂到
+// Dialog.Content 本身（它是 position:fixed，可以当定位基准，absolute 相对它算坐标）；
+// 不能直接挂 document.body——Dialog 自己也是 Portal 到 body 的兄弟节点，Radix 的
+// dismissable layer 会把挂在 body 下、不在 Dialog.Content 子树里的点击一律当成
+// "点击了 Dialog 外部"，直接把整个 Modal 关掉，导致日期怎么点都选不中。
+function useFloatingMenu(open: boolean, triggerRef: React.RefObject<HTMLElement | null>) {
+  const [menu, setMenu] = React.useState<{ container: HTMLElement; style: React.CSSProperties } | null>(null)
+  const update = React.useCallback(() => {
+    const trigger = triggerRef.current
+    const tr = trigger?.getBoundingClientRect()
+    if (!trigger || !tr) return
+    const dialog = trigger.closest('[role="dialog"]') as HTMLElement | null
+    if (dialog) {
+      const dr = dialog.getBoundingClientRect()
+      setMenu({ container: dialog, style: { position: 'absolute', top: tr.bottom - dr.top + 6, left: tr.left - dr.left } })
+    } else {
+      setMenu({ container: document.body, style: { position: 'fixed', top: tr.bottom + 6, left: tr.left } })
+    }
+  }, [triggerRef])
+
+  React.useLayoutEffect(() => {
+    if (!open) { setMenu(null); return }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [open, update])
+
+  return menu
+}
+
 function monthCells(year: number, month: number): (Date | null)[] {
   const startOffset = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -637,11 +686,17 @@ export function DatePicker({ value, onChange, min, max, placeholder, disabled, c
   const selected = parseDate(value)
   const [viewDate, setViewDate] = React.useState(() => selected ?? new Date())
   const rootRef = React.useRef<HTMLDivElement>(null)
+  const triggerRef = React.useRef<HTMLButtonElement>(null)
+  const popRef = React.useRef<HTMLDivElement>(null)
+  const menu = useFloatingMenu(open, triggerRef)
 
   React.useEffect(() => {
     if (!open) return
     const onDocClick = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (rootRef.current?.contains(target)) return
+      if (popRef.current?.contains(target)) return
+      setOpen(false)
     }
     const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onDocClick)
@@ -667,6 +722,7 @@ export function DatePicker({ value, onChange, min, max, placeholder, disabled, c
   return (
     <div ref={rootRef} className={clsx('relative inline-block', className)}>
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={() => setOpen(o => !o)}
@@ -681,8 +737,12 @@ export function DatePicker({ value, onChange, min, max, placeholder, disabled, c
         <span className={clsx(!value && 'text-slate-400')}>{value || placeholder || '选择日期'}</span>
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1.5 w-64 rounded-xl border border-slate-200 bg-white shadow-lg p-3">
+      {open && menu && createPortal(
+        <div
+          ref={popRef}
+          style={{ ...menu.style, pointerEvents: 'auto' }}
+          className="z-50 w-64 rounded-xl border border-slate-200 bg-white shadow-lg p-3"
+        >
           <div className="flex items-center justify-between mb-2">
             <button
               type="button"
@@ -727,7 +787,8 @@ export function DatePicker({ value, onChange, min, max, placeholder, disabled, c
               )
             })}
           </div>
-        </div>
+        </div>,
+        menu.container,
       )}
     </div>
   )

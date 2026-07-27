@@ -39,6 +39,7 @@ const ItemManagement: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [previewImageUrl, setPreviewImageUrl] = useState<string | undefined>(undefined)
   const [imageUploading, setImageUploading] = useState(false)
 
@@ -51,10 +52,12 @@ const ItemManagement: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadItems()
+      // 有搜索词时走搜索，否则拉列表；两条路径都会带上当前状态筛选
+      searchQuery.trim() ? handleSearch() : loadItems()
       loadCategories()
     }
-  }, [isAuthenticated, pagination.current, pagination.pageSize])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, pagination.current, pagination.pageSize, statusFilter])
 
   const loadItems = async () => {
     setLoading(true)
@@ -63,6 +66,8 @@ const ItemManagement: React.FC = () => {
         page: pagination.current,
         limit: pagination.pageSize,
         search: searchQuery || undefined,
+        // all=显示全部（含未激活），active/inactive=按状态过滤
+        ...(statusFilter === 'all' ? { includeInactive: true } : { isActive: statusFilter === 'active' }),
       })
       setItems(response.data)
       setPagination(prev => ({ ...prev, total: response.total }))
@@ -88,7 +93,10 @@ const ItemManagement: React.FC = () => {
     if (searchQuery.trim()) {
       setLoading(true)
       try {
-        const results = await itemManagementService.searchItems(searchQuery)
+        const results = await itemManagementService.searchItems(
+          searchQuery,
+          statusFilter === 'all' ? { includeInactive: true } : { isActive: statusFilter === 'active' },
+        )
         setItems(results)
         setPagination(prev => ({ ...prev, total: results.length }))
         toast.success(t('pages.itemManagement.foundMatchingCount', { count: results.length }))
@@ -269,6 +277,16 @@ const ItemManagement: React.FC = () => {
             <Btn variant="secondary" onClick={handleSearch}>{t('pages.itemManagement.searchBtn')}</Btn>
           </div>
           <div className="flex gap-2">
+            <SelectInput
+              className="w-32"
+              value={statusFilter}
+              onChange={(v) => { setStatusFilter(v as 'all' | 'active' | 'inactive'); setPagination(prev => ({ ...prev, current: 1 })) }}
+              options={[
+                { label: t('pages.itemManagement.statusAll'), value: 'all' },
+                { label: t('pages.itemManagement.statusActive'), value: 'active' },
+                { label: t('pages.itemManagement.statusInactive'), value: 'inactive' },
+              ]}
+            />
             <Btn variant="secondary" icon={<RotateCw className="w-3.5 h-3.5" />} loading={loading} onClick={loadItems}>{t('common.refresh')}</Btn>
             <Btn variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={handleCreate}>{t('pages.itemManagement.addItemBtn')}</Btn>
           </div>

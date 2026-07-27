@@ -645,6 +645,7 @@ export interface PaginationParams {
 export interface ItemListParams extends PaginationParams {
   categoryId?: string
   isActive?: boolean
+  includeInactive?: boolean // 管理端专用：true=返回全部（含未激活），否则按 isActive 过滤（默认只激活）
   search?: string
 }
 
@@ -769,11 +770,11 @@ class ItemManagementService {
     return response.data
   }
 
-  async searchItems(query: string): Promise<Item[]> {
+  async searchItems(query: string, params?: { includeInactive?: boolean; isActive?: boolean }): Promise<Item[]> {
     console.log('🔍 [ITEM SERVICE DEBUG] Searching items:', query)
 
     // /items/search/:query 已不存在，改为使用 search 查询参数
-    const result = await this.getItems({ search: query, limit: 100 })
+    const result = await this.getItems({ search: query, limit: 100, ...params })
 
     console.log('🔍 [ITEM SERVICE DEBUG] Search results:', result.data.length)
     return result.data

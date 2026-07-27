@@ -9,7 +9,11 @@ import { formatPrice, fromMinorUnit, toMinorUnit } from '../../utils/priceConver
 import { getCurrencySymbol } from '../../config/currencyConfig'
 import ModifierGroupManager from './ModifierGroupManager'
 import ItemChannelConfig from './components/ItemChannelConfig'
-import { storeMenuService, type StoreMenuConfig } from '../../services/store-menu'
+import { storeMenuService, type StoreMenuConfig, type StoreModifierAvailability } from '../../services/store-menu'
+import { getOrganization } from '../../services/auth'
+import { SnoozeModal } from '@/components/SnoozeModal'
+import { AvailabilityToggle } from '@/components/AvailabilityToggle'
+import type { BusinessHours } from '@/utils/businessHours'
 import {
   itemManagementService,
   type Item as APIItem,
@@ -374,6 +378,14 @@ const MenuCenter: React.FC = () => {
 
   // 非主店：品牌商品的门店配置（可用性 / 价格覆盖）
   const [storeConfigs, setStoreConfigs] = useState<Map<string, StoreMenuConfig>>(new Map())
+  // 非主店：modifier 选项的门店可用性覆盖（临时下架/86'd）
+  const [modifierAvailability, setModifierAvailability] = useState<Map<string, StoreModifierAvailability>>(new Map())
+  // 当前门店营业时间 + 时区（供“临时下架至今日营业结束”预设使用）；
+  // organizations 列表在 ACCOUNT 登录下可能缺失这两个字段，缺失时回退单独请求
+  const [storeBusinessHours, setStoreBusinessHours] = useState<BusinessHours | null>(null)
+  const [storeTimezone, setStoreTimezone] = useState<string | null>(null)
+  // 临时下架弹窗（商品或 modifier 选项通用）
+  const [snoozeTarget, setSnoozeTarget] = useState<{ type: 'item' | 'modifierOption'; id: string; name: string } | null>(null)
 
   // 自定义加载图标
 
@@ -519,7 +531,9 @@ const MenuCenter: React.FC = () => {
         loadModifierGroups()
         loadCombos()
         loadAllItems()
-        if (!isMain) loadStoreConfigs()
+        // 临时下架是门店级覆盖（store_menu_items/store_modifier_availability），主店对自己的 store_id
+        // 同样适用——不只是分店/加盟店才需要，所以这三个一律加载，不再按 isMain 区分
+        loadStoreConfigs(); loadModifierAvailability(); loadStoreBusinessHours()
         // 加载品牌语言配置以显示译名输入框
         getBrandLocale().then(cfg => {
           setDefaultLocale(cfg.default_locale)
@@ -574,6 +588,33 @@ const MenuCenter: React.FC = () => {
       setStoreConfigs(new Map(configs.map(c => [c.catalogItemId, c])))
     } catch {
       // 配置加载失败不影响主功能
+    }
+  }
+
+  const loadModifierAvailability = async () => {
+    try {
+      const list = await storeMenuService.getStoreModifierAvailability()
+      setModifierAvailability(new Map(list.map(a => [a.modifierOptionId, a])))
+    } catch {
+      // 配置加载失败不影响主功能
+    }
+  }
+
+  // 加载当前门店营业时间/时区（供“临时下架至今日营业结束”预设计算下一个营业开始时刻）；
+  // ACCOUNT 登录下 organizations 列表可能没带 businessHours/timezone，缺失时单独请求一次权威数据
+  const loadStoreBusinessHours = async () => {
+    if (!currentOrg) return
+    if (currentOrg.businessHours || currentOrg.timezone) {
+      setStoreBusinessHours((currentOrg.businessHours as BusinessHours) ?? null)
+      setStoreTimezone(currentOrg.timezone ?? null)
+      return
+    }
+    try {
+      const org = await getOrganization(currentOrg.id)
+      setStoreBusinessHours((org.businessHours as BusinessHours) ?? null)
+      setStoreTimezone(org.timezone ?? null)
+    } catch {
+      // 拿不到营业时间时，弹窗里“今日营业结束”预设会自动禁用，不影响其他预设
     }
   }
 
@@ -928,7 +969,8 @@ const MenuCenter: React.FC = () => {
       const [itemsResponse, combosResponse] = await Promise.all([
         itemManagementService.getItems({
           categoryId: requestedCategoryId,
-          limit: 100
+          limit: 100,
+          includeInactive: true // 管理端商品列表：显示全部（含未激活），靠状态徽章区分
         }),
         itemManagementService.getCombos({
           categoryId: requestedCategoryId,
@@ -1082,6 +1124,24 @@ const MenuCenter: React.FC = () => {
   }
 
   // 门店改价弹窗：打开时并行加载该商品的选项组（品牌默认价）+ 本店已保存的选项加价覆盖
+  /**
+   * 商品的门店级可用性控制：合并了原本分开的"上下架开关"和"临时下架"——
+   * 一个按钮显示当前状态（在售/临时下架中/已下架），点击统一打开 SnoozeModal，
+   * 由用户在弹窗里选择 1小时/3小时/今日营业结束/永久下架，或直接恢复。
+   */
+  const renderAvailabilityControl = (item: Item) => {
+    if (!canEditAvailability) return null
+    const cfg = storeConfigs.get(item.id)
+    return (
+      <AvailabilityToggle
+        isAvailable={cfg?.isAvailable ?? true}
+        unavailableUntil={cfg?.unavailableUntil}
+        catalogIsActive={item.isActive}
+        onClick={() => setSnoozeTarget({ type: 'item', id: item.id, name: item.name })}
+      />
+    )
+  }
+
   const openPriceOverride = async (item: Item) => {
     setPriceOverrideTarget(item)
     setPriceOverrideValue(storeConfigs.get(item.id)?.priceOverride ?? NaN)
@@ -1898,25 +1958,12 @@ const MenuCenter: React.FC = () => {
                             <>
                               {canEdit && <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditItem(item)}>{t('pages.menuCenter.edit')}</UI.Btn>}
                               {canEdit && <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>{t('pages.menuCenter.saleRange')}</UI.Btn>}
+                              {renderAvailabilityControl(item)}
                               {canEdit && <UI.Tooltip label={t('pages.menuCenter.delete')}><button onClick={() => setItemDeleteTarget(item)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button></UI.Tooltip>}
                             </>
                           ) : (
                             <>
-                              <UI.SwitchOrStatus
-                                checked={storeConfigs.get(item.id)?.isAvailable ?? true}
-                                editable={canEditAvailability}
-                                onLabel={t('pages.menuCenter.active')}
-                                offLabel={t('pages.menuCenter.inactive')}
-                                onCheckedChange={async (val) => {
-                                  await storeMenuService.upsertStoreMenuConfig(item.id, { isAvailable: val })
-                                  setStoreConfigs(prev => {
-                                    const next = new Map(prev)
-                                    const existing = prev.get(item.id)
-                                    next.set(item.id, { ...(existing ?? { catalogItemId: item.id, priceOverride: null }), isAvailable: val })
-                                    return next
-                                  })
-                                }}
-                              />
+                              {renderAvailabilityControl(item)}
                               {canEditPricing && <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openPriceOverride(item)}>{t('pages.menuCenter.changePriceBtn')}</UI.Btn>}
                               {canEdit && <UI.Btn variant="ghost" size="sm" icon={<GitBranch className="w-3.5 h-3.5" />} onClick={() => setChannelModal({ id: item.id, name: item.name })}>{t('pages.menuCenter.saleRange')}</UI.Btn>}
                             </>
@@ -2013,7 +2060,14 @@ const MenuCenter: React.FC = () => {
               </div>
           )}
           {productsTab === 'modifiers' && (
-            <ModifierGroupManager readOnly={!isMain || !canEdit} isMain={isMain} additionalLocales={additionalLocales} />
+            <ModifierGroupManager
+              readOnly={!isMain || !canEdit}
+              isMain={isMain}
+              additionalLocales={additionalLocales}
+              canEditAvailability={canEditAvailability}
+              modifierAvailability={modifierAvailability}
+              onSnoozeOption={(option) => setSnoozeTarget({ type: 'modifierOption', id: option.id, name: option.displayName })}
+            />
           )}
           </div>
         </>
@@ -2710,6 +2764,45 @@ const MenuCenter: React.FC = () => {
         danger
         onConfirm={() => { if (categoryDeleteTarget) { handleDeleteCategory(categoryDeleteTarget.id); setCategoryDeleteTarget(null) } }}
       />
+
+      {/* 门店级可用性控制弹窗：上下架开关 + 临时下架合并为一个入口，商品和 modifier 选项共用 */}
+      {snoozeTarget && (
+        <SnoozeModal
+          open={!!snoozeTarget}
+          onOpenChange={(v) => !v && setSnoozeTarget(null)}
+          targetName={snoozeTarget.name}
+          businessHours={storeBusinessHours}
+          timezone={storeTimezone}
+          currentIsAvailable={
+            snoozeTarget.type === 'item'
+              ? storeConfigs.get(snoozeTarget.id)?.isAvailable ?? true
+              : modifierAvailability.get(snoozeTarget.id)?.isAvailable ?? true
+          }
+          currentUnavailableUntil={
+            snoozeTarget.type === 'item'
+              ? storeConfigs.get(snoozeTarget.id)?.unavailableUntil
+              : modifierAvailability.get(snoozeTarget.id)?.unavailableUntil
+          }
+          onConfirm={async ({ isAvailable, unavailableUntil }) => {
+            if (snoozeTarget.type === 'item') {
+              // upsertStoreMenuConfig 返回的 updated 已经是完整、规范化的 StoreMenuConfig，直接替换即可
+              const updated = await storeMenuService.upsertStoreMenuConfig(snoozeTarget.id, { isAvailable, unavailableUntil })
+              setStoreConfigs(prev => {
+                const next = new Map(prev)
+                next.set(snoozeTarget.id, updated)
+                return next
+              })
+            } else {
+              const updated = await storeMenuService.upsertStoreModifierAvailability(snoozeTarget.id, { isAvailable, unavailableUntil })
+              setModifierAvailability(prev => {
+                const next = new Map(prev)
+                next.set(snoozeTarget.id, updated)
+                return next
+              })
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

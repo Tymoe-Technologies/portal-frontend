@@ -908,7 +908,9 @@ const MenuCenter: React.FC = () => {
         imageUrl: comboImageUrl,
         // 可选套餐才发送 itemGroups
         itemGroups: comboType === 'selection' ? comboItemGroups : undefined,
-        availabilityRules: comboAvailabilityRules?.enabled ? comboAvailabilityRules : undefined
+        // 始终发送当前状态（哪怕 enabled:false）：后端按字段是否存在于payload里判断要不要更新，
+        // 之前"关闭时发undefined"会导致这个key被JSON.stringify丢掉，编辑时关闭时段限制永远保存不了
+        availabilityRules: comboAvailabilityRules
       }
 
       if (editingCombo) {

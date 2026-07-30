@@ -61,6 +61,7 @@ const PricingManagement: React.FC = () => {
     item: PriceItem
     setter: (items: PriceItem[]) => void
     list: PriceItem[]
+    isCombo: boolean
   } | null>(null)
 
   const tenantId = localStorage.getItem('organization_id') || ''
@@ -349,7 +350,7 @@ const PricingManagement: React.FC = () => {
     }
   }
 
-  const renderPriceCards = (list: PriceItem[], setter: (items: PriceItem[]) => void) => {
+  const renderPriceCards = (list: PriceItem[], setter: (items: PriceItem[]) => void, isCombo: boolean = false) => {
     if (list.length === 0) {
       return <div className="py-10"><EmptyState title={t('common.noData')} /></div>
     }
@@ -376,7 +377,7 @@ const PricingManagement: React.FC = () => {
             <div
               key={item.id}
               onClick={() => {
-                setSelectedItem({ item, setter, list })
+                setSelectedItem({ item, setter, list, isCombo })
                 setPricingModalVisible(true)
               }}
               className={`cursor-pointer rounded-lg border p-3 transition-colors hover:border-slate-300 hover:shadow-sm ${
@@ -558,7 +559,7 @@ const PricingManagement: React.FC = () => {
                 />
                 <div className="mt-4">
                   {activeTab === 'items' && renderPriceCards(items, setItems)}
-                  {activeTab === 'combos' && renderPriceCards(combos, setCombos)}
+                  {activeTab === 'combos' && renderPriceCards(combos, setCombos, true)}
                 </div>
               </>
             )}
@@ -586,6 +587,7 @@ const PricingManagement: React.FC = () => {
           sourceCode={selectedChannel.sourceType || selectedChannel.sourceName}
           sourceName={selectedChannel.sourceName}
           isExternalChannel={!selectedChannel.isSystemChannel}
+          isCombo={selectedItem.isCombo}
           onClose={() => {
             setPricingModalVisible(false)
             setSelectedItem(null)

@@ -5,7 +5,7 @@ import { useAuthContext } from '../../auth/AuthProvider'
 import { canEditModule } from '../../auth/permissions'
 import { debugOrganizationIsolation } from '../../utils/debug-org'
 import { getJWTInfo, checkJWTOrganizationInfo } from '../../utils/jwt-utils'
-import { formatPrice, fromMinorUnit, toMinorUnit } from '../../utils/priceConverter'
+import { formatPrice, fromMinorUnit, toMinorUnit, applyComboDiscount, reverseComboDiscount } from '../../utils/priceConverter'
 import { getCurrencySymbol } from '../../config/currencyConfig'
 import ModifierGroupManager from './ModifierGroupManager'
 import ItemChannelConfig from './components/ItemChannelConfig'
@@ -828,12 +828,17 @@ const MenuCenter: React.FC = () => {
       }
     }
 
+    const savedDiscountType = (combo.discountType as 'fixed' | 'percentage') || 'fixed'
+    // combo.basePrice 存的是折后价（提交时已经扣过折扣），这里要反推回原价填进"原价"输入框，
+    // 否则会显示成折后价、这次编辑再套一次折扣就变成折上折
+    const reconstructedBasePrice = reverseComboDiscount(fromMinorUnit(combo.basePrice), discountValue ?? 0, savedDiscountType)
+
     setCbName(combo.name)
     setCbDescription(combo.description || '')
     setCbCategoryId(combo.categoryId)
-    setCbBasePrice(fromMinorUnit(combo.basePrice))
+    setCbBasePrice(reconstructedBasePrice)
     setCbDiscount(discountValue ?? 0)
-    setCbDiscountType((combo.discountType as 'fixed' | 'percentage') || 'fixed')
+    setCbDiscountType(savedDiscountType)
     setCbIsActive(combo.isActive)
     setCbComboItems(comboItems)
     setCbErr({})
@@ -896,11 +901,15 @@ const MenuCenter: React.FC = () => {
       }
 
       // 直接使用 camelCase，后端负责所有 snake_case 转换
+      // basePrice 提交折后价：后端只存储不重复计算折扣（discount/discountType 只作为"这个价格
+      // 是怎么打出来的"参考信息保留，不会被后端拿去再算一遍），避免之前"预览里打了折、实际存的
+      // 还是原价"导致顾客始终按原价收费的问题
+      const finalBasePrice = applyComboDiscount(Number(cbBasePrice) || 0, Number(cbDiscount) || 0, cbDiscountType)
       const payload: any = {
         name: cbName,
         description: cbDescription,
         categoryId: cbCategoryId,
-        basePrice: cbBasePrice,
+        basePrice: finalBasePrice,
         discount: cbDiscount,
         discountType: cbDiscountType,
         isActive: cbIsActive,
@@ -2575,8 +2584,8 @@ const MenuCenter: React.FC = () => {
               {(() => {
                 const basePrice = Number(cbBasePrice) || 0
                 const discount = Number(cbDiscount) || 0
-                const discountAmount = cbDiscountType === 'fixed' ? discount : basePrice * (discount / 100)
-                const finalPrice = Math.max(0, basePrice - discountAmount)
+                const discountAmount = discount > 0 ? basePrice - applyComboDiscount(basePrice, discount, cbDiscountType) : 0
+                const finalPrice = applyComboDiscount(basePrice, discount, cbDiscountType)
                 return (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between rounded-lg bg-blue-50 border border-blue-200 px-4 py-3">

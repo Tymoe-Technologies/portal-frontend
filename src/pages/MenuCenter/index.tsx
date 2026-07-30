@@ -514,6 +514,30 @@ const MenuCenter: React.FC = () => {
   const [cbVisibleStoreIds, setCbVisibleStoreIds] = useState<string[]>([])
   const [cbErr, setCbErr] = useState<{ name?: string; categoryId?: string; basePrice?: string }>({})
 
+  // 套餐可选商品：门店专属商品（scope=STORE_EXCLUSIVE）不是哪都能卖的，选进套餐前要跟套餐自己的
+  // 可见范围对上——套餐是 BRAND（全品牌）就不能带门店专属商品（其他店的顾客点了也买不到这个子项）；
+  // 套餐也是 STORE_EXCLUSIVE 时，商品的可见门店必须覆盖套餐选中的每一家门店，否则同理会出现买不到的门店
+  const comboEligibleItems = useMemo(() => {
+    return allItems.filter(item => {
+      if (item.scope !== 'STORE_EXCLUSIVE') return true
+      if (cbScope !== 'STORE_EXCLUSIVE' || cbVisibleStoreIds.length === 0) return false
+      const itemVisibleStoreIds = new Set((item.visible_stores || []).map(s => s.store_id))
+      return cbVisibleStoreIds.every(sid => itemVisibleStoreIds.has(sid))
+    })
+  }, [allItems, cbScope, cbVisibleStoreIds])
+
+  // 改了套餐的可见范围之后，之前选进去、现在已经不满足可见范围的商品也要跟着清掉，
+  // 不然它会从选择器里"消失"但其实还留在 cbComboItems 里，保存时又会被当成正常子项提交
+  useEffect(() => {
+    if (allItems.length === 0) return
+    const eligibleIds = new Set(comboEligibleItems.map(i => i.id))
+    setCbComboItems(prev => {
+      const filtered = prev.filter(ci => eligibleIds.has(ci.itemId))
+      return filtered.length === prev.length ? prev : filtered
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comboEligibleItems])
+
   // 初始化数据
   
   useEffect(() => {
@@ -2658,7 +2682,7 @@ const MenuCenter: React.FC = () => {
               <ComboItemsInput
                 value={cbComboItems}
                 onChange={setCbComboItems}
-                allItems={allItems}
+                allItems={comboEligibleItems}
                 onPriceChange={(totalPrice) => setCbBasePrice(fromMinorUnit(totalPrice))}
                 t={t}
               />
@@ -2712,7 +2736,7 @@ const MenuCenter: React.FC = () => {
                 onGroupsChange={setComboItemGroups}
                 comboItems={cbComboItems}
                 onComboItemsChange={setCbComboItems}
-                allItems={allItems}
+                allItems={comboEligibleItems}
               />
               <UI.Field label={t('pages.menuCenter.comboPriceLabel')} required error={cbErr.basePrice} hint={t('pages.menuCenter.comboPriceHint')}>
                 <div className="w-52">

@@ -50,7 +50,8 @@ export const ComboItemGroupsConfig: React.FC<ComboItemGroupsConfigProps> = ({
 
   const confirmDeleteGroup = (index: number) => {
     const groupId = groups[index].id
-    const updatedItems = comboItems.map(item => item.groupId === groupId ? { ...item, groupId: undefined } : item)
+    // 分组删了，组里的商品也没地方待了，一并从 comboItems 里删掉（理由同 removeFromGroup）
+    const updatedItems = comboItems.filter(item => item.groupId !== groupId)
     onComboItemsChange(updatedItems)
     onGroupsChange(groups.filter((_, i) => i !== index))
     toast.success(t('pages.menuCenter.comboItemGroupsConfig.groupDeleted'))
@@ -86,8 +87,9 @@ export const ComboItemGroupsConfig: React.FC<ComboItemGroupsConfigProps> = ({
           updatedItems.push({ itemId, quantity: 1, isRequired: false, sortOrder: updatedItems.length, groupId: modalGroupId!, additionalPrice: 0 })
         }
       } else if (existingItem) {
-        if (existingItem.groupId === modalGroupId) updatedItems.push({ ...existingItem, groupId: undefined })
-        else updatedItems.push(existingItem)
+        // 取消勾选：如果之前就在这个分组里，直接从 comboItems 里拿掉（理由同 removeFromGroup）；
+        // 不属于这个分组的商品（在别的分组里）保持不变
+        if (existingItem.groupId !== modalGroupId) updatedItems.push(existingItem)
       }
     })
 
@@ -123,8 +125,11 @@ export const ComboItemGroupsConfig: React.FC<ComboItemGroupsConfigProps> = ({
     setEditingItemId(null)
   }
 
+  // 每个子项只能属于一个分组，取消分组等于这个商品在套餐里就没地方待了——
+  // 直接从 comboItems 里整条删掉，而不是只清空 groupId（否则会变成一个既不在任何
+  // 分组里、又不是固定必选项的"孤儿"子项，UI 上再也看不到、但还会一直存在于套餐数据里）
   const removeFromGroup = (itemId: string, groupId: string) => {
-    const updatedItems = comboItems.map(ci => ci.itemId === itemId ? { ...ci, groupId: undefined } : ci)
+    const updatedItems = comboItems.filter(ci => ci.itemId !== itemId)
     onComboItemsChange(updatedItems)
     const currentGroup = groups.find(g => g.id === groupId)
     if (currentGroup && currentGroup.selectionType === 'multiple') {

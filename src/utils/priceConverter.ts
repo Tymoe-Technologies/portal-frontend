@@ -160,6 +160,40 @@ export function applyDiscount(baseAmount: number, discountPercent: number): numb
 }
 
 /**
+ * 套餐折扣：算出折后价（主单位）
+ * @param basePrice 套餐原价（主单位）
+ * @param discount 折扣值：discountType='fixed' 时是要减掉的金额，'percentage' 时是百分比数值（如 10 代表 10%）
+ * @param discountType 折扣类型
+ *
+ * @example
+ * applyComboDiscount(15, 2, 'fixed')        // 返回 13（立减2元）
+ * applyComboDiscount(15, 10, 'percentage')  // 返回 13.5（打9折）
+ */
+export function applyComboDiscount(basePrice: number, discount: number, discountType: 'fixed' | 'percentage'): number {
+  const discountAmount = discountType === 'percentage' ? basePrice * (discount / 100) : discount
+  return Math.max(0, basePrice - discountAmount)
+}
+
+/**
+ * 套餐折扣：从折后价反推原价（主单位）
+ *
+ * 用途：后端存的 basePrice 是已经应用过折扣的最终售价（前端算好折后价再提交，
+ * 后端只存储不重复计算），重新打开套餐编辑表单时，"原价"输入框需要从
+ * 折后价 + 折扣设置反推出原价，否则会显示成折后价、再套一次折扣算出折上折。
+ *
+ * @example
+ * reverseComboDiscount(13, 2, 'fixed')        // 返回 15
+ * reverseComboDiscount(13.5, 10, 'percentage') // 返回 15
+ */
+export function reverseComboDiscount(finalPrice: number, discount: number, discountType: 'fixed' | 'percentage'): number {
+  if (discountType === 'percentage') {
+    if (discount >= 100) return finalPrice // 100%折扣时原价无法从0反推，退化返回折后价，避免除0
+    return finalPrice / (1 - discount / 100)
+  }
+  return finalPrice + discount
+}
+
+/**
  * 验证金额的有效性（副单位）
  * @param amount 金额（副单位）
  * @returns 如果有效返回 true，否则 false
@@ -374,6 +408,8 @@ export default {
   calculateTaxedAmount,
   calculateTaxAmount,
   applyDiscount,
+  applyComboDiscount,
+  reverseComboDiscount,
 
   // 验证和比较
   isValidAmount,

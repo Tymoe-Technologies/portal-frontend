@@ -504,6 +504,8 @@ const MenuCenter: React.FC = () => {
   const [cbDiscountType, setCbDiscountType] = useState<'fixed' | 'percentage'>('fixed')
   const [cbIsActive, setCbIsActive] = useState(true)
   const [cbComboItems, setCbComboItems] = useState<CreateComboItemPayload[]>([])
+  const [cbScope, setCbScope] = useState<string>('BRAND')
+  const [cbVisibleStoreIds, setCbVisibleStoreIds] = useState<string[]>([])
   const [cbErr, setCbErr] = useState<{ name?: string; categoryId?: string; basePrice?: string }>({})
 
   // 初始化数据
@@ -790,6 +792,7 @@ const MenuCenter: React.FC = () => {
     setEditingCombo(null)
     setCbName(''); setCbDescription(''); setCbCategoryId(undefined); setCbBasePrice(0)
     setCbDiscount(0); setCbDiscountType('fixed'); setCbIsActive(true); setCbComboItems([]); setCbErr({})
+    setCbScope('BRAND'); setCbVisibleStoreIds([])
     setComboImageUrl(undefined)
     setComboImageFile(null)
     setComboItemGroups([])
@@ -841,6 +844,8 @@ const MenuCenter: React.FC = () => {
     setCbDiscountType(savedDiscountType)
     setCbIsActive(combo.isActive)
     setCbComboItems(comboItems)
+    setCbScope(combo.scope || 'BRAND')
+    setCbVisibleStoreIds(combo.visibleStoreIds || [])
     setCbErr({})
 
     // 加载增强功能字段
@@ -919,7 +924,9 @@ const MenuCenter: React.FC = () => {
         itemGroups: comboType === 'selection' ? comboItemGroups : undefined,
         // 始终发送当前状态（哪怕 enabled:false）：后端按字段是否存在于payload里判断要不要更新，
         // 之前"关闭时发undefined"会导致这个key被JSON.stringify丢掉，编辑时关闭时段限制永远保存不了
-        availabilityRules: comboAvailabilityRules
+        availabilityRules: comboAvailabilityRules,
+        scope: cbScope,
+        visibleStoreIds: cbScope === 'STORE_EXCLUSIVE' ? cbVisibleStoreIds : undefined
       }
 
       if (editingCombo) {
@@ -2005,6 +2012,7 @@ const MenuCenter: React.FC = () => {
                                 {combo.itemGroups && combo.itemGroups.length > 0 ? <UI.Badge variant="gold">{t('pages.menuCenter.selectableComboBadge')}</UI.Badge> : <UI.Badge variant="blue">{t('pages.menuCenter.fixedComboBadge')}</UI.Badge>}
                                 <span className="font-medium text-slate-800">{combo.name}</span>
                                 {!combo.isActive && <UI.Badge variant="red">{t('pages.menuCenter.deactivated')}</UI.Badge>}
+                                {combo.scope === 'STORE_EXCLUSIVE' && <UI.Badge variant="gold">{t('pages.menuCenter.storeExclusiveBadge')}</UI.Badge>}
                               </div>
                               {combo.description && <p className="text-sm text-slate-500 mt-1">{combo.description}</p>}
                               {(!combo.itemGroups || combo.itemGroups.length === 0) && combo.comboItems && combo.comboItems.length > 0 && (
@@ -2539,6 +2547,36 @@ const MenuCenter: React.FC = () => {
             <span className="text-sm font-medium text-slate-700">{t('pages.menuCenter.activeStatus')}</span>
             <UI.Switch checked={cbIsActive} onCheckedChange={setCbIsActive} />
           </div>
+
+          {isMain && (
+            <>
+              <UI.Field label={t('pages.menuCenter.itemScopeLabel')}>
+                <UI.SelectInput
+                  value={cbScope}
+                  onChange={(v) => setCbScope(String(v))}
+                  className="w-full"
+                  options={[
+                    { label: t('pages.menuCenter.brandItemOption'), value: 'BRAND' },
+                    { label: t('pages.menuCenter.storeExclusiveOption'), value: 'STORE_EXCLUSIVE' },
+                  ]}
+                />
+              </UI.Field>
+              {cbScope === 'STORE_EXCLUSIVE' && (
+                <UI.Field label={t('pages.menuCenter.visibleStoresLabel')}>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto sidebar-scroll rounded-lg border border-slate-200 p-2">
+                    {organizations.map((o: any) => (
+                      <UI.Checkbox
+                        key={o.id}
+                        checked={cbVisibleStoreIds.includes(o.id)}
+                        onCheckedChange={(c) => setCbVisibleStoreIds(prev => c ? [...prev, o.id] : prev.filter(id => id !== o.id))}
+                        label={`${o.orgName}${o.orgType === 'MAIN' ? t('pages.menuCenter.mainStoreSuffix') : o.orgType === 'FRANCHISE' ? t('pages.menuCenter.franchiseSuffix') : t('pages.menuCenter.branchSuffix')}`}
+                      />
+                    ))}
+                  </div>
+                </UI.Field>
+              )}
+            </>
+          )}
 
           {/* 套餐类型 */}
           <div>

@@ -507,6 +507,9 @@ export interface Combo {
   imageUrl?: string
   itemGroups?: ComboItemGroup[]
   availabilityRules?: ComboAvailabilityRules
+  // 作用域：BRAND=全品牌门店可见，STORE_EXCLUSIVE=仅 visibleStoreIds 登记的门店可见
+  scope?: 'BRAND' | 'STORE_EXCLUSIVE'
+  visibleStoreIds?: string[]
   // 关联
   category?: Category
   comboItems?: ComboItem[]
@@ -541,6 +544,8 @@ export interface CreateComboPayload {
   itemGroups?: ComboItemGroup[]
   availabilityRules?: ComboAvailabilityRules
   comboItems?: CreateComboItemPayload[]
+  scope?: 'BRAND' | 'STORE_EXCLUSIVE'
+  visibleStoreIds?: string[]
 }
 
 export interface UpdateComboPayload extends Partial<CreateComboPayload> {}

@@ -23,6 +23,9 @@ interface ItemPricingModalProps {
   sourceName: string
   /** 是否为外部渠道（非系统预置，如自取/堂食）。只有外部渠道才显示和编辑渠道 modifier 价格 */
   isExternalChannel?: boolean
+  /** 是否为套餐（而不是商品）。套餐没有自己的自定义选项——子项通过关联的商品动态继承，
+   * 不应该拿套餐ID去调"商品自定义选项"接口（会 404/报错），这种情况直接跳过整个自定义选项区块 */
+  isCombo?: boolean
   onClose: () => void
   onSave: (newPrice: number) => void
 }
@@ -80,6 +83,7 @@ const ItemPricingModal: React.FC<ItemPricingModalProps> = ({
   sourceCode,
   sourceName,
   isExternalChannel = false,
+  isCombo = false,
   onClose,
   onSave
 }) => {
@@ -114,6 +118,14 @@ const ItemPricingModal: React.FC<ItemPricingModalProps> = ({
 
   // 加载自定义选项价格
   const loadCustomOptionPrices = async () => {
+    // 套餐没有自己的自定义选项（子项通过关联的商品动态继承），itemId 在这里其实是 comboId，
+    // 拿去调商品的 modifier 接口没有意义，会报错——直接跳过整个区块
+    if (isCombo) {
+      setHasModifiers(false)
+      setCustomOptionPrices([])
+      return
+    }
+
     try {
       setLoading(true)
 

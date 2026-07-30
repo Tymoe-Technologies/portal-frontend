@@ -9,7 +9,7 @@ import { formatPrice, fromMinorUnit, toMinorUnit, applyComboDiscount, reverseCom
 import { getCurrencySymbol } from '../../config/currencyConfig'
 import ModifierGroupManager from './ModifierGroupManager'
 import ItemChannelConfig from './components/ItemChannelConfig'
-import { storeMenuService, type StoreMenuConfig, type StoreModifierAvailability } from '../../services/store-menu'
+import { storeMenuService, type StoreMenuConfig, type StoreModifierAvailability, type StoreComboConfig } from '../../services/store-menu'
 import { getOrganization } from '../../services/auth'
 import { SnoozeModal } from '@/components/SnoozeModal'
 import { AvailabilityToggle } from '@/components/AvailabilityToggle'
@@ -378,14 +378,16 @@ const MenuCenter: React.FC = () => {
 
   // 非主店：品牌商品的门店配置（可用性 / 价格覆盖）
   const [storeConfigs, setStoreConfigs] = useState<Map<string, StoreMenuConfig>>(new Map())
+  // 套餐的门店配置（可用性 / 价格覆盖），跟 storeConfigs 是同一层级的套餐版本
+  const [comboStoreConfigs, setComboStoreConfigs] = useState<Map<string, StoreComboConfig>>(new Map())
   // 非主店：modifier 选项的门店可用性覆盖（临时下架/86'd）
   const [modifierAvailability, setModifierAvailability] = useState<Map<string, StoreModifierAvailability>>(new Map())
   // 当前门店营业时间 + 时区（供“临时下架至今日营业结束”预设使用）；
   // organizations 列表在 ACCOUNT 登录下可能缺失这两个字段，缺失时回退单独请求
   const [storeBusinessHours, setStoreBusinessHours] = useState<BusinessHours | null>(null)
   const [storeTimezone, setStoreTimezone] = useState<string | null>(null)
-  // 临时下架弹窗（商品或 modifier 选项通用）
-  const [snoozeTarget, setSnoozeTarget] = useState<{ type: 'item' | 'modifierOption'; id: string; name: string } | null>(null)
+  // 临时下架弹窗（商品 / modifier 选项 / 套餐通用）
+  const [snoozeTarget, setSnoozeTarget] = useState<{ type: 'item' | 'modifierOption' | 'combo'; id: string; name: string } | null>(null)
 
   // 自定义加载图标
 
@@ -446,6 +448,10 @@ const MenuCenter: React.FC = () => {
   const [priceOverrideModifierValues, setPriceOverrideModifierValues] = useState<Record<string, string>>({})
   const [priceOverrideModifierLoading, setPriceOverrideModifierLoading] = useState(false)
   const [priceOverrideSaving, setPriceOverrideSaving] = useState(false)
+  // 套餐门店改价（跟商品的门店改价是同一个概念，套餐没有选项加价覆盖，弹窗更简单）
+  const [comboPriceOverrideTarget, setComboPriceOverrideTarget] = useState<Combo | null>(null)
+  const [comboPriceOverrideValue, setComboPriceOverrideValue] = useState<number>(NaN)
+  const [comboPriceOverrideSaving, setComboPriceOverrideSaving] = useState(false)
   // 套餐增强功能状态
   const [comboImageUrl, setComboImageUrl] = useState<string | undefined>()
   // 新建套餐时选择的待上传图片文件（保存套餐成功后自动上传）
@@ -534,8 +540,8 @@ const MenuCenter: React.FC = () => {
         loadCombos()
         loadAllItems()
         // 临时下架是门店级覆盖（store_menu_items/store_modifier_availability），主店对自己的 store_id
-        // 同样适用——不只是分店/加盟店才需要，所以这三个一律加载，不再按 isMain 区分
-        loadStoreConfigs(); loadModifierAvailability(); loadStoreBusinessHours()
+        // 同样适用——不只是分店/加盟店才需要，所以这几个一律加载，不再按 isMain 区分
+        loadStoreConfigs(); loadComboStoreConfigs(); loadModifierAvailability(); loadStoreBusinessHours()
         // 加载品牌语言配置以显示译名输入框
         getBrandLocale().then(cfg => {
           setDefaultLocale(cfg.default_locale)
@@ -588,6 +594,16 @@ const MenuCenter: React.FC = () => {
     try {
       const configs = await storeMenuService.getStoreMenuConfigs()
       setStoreConfigs(new Map(configs.map(c => [c.catalogItemId, c])))
+    } catch {
+      // 配置加载失败不影响主功能
+    }
+  }
+
+  // 加载套餐的门店配置（用于显示套餐的本店可用状态/改价），跟 loadStoreConfigs 是同一层级的套餐版本
+  const loadComboStoreConfigs = async () => {
+    try {
+      const configs = await storeMenuService.getStoreComboConfigs()
+      setComboStoreConfigs(new Map(configs.map(c => [c.catalogComboId as string, c])))
     } catch {
       // 配置加载失败不影响主功能
     }
@@ -1158,6 +1174,26 @@ const MenuCenter: React.FC = () => {
         onClick={() => setSnoozeTarget({ type: 'item', id: item.id, name: item.name })}
       />
     )
+  }
+
+  // 套餐版本的门店可用性控制，跟商品的 renderAvailabilityControl 是同一个概念
+  const renderComboAvailabilityControl = (combo: Combo) => {
+    if (!canEditAvailability) return null
+    const cfg = comboStoreConfigs.get(combo.id)
+    return (
+      <AvailabilityToggle
+        isAvailable={cfg?.isAvailable ?? true}
+        unavailableUntil={cfg?.unavailableUntil}
+        catalogIsActive={combo.isActive}
+        onClick={() => setSnoozeTarget({ type: 'combo', id: combo.id, name: combo.name })}
+      />
+    )
+  }
+
+  // 套餐门店改价：跟商品的 openPriceOverride 是同一个概念，套餐没有选项加价覆盖，不用额外加载 modifier
+  const openComboPriceOverride = (combo: Combo) => {
+    setComboPriceOverrideTarget(combo)
+    setComboPriceOverrideValue(comboStoreConfigs.get(combo.id)?.priceOverride ?? NaN)
   }
 
   const openPriceOverride = async (item: Item) => {
@@ -2059,12 +2095,20 @@ const MenuCenter: React.FC = () => {
                                 )}
                               </div>
                             </div>
-                            {canEdit && (
-                              <div className="flex items-center gap-1 shrink-0">
-                                <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditCombo(combo)}>{t('pages.menuCenter.edit')}</UI.Btn>
-                                <UI.Tooltip label={t('pages.menuCenter.delete')}><button onClick={() => setComboDeleteTarget(combo)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button></UI.Tooltip>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {isMain ? (
+                                <>
+                                  {canEdit && <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => handleEditCombo(combo)}>{t('pages.menuCenter.edit')}</UI.Btn>}
+                                  {renderComboAvailabilityControl(combo)}
+                                  {canEdit && <UI.Tooltip label={t('pages.menuCenter.delete')}><button onClick={() => setComboDeleteTarget(combo)} className="p-1.5 rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"><Trash2 className="w-4 h-4" /></button></UI.Tooltip>}
+                                </>
+                              ) : (
+                                <>
+                                  {renderComboAvailabilityControl(combo)}
+                                  {canEditPricing && <UI.Btn variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => openComboPriceOverride(combo)}>{t('pages.menuCenter.changePriceBtn')}</UI.Btn>}
+                                </>
+                              )}
+                            </div>
                           </div>
                         )
                       })}
@@ -2778,6 +2822,46 @@ const MenuCenter: React.FC = () => {
         </div>
       </UI.Modal>
 
+      {/* 套餐门店改价弹窗——套餐没有选项加价覆盖，比商品的改价弹窗简单，只有一个价格输入框 */}
+      <UI.Modal
+        open={!!comboPriceOverrideTarget}
+        onOpenChange={(v) => !v && setComboPriceOverrideTarget(null)}
+        title={comboPriceOverrideTarget ? t('pages.menuCenter.changePriceModalTitle', { name: comboPriceOverrideTarget.name }) : t('pages.menuCenter.changePriceModalTitleDefault')}
+        footer={
+          <>
+            <UI.Btn variant="secondary" onClick={() => setComboPriceOverrideTarget(null)}>{t('pages.menuCenter.cancel')}</UI.Btn>
+            <UI.Btn variant="primary" loading={comboPriceOverrideSaving} onClick={async () => {
+              if (!comboPriceOverrideTarget) return
+              setComboPriceOverrideSaving(true)
+              try {
+                const updated = await storeMenuService.upsertStoreComboOverride(comboPriceOverrideTarget.id, {
+                  priceOverride: Number.isNaN(comboPriceOverrideValue) ? undefined : comboPriceOverrideValue,
+                  isAvailable: comboStoreConfigs.get(comboPriceOverrideTarget.id)?.isAvailable ?? true,
+                })
+                setComboStoreConfigs(prev => {
+                  const next = new Map(prev)
+                  next.set(comboPriceOverrideTarget.id, updated)
+                  return next
+                })
+                UI.toast.success(t('pages.menuCenter.priceUpdatedSuccess'))
+                setComboPriceOverrideTarget(null)
+              } finally {
+                setComboPriceOverrideSaving(false)
+              }
+            }}>{t('common.save')}</UI.Btn>
+          </>
+        }
+      >
+        <UI.Field
+          label={t('pages.menuCenter.storePriceInYuanLabel')}
+          hint={comboPriceOverrideTarget ? (
+            <span>{t('pages.menuCenter.brandPriceLabelPrefix')}<span className="font-semibold text-slate-600">{currencySymbol}{formatPrice(comboPriceOverrideTarget.basePrice)}</span>{t('pages.menuCenter.restoreDefaultHint')}</span>
+          ) : undefined}
+        >
+          <UI.NumberInput value={comboPriceOverrideValue} onChange={setComboPriceOverrideValue} min={0} prefix={currencySymbol} className="w-full font-semibold" />
+        </UI.Field>
+      </UI.Modal>
+
       {channelModal && (
         <ItemChannelConfig
           open={!!channelModal}
@@ -2814,7 +2898,7 @@ const MenuCenter: React.FC = () => {
         onConfirm={() => { if (categoryDeleteTarget) { handleDeleteCategory(categoryDeleteTarget.id); setCategoryDeleteTarget(null) } }}
       />
 
-      {/* 门店级可用性控制弹窗：上下架开关 + 临时下架合并为一个入口，商品和 modifier 选项共用 */}
+      {/* 门店级可用性控制弹窗：上下架开关 + 临时下架合并为一个入口，商品/modifier选项/套餐共用 */}
       {snoozeTarget && (
         <SnoozeModal
           open={!!snoozeTarget}
@@ -2825,18 +2909,29 @@ const MenuCenter: React.FC = () => {
           currentIsAvailable={
             snoozeTarget.type === 'item'
               ? storeConfigs.get(snoozeTarget.id)?.isAvailable ?? true
-              : modifierAvailability.get(snoozeTarget.id)?.isAvailable ?? true
+              : snoozeTarget.type === 'combo'
+                ? comboStoreConfigs.get(snoozeTarget.id)?.isAvailable ?? true
+                : modifierAvailability.get(snoozeTarget.id)?.isAvailable ?? true
           }
           currentUnavailableUntil={
             snoozeTarget.type === 'item'
               ? storeConfigs.get(snoozeTarget.id)?.unavailableUntil
-              : modifierAvailability.get(snoozeTarget.id)?.unavailableUntil
+              : snoozeTarget.type === 'combo'
+                ? comboStoreConfigs.get(snoozeTarget.id)?.unavailableUntil
+                : modifierAvailability.get(snoozeTarget.id)?.unavailableUntil
           }
           onConfirm={async ({ isAvailable, unavailableUntil }) => {
             if (snoozeTarget.type === 'item') {
               // upsertStoreMenuConfig 返回的 updated 已经是完整、规范化的 StoreMenuConfig，直接替换即可
               const updated = await storeMenuService.upsertStoreMenuConfig(snoozeTarget.id, { isAvailable, unavailableUntil })
               setStoreConfigs(prev => {
+                const next = new Map(prev)
+                next.set(snoozeTarget.id, updated)
+                return next
+              })
+            } else if (snoozeTarget.type === 'combo') {
+              const updated = await storeMenuService.upsertStoreComboOverride(snoozeTarget.id, { isAvailable, unavailableUntil })
+              setComboStoreConfigs(prev => {
                 const next = new Map(prev)
                 next.set(snoozeTarget.id, updated)
                 return next

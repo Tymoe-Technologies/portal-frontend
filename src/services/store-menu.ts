@@ -39,6 +39,24 @@ export interface StoreItemChannel {
   isVisible: boolean
 }
 
+/** 套餐在该门店的覆盖配置（overlay）——门店只能改本店价格 + 是否售卖，名称等一律取品牌目录 */
+export interface StoreComboConfig {
+  id: string
+  storeId: string
+  catalogComboId: string | null
+  priceOverride?: number         // 门店价格覆盖（分）
+  isAvailable: boolean
+  /** 临时下架（86'd/snooze）到期时间；为空或已过期 = 视为可售，到期自动恢复 */
+  unavailableUntil?: string | null
+  channels?: StoreItemChannel[]
+  catalogCombo?: {
+    id: string
+    name: string
+    basePrice: number
+    imageUrl?: string
+  }
+}
+
 /** 门店完整菜单（品牌目录 + 门店覆盖 + 店铺专属商品，统一在 items 中） */
 export interface StoreMenu {
   items: StoreMenuItem[]
@@ -79,6 +97,28 @@ function normalizeConfig(raw: any): StoreMenuConfig {
       name: raw.catalog_item.name,
       basePrice: fromMinorUnit(raw.catalog_item.base_price),
       imageUrl: raw.catalog_item.image_url,
+    } : undefined,
+    channels: raw.channels?.map((ch: any) => ({
+      id: ch.id,
+      channelCode: ch.channel_code,
+      isVisible: ch.is_visible,
+    }))
+  }
+}
+
+function normalizeComboConfig(raw: any): StoreComboConfig {
+  return {
+    ...raw,
+    priceOverride: raw.price_override != null ? fromMinorUnit(raw.price_override) : undefined,
+    storeId: raw.store_id,
+    catalogComboId: raw.catalog_combo_id,
+    isAvailable: raw.is_available,
+    unavailableUntil: raw.unavailable_until ?? null,
+    catalogCombo: raw.catalog_combo ? {
+      id: raw.catalog_combo.id,
+      name: raw.catalog_combo.name,
+      basePrice: fromMinorUnit(raw.catalog_combo.base_price),
+      imageUrl: raw.catalog_combo.image_url,
     } : undefined,
     channels: raw.channels?.map((ch: any) => ({
       id: ch.id,
@@ -228,6 +268,34 @@ class StoreMenuService {
         priceOverride: ch.priceOverride != null ? toMinorUnit(ch.priceOverride) : undefined,
       }))
     })
+  }
+
+  // ─── 套餐门店覆盖 ──────────────────────────────────────────────
+
+  /** 获取门店所有套餐覆盖配置（管理视图） */
+  async getStoreComboConfigs(): Promise<StoreComboConfig[]> {
+    const res = await httpService.get<any>(`${API_BASE}/store-menu/combos/configs`)
+    return (res.data.configs ?? []).map(normalizeComboConfig)
+  }
+
+  /** 设置套餐的门店覆盖（本店价格 + 是否售卖 + 临时下架到期时间） */
+  async upsertStoreComboOverride(catalogComboId: string, payload: {
+    priceOverride?: number
+    isAvailable?: boolean
+    /** ISO 时间 = 临时下架至该时刻（过期自动恢复），null = 清除临时下架，缺省 = 不修改 */
+    unavailableUntil?: string | null
+  }): Promise<StoreComboConfig> {
+    const res = await httpService.put<any>(`${API_BASE}/combos/${catalogComboId}/store-override`, {
+      priceOverride: payload.priceOverride != null ? toMinorUnit(payload.priceOverride) : undefined,
+      isAvailable: payload.isAvailable,
+      unavailableUntil: payload.unavailableUntil,
+    })
+    return normalizeComboConfig(res.data)
+  }
+
+  /** 设置套餐在某个端的可见性（目前只支持单条设置，无批量接口） */
+  async setComboChannel(catalogComboId: string, channelCode: string, isVisible: boolean): Promise<void> {
+    await httpService.put(`${API_BASE}/combos/${catalogComboId}/store-channel`, { channelCode, isVisible })
   }
 }
 

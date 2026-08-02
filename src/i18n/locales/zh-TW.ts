@@ -1341,6 +1341,7 @@ const zhTW = {
         localeSettings: '語言設置',
         customOptionGroupsTab: '自定義選項組',
         customOptionConfigTab: '自定義選項配置',
+        itemTagsTab: '標籤',
         // 可售範圍
         saleRange: '可售範圍',
 

@@ -1313,6 +1313,7 @@ const fr = {
         localeSettings: 'Paramètres de langue',
         customOptionGroupsTab: "Groupes d'options personnalisées",
         customOptionConfigTab: 'Configuration des options personnalisées',
+        itemTagsTab: 'Étiquettes',
         saleRange: 'Portée de vente',
         loadCategoriesFailed: 'Échec du chargement des catégories',
         loadAttributeTypesFailed: "Échec du chargement des types d'attributs",

@@ -1350,6 +1350,7 @@ const en = {
         localeSettings: 'Locale Settings',
         customOptionGroupsTab: 'Custom Option Groups',
         customOptionConfigTab: 'Custom Option Config',
+        itemTagsTab: 'Tags',
         // Sale range
         saleRange: 'Sale Range',
 

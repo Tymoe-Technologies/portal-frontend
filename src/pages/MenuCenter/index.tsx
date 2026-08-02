@@ -41,12 +41,14 @@ import {
   type CreateComboItemPayload,
   type ComboItemGroup,
   type ComboAvailabilityRules,
-  type ItemModifierGroup
+  type ItemModifierGroup,
+  type TagGroup
 } from '../../services/item-management'
 import { ComboItemGroupsConfig } from './components/ComboItemGroupsConfig'
 import { ComboAvailabilityConfig } from './components/ComboAvailabilityConfig'
 import { ComboImageUpload } from './components/ComboImageUpload'
 import ItemModifierConfigInputComponent, { type ItemModifierConfig as ItemModifierConfigType } from './components/ItemModifierConfigInput'
+import ItemTagsConfigInput from './components/ItemTagsConfigInput'
 import SupplyTab from '../SupplyManagement'
 import BrandLocaleSettings from '../BrandLocaleSettings'
 import { getBrandLocale, LOCALE_LABELS } from '@/services/brand-locale'
@@ -407,6 +409,7 @@ const MenuCenter: React.FC = () => {
   const [itemAddons, setItemAddons] = useState<Record<string, ItemAddon[]>>({})
   // 自定义选项组（统一的 ModifierGroup 管理）
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([])
+  const [tagGroups, setTagGroups] = useState<TagGroup[]>([])
   const [modifierGroupOptions, setModifierGroupOptions] = useState<Record<string, ModifierOption[]>>({})
   const [combos, setCombos] = useState<Combo[]>([])
   const [categoryCombos, setCategoryCombos] = useState<Combo[]>([]) // 当前分类下的套餐
@@ -417,7 +420,8 @@ const MenuCenter: React.FC = () => {
     updating: false,
     attributes: false,
     modifiers: false,
-    combos: false
+    combos: false,
+    tags: false
   })
 
   // 模态框状态
@@ -478,7 +482,7 @@ const MenuCenter: React.FC = () => {
   const [topTab, setTopTab] = useState<'products' | 'combos' | 'supplies' | 'locale-settings'>('products')
   const [productsTab, setProductsTab] = useState<'items' | 'modifiers'>('items')
   // 商品表单（受控，去 antd Form；提交时组装 values 传给 handleItemSubmit）
-  const [itemModalTab, setItemModalTab] = useState<'basic' | 'modifiers'>('basic')
+  const [itemModalTab, setItemModalTab] = useState<'basic' | 'modifiers' | 'tags'>('basic')
   const [itName, setItName] = useState('')
   const [itNameI18n, setItNameI18n] = useState<Record<string, string>>({})
   const [itDescription, setItDescription] = useState('')
@@ -491,6 +495,7 @@ const MenuCenter: React.FC = () => {
   const [itVisibleStoreIds, setItVisibleStoreIds] = useState<string[]>([])
   const [itCustomFields, setItCustomFields] = useState<any>(undefined)
   const [itModifiers, setItModifiers] = useState<ItemModifierConfig[]>([])
+  const [itTagIds, setItTagIds] = useState<string[]>([])
   // 属性类型表单（受控，含动态选项列表）
   const [atName, setAtName] = useState('')
   const [atDisplayName, setAtDisplayName] = useState('')
@@ -561,6 +566,7 @@ const MenuCenter: React.FC = () => {
         loadAttributeTypes()
         loadAddons()
         loadModifierGroups()
+        loadTagGroups()
         loadCombos()
         loadAllItems()
         // 临时下架是门店级覆盖（store_menu_items/store_modifier_availability），主店对自己的 store_id
@@ -601,6 +607,7 @@ const MenuCenter: React.FC = () => {
       loadAttributeTypes()
       loadAddons()
       loadModifierGroups()
+      loadTagGroups()
       loadCombos()
       loadAllItems()
     }
@@ -770,6 +777,19 @@ const MenuCenter: React.FC = () => {
   }
 
   // 加载自定义选项组（ModifierGroups）
+  const loadTagGroups = async () => {
+    setLoading(prev => ({ ...prev, tags: true }))
+    try {
+      const groups = await itemManagementService.getTags()
+      setTagGroups(groups)
+    } catch (error) {
+      console.error('Failed to load tag groups:', error)
+      setTagGroups([])
+    } finally {
+      setLoading(prev => ({ ...prev, tags: false }))
+    }
+  }
+
   const loadModifierGroups = async () => {
     setLoading(prev => ({ ...prev, modifiers: true }))
     try {
@@ -1175,7 +1195,7 @@ const MenuCenter: React.FC = () => {
     setEditingItem(null)
     setItName(''); setItNameI18n({}); setItDescription(''); setItDescriptionI18n({})
     setItCategoryId(selectedCategoryId || undefined); setItBasePrice(NaN); setItCost(NaN)
-    setItIsActive(true); setItScope('BRAND'); setItVisibleStoreIds([]); setItCustomFields(undefined); setItModifiers([])
+    setItIsActive(true); setItScope('BRAND'); setItVisibleStoreIds([]); setItCustomFields(undefined); setItModifiers([]); setItTagIds([])
     setItemModalTab('basic')
     setPreviewImageUrl(undefined)
     setItemModalVisible(true)
@@ -1313,7 +1333,17 @@ const MenuCenter: React.FC = () => {
       console.error('Failed to load item modifiers:', error)
       // 不阻塞编辑流程，只是记录错误
     }
-    
+
+    // 加载商品当前的标签（分店/加盟店也能查看，只是不能改）
+    let itemTagIds: string[] = []
+    try {
+      const itemTags = await itemManagementService.getItemTags(item.id)
+      itemTagIds = itemTags.map(tag => tag.id)
+    } catch (error) {
+      console.error('Failed to load item tags:', error)
+      // 不阻塞编辑流程，只是记录错误
+    }
+
     // 将价格从分转换为元（后端存储的是分，表单显示的是元）
     setItName(item.name)
     setItNameI18n((item as any).name_i18n ?? {})
@@ -1325,6 +1355,7 @@ const MenuCenter: React.FC = () => {
     setItIsActive(item.isActive)
     setItCustomFields(item.customFields)
     setItModifiers(itemModifiersData)
+    setItTagIds(itemTagIds)
     setItScope(item.scope || 'BRAND')
     setItVisibleStoreIds(item.visible_stores?.map(vs => vs.store_id) || [])
     setItemModalTab('basic')
@@ -1523,6 +1554,11 @@ const MenuCenter: React.FC = () => {
           }
         }
         
+        // 标签只有主店能改（后端也会校验），分店/加盟店不发这个请求
+        if (isMain && Array.isArray(values.tagIds)) {
+          await itemManagementService.setItemTags(editingItem.id, values.tagIds)
+        }
+
         UI.toast.success(t('pages.menuCenter.itemUpdateSuccess'))
       } else {
         // 主店创建商品（BRAND 或 STORE_EXCLUSIVE）
@@ -1587,6 +1623,11 @@ const MenuCenter: React.FC = () => {
           }
         }
         
+        // 标签只有主店能改；新建商品当然只有主店能建，这里不用再判断 isMain
+        if (Array.isArray(values.tagIds) && values.tagIds.length > 0 && createdItem.id) {
+          await itemManagementService.setItemTags(createdItem.id, values.tagIds)
+        }
+
         UI.toast.success(t('pages.menuCenter.itemCreateSuccess'))
       }
       
@@ -1882,6 +1923,7 @@ const MenuCenter: React.FC = () => {
       loadCategories()
       loadAttributeTypes()
       loadModifierGroups() // 加载自定义选项组
+      loadTagGroups() // 加载标签字典
     }
   }, [isAuthenticated])
 
@@ -2319,6 +2361,7 @@ const MenuCenter: React.FC = () => {
               isActive: itIsActive,
               customFields: itCustomFields,
               itemModifiers: itModifiers,
+              tagIds: itTagIds,
               scope: itScope,
               visibleStoreIds: itVisibleStoreIds,
             })}>
@@ -2329,10 +2372,11 @@ const MenuCenter: React.FC = () => {
       >
         <UI.Tabs
           value={itemModalTab}
-          onChange={(k) => setItemModalTab(k as 'basic' | 'modifiers')}
+          onChange={(k) => setItemModalTab(k as 'basic' | 'modifiers' | 'tags')}
           items={[
             { key: 'basic', label: t('pages.menuCenter.basicInfo') },
             { key: 'modifiers', label: t('pages.menuCenter.customOptionConfigTab') },
+            { key: 'tags', label: t('pages.menuCenter.itemTagsTab') },
           ]}
         />
 
@@ -2432,13 +2476,31 @@ const MenuCenter: React.FC = () => {
                 )}
               </div>
             </div>
-          ) : (
+          ) : itemModalTab === 'modifiers' ? (
             <ItemModifierConfigInput
               value={itModifiers}
               onChange={setItModifiers}
               modifierGroups={modifierGroups}
               t={t}
             />
+          ) : (
+            <div>
+              {!isMain && (
+                <div className="mb-3">
+                  <UI.Badge variant="blue">
+                    {t('organization.inheritedFromBadge', {
+                      name: organizations.find((o: any) => o.id === currentOrg?.parentOrgId)?.orgName ?? t('pages.menuCenter.mainStoreSuffix'),
+                    })}
+                  </UI.Badge>
+                </div>
+              )}
+              <ItemTagsConfigInput
+                tagGroups={tagGroups}
+                value={itTagIds}
+                onChange={setItTagIds}
+                readOnly={!isMain}
+              />
+            </div>
           )}
         </div>
       </UI.Modal>

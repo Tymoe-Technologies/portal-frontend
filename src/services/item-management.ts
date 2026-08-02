@@ -83,6 +83,29 @@ export interface ItemAddon {
  * - 'custom': 自定义类型 - 其他自定义分类
  */
 /**
+ * 餐饮标签（系统预置字典，不提供新增/编辑分组或标签的 API，仅供商品勾选）
+ */
+export interface TagItem {
+  id: string
+  code: string
+  name: string
+  nameI18n?: Record<string, string>
+  color?: string
+  icon?: string
+  displayOrder: number
+}
+
+export interface TagGroup {
+  id: string
+  code: string
+  name: string
+  nameI18n?: Record<string, string>
+  isExclusive: boolean
+  displayOrder: number
+  tags: TagItem[]
+}
+
+/**
  * 自定义选项组
  * 选择规则（最小/最大选择数、是否必选）在商品关联时定义，见 ItemModifierGroup
  */
@@ -2035,6 +2058,50 @@ class ItemManagementService {
    */
   async removeModifierGroupFromItem(itemId: string, groupId: string): Promise<void> {
     await httpService.delete(`${API_BASE}/items/${itemId}/modifier-groups/${groupId}`)
+  }
+
+  // ─── 餐饮标签（系统预置字典，仅提供商品打标签接口）────────────────
+
+  private mapTag = (tag: any): TagItem => ({
+    id: tag.id,
+    code: tag.code,
+    name: tag.name,
+    nameI18n: tag.name_i18n ?? undefined,
+    color: tag.color ?? undefined,
+    icon: tag.icon ?? undefined,
+    displayOrder: tag.display_order,
+  })
+
+  /**
+   * 获取标签字典（按分组返回）
+   */
+  async getTags(): Promise<TagGroup[]> {
+    const response = await httpService.get<{ groups: any[] }>(`${API_BASE}/tags`)
+    return (response.data.groups || []).map((group: any) => ({
+      id: group.id,
+      code: group.code,
+      name: group.name,
+      nameI18n: group.name_i18n ?? undefined,
+      isExclusive: group.is_exclusive,
+      displayOrder: group.display_order,
+      tags: (group.tags || []).map(this.mapTag),
+    }))
+  }
+
+  /**
+   * 获取商品当前的标签
+   */
+  async getItemTags(itemId: string): Promise<TagItem[]> {
+    const response = await httpService.get<{ tags: any[] }>(`${API_BASE}/items/${itemId}/tags`)
+    return (response.data.tags || []).map(this.mapTag)
+  }
+
+  /**
+   * 设置商品的标签（整体替换，仅品牌总部 MAIN 可调用）
+   */
+  async setItemTags(itemId: string, tagIds: string[]): Promise<TagItem[]> {
+    const response = await httpService.put<{ tags: any[] }>(`${API_BASE}/items/${itemId}/tags`, { tagIds })
+    return (response.data.tags || []).map(this.mapTag)
   }
 
   /**

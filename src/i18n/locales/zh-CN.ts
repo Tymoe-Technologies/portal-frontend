@@ -1378,6 +1378,7 @@ const zhCN = {
         localeSettings: '语言设置',
         customOptionGroupsTab: '自定义选项组',
         customOptionConfigTab: '自定义选项配置',
+        itemTagsTab: '标签',
         // 可售范围
         saleRange: '可售范围',
 

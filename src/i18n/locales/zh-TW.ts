@@ -1342,6 +1342,9 @@ const zhTW = {
         customOptionGroupsTab: '自定義選項組',
         customOptionConfigTab: '自定義選項配置',
         itemTagsTab: '標籤',
+        tagSingleSelectHint: '（單選）',
+        featureTagPreviewTitle: '顧客端效果預覽',
+        featureTagPreviewEmpty: '未選擇特色標籤，商品卡片右上角不會顯示角標',
         // 可售範圍
         saleRange: '可售範圍',
 

@@ -1351,6 +1351,9 @@ const en = {
         customOptionGroupsTab: 'Custom Option Groups',
         customOptionConfigTab: 'Custom Option Config',
         itemTagsTab: 'Tags',
+        tagSingleSelectHint: '(single select)',
+        featureTagPreviewTitle: 'Customer app preview',
+        featureTagPreviewEmpty: 'No feature tag selected — no badge will appear on the product card',
         // Sale range
         saleRange: 'Sale Range',
 

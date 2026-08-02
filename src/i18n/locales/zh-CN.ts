@@ -1379,6 +1379,9 @@ const zhCN = {
         customOptionGroupsTab: '自定义选项组',
         customOptionConfigTab: '自定义选项配置',
         itemTagsTab: '标签',
+        tagSingleSelectHint: '（单选）',
+        featureTagPreviewTitle: '顾客端效果预览',
+        featureTagPreviewEmpty: '未选择特色标签，商品卡片右上角不会显示角标',
         // 可售范围
         saleRange: '可售范围',
 

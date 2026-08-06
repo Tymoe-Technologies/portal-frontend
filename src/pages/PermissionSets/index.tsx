@@ -23,7 +23,7 @@ const MODULE_GROUPS: { key: string; modules: string[] }[] = [
   { key: 'storeOperations', modules: ['devices', 'printSettings', 'menuAvailability'] },
   { key: 'menuAndCatalog', modules: ['menuCatalog', 'recipesSupplies', 'multiMenu', 'menuPricingCosts', 'taxSettings'] },
   { key: 'ordersSales', modules: ['orders', 'salesChannels', 'reports'] },
-  { key: 'financial', modules: ['payments', 'giftCards', 'refunds', 'financialReports'] },
+  { key: 'financial', modules: ['payments', 'cashDrawer', 'giftCards', 'refunds', 'financialReports'] },
   { key: 'bookings', modules: ['bookings', 'bookingSetup'] },
   { key: 'loyaltyMembers', modules: ['members', 'loyaltyRewards', 'loyaltyProgram'] },
   { key: 'delivery', modules: ['uberOperations', 'uberIntegration'] },
